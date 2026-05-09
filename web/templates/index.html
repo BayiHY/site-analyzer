@@ -460,6 +460,7 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 </head>
 <body>
     <header class="header">
@@ -1140,20 +1141,66 @@
 
         // ========== 分享功能 ==========
 
-        // 截长图
+        // 截长图（带底部二维码）
         async function shareScreenshot() {
             const el = document.getElementById('result');
             if (!el) return;
             showToast('正在生成截图...', null);
             try {
+                const url = document.getElementById('urlInput').value.trim();
+                const shareUrl = window.location.origin + window.location.pathname + '?url=' + encodeURIComponent(url);
+
+                // 生成二维码 canvas
+                const qrCanvas = document.createElement('canvas');
+                qrCanvas.width = 88;
+                qrCanvas.height = 88;
+                try {
+                    const qr = qrcode(0, 'M');
+                    qr.addData(shareUrl);
+                    qr.make();
+                    const svgStr = qr.createSvgTag(4, 0);
+                    const svgBlob = new Blob([svgStr], {type: 'image/svg+xml;charset=utf-8'});
+                    const svgUrl = URL.createObjectURL(svgBlob);
+                    const img = new Image();
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                        img.src = svgUrl;
+                    });
+                    const ctx = qrCanvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, 88, 88);
+                    ctx.drawImage(img, 4, 4, 80, 80);
+                    URL.revokeObjectURL(svgUrl);
+                } catch(e) {}
+
+                // 直接在结果区域末尾追加二维码 footer
+                const footer = document.createElement('div');
+                footer.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-top:1px solid rgba(255,255,255,0.1);';
+                footer.innerHTML = '<div style="color:#888;font-size:13px;line-height:1.8;">' +
+                    '<div style="color:#fff;font-size:15px;font-weight:600;">站长工具 · SEO分析报告</div>' +
+                    '<div>扫码查看完整报告</div>' +
+                    '<div style="font-size:11px;color:#555;">' + shareUrl + '</div></div>';
+                const qrWrap = document.createElement('div');
+                qrWrap.style.cssText = 'background:#fff;padding:8px;border-radius:8px;';
+                qrWrap.appendChild(qrCanvas);
+                footer.appendChild(qrWrap);
+                el.appendChild(footer);
+
+                // 直接截图
                 const canvas = await html2canvas(el, {
                     backgroundColor: '#0a0a1a',
                     scale: 2,
                     useCORS: true,
                     logging: false
                 });
+
+                // 移除临时 footer
+                el.removeChild(footer);
+
                 const link = document.createElement('a');
-                link.download = 'site-analysis-' + (document.getElementById('urlInput').value.replace(/[^a-zA-Z0-9]/g, '_')) + '.png';
+                const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0,14);
+                link.download = 'site-analysis-' + (url.replace(/[^a-zA-Z0-9]/g, '_')) + '-' + ts + '.png';
                 link.href = canvas.toDataURL('image/png');
                 link.click();
                 showToast('截图已保存', null);
