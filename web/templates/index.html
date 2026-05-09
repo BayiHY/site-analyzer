@@ -510,9 +510,9 @@
                     // 2. 通过DoH查询多个公共DNS
                     const domain = 'github.com';
                     const dohServers = [
+                        {name: '阿里 DNS', url: `https://dns.alidns.com/resolve?name=${domain}&type=A`},
                         {name: 'Google DNS', url: `https://dns.google/resolve?name=${domain}&type=A`},
                         {name: 'Cloudflare', url: `https://cloudflare-dns.com/dns-query?name=${domain}&type=A`, header: 'application/dns-json'},
-                        {name: '阿里 DNS', url: `https://dns.alidns.com/resolve?name=${domain}&type=A`},
                     ];
                     
                     let html = '<div style="font-weight:600;margin-bottom:8px;">📡 DNS解析检测</div>';
