@@ -467,20 +467,56 @@
 
     <footer class="footer">
         <div style="margin-bottom:8px;">
-            站长工具 H5 版 · &copy; <a href="https://gitcode.com/BayiHY/site-analyzer" target="_blank" style="color: inherit;">巴依浩爷(BayiHY)</a> · Powered by Python
+            站长工具 · © <a href="https://gitcode.com/BayiHY" target="_blank" style="color: inherit;">巴依浩爷(BayiHY)</a> · 免费开源 · 隐私优先 · 数据不存储
         </div>
-        <div style="font-size:11px;color:#888;margin-bottom:8px;">
-            📧 <a href="mailto:95440881@qq.com" style="color:#888;margin:0 4px;">95440881@qq.com</a> · 
-            💬 微信: BayiHY · 
-            🎵 抖音: BayiHY · 
-            🐧 QQ: 95440881
+        <div style="font-size:11px;color:#888;margin-bottom:6px;">
+            📧 95440881@qq.com · 💬 微信: BayiHY · 🎵 抖音: BayiHY · 🐧 QQ: 95440881
         </div>
         <div style="font-size:11px;color:#666;">
-            <a href="https://gitcode.com/BayiHY/site-analyzer" target="_blank" style="color:#888;margin:0 8px;">⭐ 开源项目</a> · 
-            <a href="https://gitcode.com/BayiHY" target="_blank" style="color:#888;margin:0 8px;">👨‍💻 作者主页</a> · 
-            <a href="https://gitcode.com/BayiHY/site-analyzer/stargazers" target="_blank" style="color:#888;margin:0 8px;">🌟 给个Star</a>
+            <a href="https://gitcode.com/BayiHY/site-analyzer" target="_blank" style="color:#888;margin:0 8px;">⭐ 给个Star</a> · 
+            <a href="#privacy" onclick="showPrivacy();return false;" style="color:#888;margin:0 8px;">🔒 隐私政策</a> · 
+            <a href="#disclaimer" onclick="showDisclaimer();return false;" style="color:#888;margin:0 8px;">📋 免责条款</a> · 
+            <a href="https://gitcode.com/BayiHY/site-analyzer" target="_blank" style="color:#888;margin:0 8px;">📖 使用文档</a>
         </div>
     </footer>
+
+    <!-- 隐私政策弹窗 -->
+    <div id="privacyModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;border:1px solid #333;">
+            <h3 style="color:#00d2ff;margin-bottom:15px;">🔒 隐私政策</h3>
+            <div style="color:#ccc;font-size:14px;line-height:1.8;">
+                <p><strong>数据收集：</strong>本工具不收集、不存储任何用户输入的URL或分析结果。</p>
+                <p style="margin-top:10px;"><strong>分析过程：</strong>所有分析在服务器端实时完成，分析完成后数据即丢弃。</p>
+                <p style="margin-top:10px;"><strong>Cookies：</strong>本工具不使用Cookies或任何跟踪技术。</p>
+                <p style="margin-top:10px;"><strong>第三方服务：</strong>分析过程中会访问用户输入的URL，但不会向第三方泄露用户信息。</p>
+                <p style="margin-top:10px;"><strong>开源透明：</strong>本工具完全开源，代码可审计。</p>
+            </div>
+            <button onclick="document.getElementById('privacyModal').style.display='none'" style="margin-top:20px;padding:8px 24px;background:#00d2ff;color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600;">关闭</button>
+        </div>
+    </div>
+
+    <!-- 免责条款弹窗 -->
+    <div id="disclaimerModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;border:1px solid #333;">
+            <h3 style="color:#ff9800;margin-bottom:15px;">📋 免责条款</h3>
+            <div style="color:#ccc;font-size:14px;line-height:1.8;">
+                <p><strong>仅供参考：</strong>本工具提供的分析结果仅供参考，不构成专业的SEO或技术建议。</p>
+                <p style="margin-top:10px;"><strong>准确性：</strong>虽然我们努力提供准确的分析，但无法保证100%准确，结果可能因网站变化而有所不同。</p>
+                <p style="margin-top:10px;"><strong>责任限制：</strong>使用本工具产生的任何直接或间接损失，我们不承担责任。</p>
+                <p style="margin-top:10px;"><strong>专业建议：</strong>如需正式的SEO优化或网站安全评估，请咨询专业人士。</p>
+            </div>
+            <button onclick="document.getElementById('disclaimerModal').style.display='none'" style="margin-top:20px;padding:8px 24px;background:#ff9800;color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:600;">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        function showPrivacy() {
+            document.getElementById('privacyModal').style.display = 'flex';
+        }
+        function showDisclaimer() {
+            document.getElementById('disclaimerModal').style.display = 'flex';
+        }
+    </script>
 
     <script>
         const urlInput = document.getElementById('urlInput');
