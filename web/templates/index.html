@@ -565,8 +565,17 @@
             result.classList.remove('active');
             errorMsg.classList.remove('active');
             
+            // 根据域名调整倒计时
+            const domain = url.toLowerCase();
+            let initialSeconds = 5;  // 默认5秒
+            if (domain.includes('github')) {
+                initialSeconds = 30;  // GitHub较慢，给30秒
+            } else if (domain.includes('google') || domain.includes('youtube')) {
+                initialSeconds = 15;  // 国外站15秒
+            }
+            
             // 开始倒计时
-            let seconds = 15;
+            let seconds = initialSeconds;
             document.getElementById('countdown').textContent = seconds;
             countdownInterval = setInterval(() => {
                 seconds--;
