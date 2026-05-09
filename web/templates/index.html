@@ -508,104 +508,39 @@
                 let dnsSeconds = 0;
                 dnsTimer = setInterval(() => {
                     dnsSeconds++;
-                    dnsResult.innerHTML = `🔍 正在检测DNS解析... <span style="color:#ff9800;">${dnsSeconds}s</span>`;
+                    dnsResult.innerHTML = `🔍 正在检测服务器能否访问GitHub... <span style="color:#ff9800;">${dnsSeconds}s</span>`;
                 }, 1000);
-                dnsResult.innerHTML = '🔍 正在检测DNS解析...';
+                dnsResult.innerHTML = '🔍 正在检测服务器能否访问GitHub...';
                 
                 try {
-                    // 1. 服务器端解析
-                    const serverResp = await fetch('api/dns', {
+                    // 直接测试服务器能否访问GitHub
+                    const testResp = await fetch('api/test-ip', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({domain: 'github.com'})
+                        body: JSON.stringify({ip: '140.82.121.4', host: 'github.com'})
                     });
-                    const serverData = await serverResp.json();
-                    
-                    // 2. 通过DoH查询多个公共DNS
-                    const domain = 'github.com';
-                    const dohServers = [
-                        {name: '阿里 DNS', url: `https://dns.alidns.com/resolve?name=${domain}&type=A`},
-                        {name: 'Google DNS', url: `https://dns.google/resolve?name=${domain}&type=A`},
-                        {name: 'Cloudflare', url: `https://cloudflare-dns.com/dns-query?name=${domain}&type=A`, header: 'application/dns-json'},
-                    ];
-                    
-                    let html = '<div style="font-weight:600;margin-bottom:8px;">📡 DNS解析检测</div>';
-                    
-                    // 显示服务器解析结果
-                    if (serverData.resolved) {
-                        html += `<div style="color:#4fc3f7;">🖥️ 服务器: ${serverData.ipv4.join(', ') || '无IPv4'}</div>`;
-                    }
-                    
-                    // 查询各个DoH服务
-                    const dohResults = await Promise.allSettled(
-                        dohServers.map(async (server) => {
-                            const headers = {'Accept': 'application/dns-json'};
-                            if (server.header) headers['Accept'] = server.header;
-                            const resp = await fetch(server.url, {headers});
-                            const data = await resp.json();
-                            const ips = data.Answer ? data.Answer.filter(a => a.type === 1).map(a => a.data) : [];
-                            return {name: server.name, ips, status: data.Status};
-                        })
-                    );
-                    
-                    // 整理结果
-                    let allIps = new Set();
-                    let results = [];
-                    dohResults.forEach((result, i) => {
-                        if (result.status === 'fulfilled' && result.value.ips.length > 0) {
-                            results.push(result.value);
-                            result.value.ips.forEach(ip => allIps.add(ip));
-                        } else {
-                            results.push({name: dohServers[i].name, ips: [], status: -1});
-                        }
-                    });
-                    
-                    // 显示各DNS结果
-                    results.forEach(r => {
-                        const icon = r.ips.length > 0 ? '✅' : '❌';
-                        const color = r.ips.length > 0 ? '#00e676' : '#ff5252';
-                        html += `<div style="color:${color};">${icon} ${r.name}: ${r.ips.join(', ') || '解析失败'}</div>`;
-                    });
-                    
-                    // 总结
-                    const uniqueIps = [...allIps];
-                    if (uniqueIps.length > 0) {
-                        html += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">`;
-                        html += `<span style="color:#00e676;">✅ 可用IP: ${uniqueIps.join(', ')}</span>`;
-                        html += `</div>`;
-                        
-                        // 测试服务器能否访问这些IP
-                        html += `<div style="margin-top:8px;font-size:11px;color:#888;">🖥️ 服务器测试: `;
-                        for (const ip of uniqueIps.slice(0, 3)) {  // 只测试前3个
-                            try {
-                                const testResp = await fetch('api/test-ip', {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({ip: ip, host: 'github.com'})
-                                });
-                                const testData = await testResp.json();
-                                if (testData.accessible) {
-                                    html += `<span style="color:#00e676;">${ip} ✓</span> `;
-                                } else {
-                                    html += `<span style="color:#ff5252;">${ip} ✗</span> `;
-                                }
-                            } catch {
-                                html += `<span style="color:#ff9800;">${ip} ?</span> `;
-                            }
-                        }
-                        html += `</div>`;
-                    } else {
-                        html += `<div style="margin-top:8px;color:#ff5252;">❌ 所有DNS均解析失败，可能需要配置hosts或使用代理</div>`;
-                    }
+                    const testData = await testResp.json();
                     
                     // 清除计时器并显示结果
                     clearInterval(dnsTimer);
-                    html += `<div style="margin-top:8px;font-size:11px;color:#888;">⏱️ DNS解析耗时: ${dnsSeconds}秒</div>`;
+                    
+                    let html = '<div style="font-weight:600;margin-bottom:8px;">📡 GitHub 访问检测</div>';
+                    
+                    if (testData.accessible) {
+                        html += `<div style="color:#00e676;">✅ 服务器可以访问 GitHub</div>`;
+                        html += `<div style="color:#4fc3f7;font-size:11px;margin-top:4px;">IP: 140.82.121.4 | 响应: ${testData.response_time}秒</div>`;
+                        html += `<div style="margin-top:8px;font-size:11px;color:#888;">⏱️ 检测耗时: ${dnsSeconds}秒</div>`;
+                    } else {
+                        html += `<div style="color:#ff5252;">❌ 服务器无法访问 GitHub</div>`;
+                        html += `<div style="color:#888;font-size:11px;margin-top:4px;">建议配置 hosts 或使用代理</div>`;
+                        html += `<div style="margin-top:8px;font-size:11px;color:#888;">⏱️ 检测耗时: ${dnsSeconds}秒</div>`;
+                    }
+                    
                     dnsResult.innerHTML = html;
                     
                 } catch (e) {
                     clearInterval(dnsTimer);
-                    dnsResult.innerHTML = '⚠️ DNS检测失败: ' + e.message + ` (${dnsSeconds}秒)`;
+                    dnsResult.innerHTML = '⚠️ 检测失败: ' + e.message + ` (${dnsSeconds}秒)`;
                     dnsResult.style.color = '#ff9800';
                 }
             }
