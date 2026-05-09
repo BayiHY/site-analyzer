@@ -494,6 +494,12 @@
                 dnsTimer = null;
             }
             
+            // 清除之前的网站分析倒计时
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+            
             // 如果不是GitHub，隐藏DNS结果框
             if (!url.includes('github')) {
                 dnsResult.style.display = 'none';
