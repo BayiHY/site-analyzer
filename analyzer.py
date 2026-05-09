@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 class SiteAnalyzer:
     """网站分析器"""
     
-    def __init__(self, url, timeout=10):
+    def __init__(self, url, timeout=30):
         self.url = self._normalize_url(url)
         self.timeout = timeout
         self.parsed_url = urlparse(self.url)
