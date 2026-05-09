@@ -506,11 +506,11 @@
                 
                 // DNS解析计时动画
                 let dnsSeconds = 0;
+                dnsResult.innerHTML = `🔍 正在检测服务器能否访问GitHub... <span style="color:#ff9800;">0s</span>`;
                 dnsTimer = setInterval(() => {
                     dnsSeconds++;
                     dnsResult.innerHTML = `🔍 正在检测服务器能否访问GitHub... <span style="color:#ff9800;">${dnsSeconds}s</span>`;
                 }, 1000);
-                dnsResult.innerHTML = '🔍 正在检测服务器能否访问GitHub...';
                 
                 try {
                     // 直接测试服务器能否访问GitHub
