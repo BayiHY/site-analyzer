@@ -481,11 +481,18 @@
         });
 
         // 快捷分析
+        let dnsTimer = null;  // 提升到函数外部，便于清除
         async function quickAnalyze(url) {
             urlInput.value = url;
             
             // 获取DNS结果框
             const dnsResult = document.getElementById('dnsResult');
+            
+            // 清除之前的DNS计时器
+            if (dnsTimer) {
+                clearInterval(dnsTimer);
+                dnsTimer = null;
+            }
             
             // 如果不是GitHub，隐藏DNS结果框
             if (!url.includes('github')) {
@@ -499,7 +506,7 @@
                 
                 // DNS解析计时动画
                 let dnsSeconds = 0;
-                let dnsTimer = setInterval(() => {
+                dnsTimer = setInterval(() => {
                     dnsSeconds++;
                     dnsResult.innerHTML = `🔍 正在检测DNS解析... <span style="color:#ff9800;">${dnsSeconds}s</span>`;
                 }, 1000);
