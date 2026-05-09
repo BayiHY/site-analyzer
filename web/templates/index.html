@@ -558,6 +558,12 @@
                 return;
             }
 
+            // 清除之前的倒计时
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+
             // UI 状态
             analyzeBtn.disabled = true;
             analyzeBtn.textContent = '分析中...';
