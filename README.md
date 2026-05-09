@@ -1,78 +1,78 @@
-# 🌐 多功能站长工具箱
+# 🌐 站长工具 - AI时代的SEO分析平台
 
-一站式网站分析工具，支持SEO分析、AI信任度检测、SSL证书检查、移动端适配检测等，提供Web版在线使用和命令行两种方式。
+> **首个支持AI可信度分析的开源SEO工具** — 帮助网站优化在ChatGPT、Perplexity、Google SGE等AI搜索引擎中的表现
 
-## ✨ 功能
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.7+](https://img.shields.io/badge/Python-3.7+-green.svg)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-Web%20Framework-orange.svg)](https://flask.palletsprojects.com/)
 
-### 核心检测
-- **SEO分析**：标题、描述、关键词、H标签、图片alt属性、Canonical标签
-- **AI信任度检测**：JSON-LD、Open Graph、Twitter Card、语义化HTML、发布日期等
-- **SSL证书检查**：证书有效期、颁发机构、剩余天数
-- **移动端适配**：响应式设计、移动子域名、JS跳转检测
-- **性能检测**：Gzip压缩、缓存控制、Keep-Alive、ETag
+## 🎯 为什么选择这个工具？
 
-### AI信任度指标
-帮助网站提升在AI搜索引擎（ChatGPT、Perplexity、Google SGE等）中的引用率：
-- JSON-LD结构化数据
-- Open Graph标签完整性
-- Canonical权威版本声明
-- 作者/发布者信息
-- 发布/修改日期
-- 语义化HTML标签
+在AI搜索引擎时代，传统SEO已不够用。**AI信任度（AI Trust）** 决定了你的内容是否会被ChatGPT、Perplexity等AI引用。
+
+这个工具是**首个**将AI信任度检测与传统SEO分析结合的开源项目：
+
+| 功能 | 本工具 | 传统SEO工具 |
+|------|--------|-------------|
+| AI信任度检测 | ✅ | ❌ |
+| JSON-LD分析 | ✅ | 部分 |
+| Open Graph检测 | ✅ | 部分 |
+| 语义化HTML分析 | ✅ | ❌ |
+| AI引用优化建议 | ✅ | ❌ |
+| 免费开源 | ✅ | ❌ |
+
+## ✨ 核心功能
+
+### 🔍 SEO分析
+- 页面标题与Meta描述
+- 关键词分析
 - H标签层级结构
-- 图片alt属性完整性
-- 页面语言声明
+- 图片alt属性检测
+- Canonical标签
+- Robots.txt分析
+- 内部/外部链接统计
 
-## 🚀 使用方式
+### 🤖 AI信任度检测（AI Trust Score）
+专为AI搜索引擎优化设计：
+- **JSON-LD结构化数据** — AI优先解析，用于生成摘要和知识图谱
+- **Open Graph标签** — 社交媒体和AI引用时的首选数据源
+- **Canonical权威声明** — 帮助AI识别内容的权威版本
+- **作者/发布者信息** — E-E-A-T信号，影响AI引用决策
+- **发布日期** — AI优先引用有明确时间的内容
+- **语义化HTML** — 帮助AI理解页面结构
+- **H标签层级** — 内容组织清晰度
+- **图片alt属性** — 多模态AI的内容理解
+- **页面语言声明** — 多语言AI的匹配依据
 
-### Web版（在线）
+### 🔒 SSL证书检测
+- 证书有效期
+- 颁发机构
+- 剩余天数预警
 
-访问 http://111.228.14.153/tools 即可在线使用，支持：
-- 单个网站分析
-- 批量网站分析（最多10个）
-- 快捷测试常用网站
-- 完整的优化建议
+### 📱 移动端适配检测
+- 响应式设计检测
+- 移动子域名检测
+- UA自适应检测（解决百度等站点误判）
 
-### 命令行版
+### ⚡ 性能检测
+- Gzip压缩
+- 缓存控制
+- Keep-Alive
+- ETag
 
-```bash
-# 单个网站分析
-python3 analyzer.py https://example.com
+## 🚀 快速开始
 
-# 批量分析（从文件读取）
-python3 analyzer.py --file urls.txt
+### 在线使用
 
-# 生成HTML报告
-python3 analyzer.py https://example.com --report
+访问 **http://111.228.14.153/tools** 即可免费使用
 
-# 批量分析并生成报告
-python3 analyzer.py --file urls.txt --report --output report.html
-```
+支持：
+- 📊 单个网站深度分析
+- 📦 批量网站分析（最多10个）
+- ⚡ 快捷测试常用网站（百度、知乎、B站、掘金、GitHub）
+- 📋 完整优化建议报告
 
-## 📦 依赖
-
-```bash
-pip install requests beautifulsoup4 flask
-```
-
-## 🏗️ 项目结构
-
-```
-site-analyzer/
-├── analyzer.py          # 核心分析引擎
-├── web/
-│   ├── app.py          # Flask Web应用
-│   └── templates/
-│       └── index.html  # H5前端页面
-├── README.md
-└── LICENSE
-```
-
-## 📱 移动端支持
-
-Web版采用响应式设计，手机、平板、电脑均可使用。
-
-## 🔧 本地部署
+### 本地部署
 
 ```bash
 # 克隆项目
@@ -90,35 +90,87 @@ python3 app.py
 # 访问 http://localhost:5000
 ```
 
+### 命令行使用
+
+```bash
+# 单个网站分析
+python3 analyzer.py https://example.com
+
+# 批量分析
+python3 analyzer.py --file urls.txt
+
+# 生成HTML报告
+python3 analyzer.py https://example.com --report
+```
+
 ## 📊 输出示例
 
-### AI信任度检测
+### AI信任度报告
 ```
-AI信任度得分: 100/100
-├── JSON-LD: ✓ 1个 (WebApplication)
+AI信任度得分: 85/100
+├── JSON-LD: ✓ 2个 (WebApplication, Organization)
 ├── Open Graph: ✓ 完整
 ├── Canonical: ✓ 已设置
 ├── 作者/发布者: ✓ 有
-├── 发布日期: ✓ 有
-├── 语义化HTML: ✓ 4种
+├── 发布日期: ✓ 2025-05-09
+├── 语义化HTML: ✓ 5种 (header, main, section, article, footer)
 ├── H标签层级: ✓ 结构清晰
+├── 图片alt: ⚠️ 75%完整
 └── 页面语言: ✓ zh-CN
 ```
 
-### HTML报告
-生成美观的HTML报告，包含：
-- 总体评分
-- SEO详细分析
-- AI信任度评分
-- 性能指标
-- 移动端适配检测
-- 优化建议
+## 🆚 与其他工具对比
+
+| 特性 | 本工具 | Screaming Frog | Ahrefs | SEMrush |
+|------|--------|----------------|--------|---------|
+| AI信任度检测 | ✅ | ❌ | ❌ | ❌ |
+| 免费使用 | ✅ | 有限 | ❌ | ❌ |
+| 开源 | ✅ | ❌ | ❌ | ❌ |
+| 自部署 | ✅ | ❌ | ❌ | ❌ |
+| 移动端支持 | ✅ | ❌ | ✅ | ✅ |
+| 批量分析 | ✅ | ✅ | ✅ | ✅ |
+
+## 🛠️ 技术栈
+
+- **后端**: Python, Flask
+- **前端**: HTML5, CSS3, JavaScript (原生)
+- **分析**: BeautifulSoup4, Requests
+- **部署**: Nginx反向代理
+
+## 📁 项目结构
+
+```
+site-analyzer/
+├── analyzer.py          # 核心分析引擎
+├── web/
+│   ├── app.py          # Flask Web应用
+│   └── templates/
+│       └── index.html  # H5前端（响应式）
+├── README.md
+└── LICENSE
+```
+
+## 🔑 关键词
+
+SEO分析工具, AI信任度检测, AI SEO优化, 网站SEO检测, 
+JSON-LD检测, Open Graph检测, 移动端适配检测, SSL证书检测, 
+站长工具, 网站健康度检测, AI搜索引擎优化, ChatGPT SEO, 
+Perplexity优化, Google SGE, 结构化数据检测, 开源SEO工具
+
+## 📄 许可证
+
+MIT License - 免费使用，商业友好
 
 ## 👨‍💻 作者
 
 **巴依浩爷(BayiHY)**
-- GitCode: https://gitcode.com/BayiHY
+- GitCode: [https://gitcode.com/BayiHY](https://gitcode.com/BayiHY)
+- 在线体验: [http://111.228.14.153/tools](http://111.228.14.153/tools)
 
-## 📄 许可证
+## 🤝 贡献
 
-MIT License
+欢迎提交Issue和Pull Request！
+
+## ⭐ 支持
+
+如果这个工具对你有帮助，请给个Star⭐
