@@ -577,6 +577,12 @@
             result.classList.remove('active');
             errorMsg.classList.remove('active');
             
+            // 隐藏DNS检测窗口
+            const dnsResult = document.getElementById('dnsResult');
+            if (dnsResult) {
+                dnsResult.style.display = 'none';
+            }
+            
             // 根据域名调整倒计时
             const domain = url.toLowerCase();
             let initialSeconds = 5;  // 默认5秒
