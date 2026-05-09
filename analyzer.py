@@ -17,6 +17,12 @@ from datetime import datetime
 from urllib.parse import urlparse, urljoin
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# 特定域名的备用IP（当DNS解析的IP不通时使用）
+ALTERNATIVE_IPS = {
+    'github.com': ['140.82.121.3', '140.82.114.4', '140.82.121.4'],
+    'www.github.com': ['140.82.121.3', '140.82.114.4', '140.82.121.4'],
+}
+
 
 class SiteAnalyzer:
     """网站分析器"""
@@ -47,6 +53,7 @@ class SiteAnalyzer:
         self._check_accessibility()
         self._check_ssl()
         self._check_seo()
+        self._check_ai_discoverability(getattr(self, '_soup', None))
         self._check_performance()
         self._calculate_score()
         
@@ -54,13 +61,31 @@ class SiteAnalyzer:
     
     def _check_accessibility(self):
         """检测网站可用性"""
+        # 先尝试默认连接
+        success = self._try_connect(self.url)
+        
+        # 如果失败且有备用IP，逐个尝试
+        if not success and self.domain in ALTERNATIVE_IPS:
+            for ip in ALTERNATIVE_IPS[self.domain]:
+                alt_url = self.url.replace(self.domain, ip)
+                if self._try_connect(alt_url, host_header=self.domain):
+                    self.results['resolved_ip'] = ip
+                    break
+    
+    def _try_connect(self, url, host_header=None):
+        """尝试连接URL"""
         try:
             start_time = time.time()
+            headers = {'User-Agent': 'Mozilla/5.0 (compatible; SiteAnalyzer/1.0)'}
+            if host_header:
+                headers['Host'] = host_header
+            
             response = requests.get(
-                self.url, 
+                url, 
                 timeout=self.timeout,
                 allow_redirects=True,
-                headers={'User-Agent': 'Mozilla/5.0 (compatible; SiteAnalyzer/1.0)'}
+                headers=headers,
+                verify=False  # 使用IP时证书可能不匹配
             )
             response_time = time.time() - start_time
             
@@ -78,16 +103,23 @@ class SiteAnalyzer:
                 self.results['redirect_chain'].append(response.url)
             
             self.results['accessible'] = True
+            return True
             
         except requests.exceptions.Timeout:
-            self.results['accessible'] = False
-            self.results['error'] = '请求超时'
+            if not host_header:  # 只在默认连接时记录错误
+                self.results['accessible'] = False
+                self.results['error'] = '请求超时'
+            return False
         except requests.exceptions.ConnectionError:
-            self.results['accessible'] = False
-            self.results['error'] = '连接失败'
+            if not host_header:
+                self.results['accessible'] = False
+                self.results['error'] = '连接失败'
+            return False
         except Exception as e:
-            self.results['accessible'] = False
-            self.results['error'] = str(e)
+            if not host_header:
+                self.results['accessible'] = False
+                self.results['error'] = str(e)
+            return False
     
     def _check_ssl(self):
         """检测SSL证书"""
@@ -97,7 +129,9 @@ class SiteAnalyzer:
             
         try:
             context = ssl.create_default_context()
-            with socket.create_connection((self.domain, 443), timeout=self.timeout) as sock:
+            # 使用解析的IP（如果有）或域名
+            connect_host = self.results.get('resolved_ip', self.domain)
+            with socket.create_connection((connect_host, 443), timeout=self.timeout) as sock:
                 with context.wrap_socket(sock, server_hostname=self.domain) as ssock:
                     cert = ssock.getpeercert()
                     
@@ -138,12 +172,21 @@ class SiteAnalyzer:
     def _check_seo(self):
         """检测SEO信息"""
         try:
+            # 使用解析的IP（如果有）或URL
+            request_url = self.url
+            headers = {'User-Agent': 'Mozilla/5.0 (compatible; SiteAnalyzer/1.0)'}
+            if 'resolved_ip' in self.results:
+                request_url = self.url.replace(self.domain, self.results['resolved_ip'])
+                headers['Host'] = self.domain
+            
             response = requests.get(
-                self.url,
+                request_url,
                 timeout=self.timeout,
-                headers={'User-Agent': 'Mozilla/5.0 (compatible; SiteAnalyzer/1.0)'}
+                headers=headers,
+                verify=False
             )
             soup = BeautifulSoup(response.text, 'html.parser')
+            self._soup = soup  # 保存供AI可发现性检测使用
             
             seo = {}
             
@@ -407,16 +450,228 @@ class SiteAnalyzer:
         except Exception as e:
             self.results['seo'] = {'error': str(e)}
     
+    def _check_ai_discoverability(self, soup):
+        """检测AI可发现性（面向国内平台）
+        
+        评分体系：
+        - 结构化数据 (20分)
+        - 内容可引用性 (25分)
+        - 自媒体适配性 (20分)
+        - 权威性信号 (20分)
+        - 可访问性 (15分)
+        """
+        discover = {}
+        score = 0
+        details = []
+        
+        # ==================== 1. 结构化数据 (20分) ====================
+        struct_score = 0
+        
+        # JSON-LD (8分)
+        json_ld = self.results.get('seo', {}).get('ai_trust', {}).get('json_ld', {})
+        if json_ld.get('exists'):
+            struct_score += 8
+            details.append({'icon': '✅', 'text': 'JSON-LD结构化数据', 'score': 8})
+        else:
+            details.append({'icon': '❌', 'text': '缺少JSON-LD', 'score': 0, 'tip': '添加JSON-LD帮助AI理解内容'})
+        
+        # Open Graph (12分) - 微信/头条/知乎通用
+        og = self.results.get('seo', {}).get('open_graph', {})
+        og_score = 0
+        if og.get('og:title'): og_score += 3
+        if og.get('og:description'): og_score += 3
+        if og.get('og:image'): og_score += 3
+        if og.get('og:url'): og_score += 3
+        struct_score += og_score
+        if og_score == 12:
+            details.append({'icon': '✅', 'text': 'Open Graph完整', 'score': 12})
+        elif og_score > 0:
+            details.append({'icon': '⚠️', 'text': f'Open Graph部分缺失', 'score': og_score, 'tip': '补全og:title/description/image/url'})
+        else:
+            details.append({'icon': '❌', 'text': '缺少Open Graph', 'score': 0, 'tip': '微信/头条/知乎分享都需要OG标签'})
+        
+        discover['structured_data'] = {'score': struct_score, 'max': 20, 'items': details.copy()}
+        score += struct_score
+        details.clear()
+        
+        # ==================== 2. 内容可引用性 (25分) ====================
+        content_score = 0
+        seo = self.results.get('seo', {})
+        
+        # 标题 (5分)
+        title = seo.get('title', '')
+        if title and title != '未设置':
+            content_score += 5
+            details.append({'icon': '✅', 'text': f'标题: {title[:30]}...', 'score': 5})
+        else:
+            details.append({'icon': '❌', 'text': '缺少标题', 'score': 0, 'tip': 'AI优先引用有明确标题的内容'})
+        
+        # 描述 (5分)
+        desc = seo.get('description', '')
+        if desc and desc != '未设置':
+            content_score += 5
+            details.append({'icon': '✅', 'text': '有Meta描述', 'score': 5})
+        else:
+            details.append({'icon': '❌', 'text': '缺少Meta描述', 'score': 0, 'tip': 'AI用描述生成摘要'})
+        
+        # 内容长度 (5分) - 通过页面大小估算
+        content_len = self.results.get('content_length', 0)
+        if content_len > 2000:  # 大约500字以上
+            content_score += 5
+            details.append({'icon': '✅', 'text': f'内容充实 ({content_len//4}字)', 'score': 5})
+        else:
+            details.append({'icon': '⚠️', 'text': f'内容较少 ({content_len//4}字)', 'score': 0, 'tip': '建议内容>500字'})
+        
+        # 作者 (5分)
+        authorship = self.results.get('seo', {}).get('ai_trust', {}).get('authorship', {})
+        if authorship.get('has_author'):
+            content_score += 5
+            details.append({'icon': '✅', 'text': '有作者署名', 'score': 5})
+        else:
+            details.append({'icon': '❌', 'text': '缺少作者信息', 'score': 0, 'tip': '添加author meta标签'})
+        
+        # 日期 (5分)
+        dates = self.results.get('seo', {}).get('ai_trust', {}).get('dates', {})
+        if dates.get('has_published'):
+            content_score += 5
+            details.append({'icon': '✅', 'text': '有发布日期', 'score': 5})
+        else:
+            details.append({'icon': '❌', 'text': '缺少发布日期', 'score': 0, 'tip': 'AI优先引用有时间戳的内容'})
+        
+        discover['content_citation'] = {'score': content_score, 'max': 25, 'items': details.copy()}
+        score += content_score
+        details.clear()
+        
+        # ==================== 3. 自媒体适配性 (20分) ====================
+        media_score = 0
+        page_text = soup.get_text().lower() if soup else ''
+        all_links = [a.get('href', '') for a in soup.find_all('a', href=True)] if soup else []
+        all_text = ' '.join(all_links) + ' ' + page_text
+        
+        # 抖音 (5分)
+        if any(kw in all_text for kw in ['douyin', '抖音', 'tiktok']):
+            media_score += 5
+            details.append({'icon': '✅', 'text': '有抖音引流', 'score': 5})
+        else:
+            details.append({'icon': '⚠️', 'text': '未发现抖音链接', 'score': 0, 'tip': '添加抖音链接增加曝光'})
+        
+        # 小红书 (5分)
+        if any(kw in all_text for kw in ['xiaohongshu', '小红书', 'redbook', 'xhslink']):
+            media_score += 5
+            details.append({'icon': '✅', 'text': '有小红书引流', 'score': 5})
+        else:
+            details.append({'icon': '⚠️', 'text': '未发现小红书链接', 'score': 0, 'tip': '添加小红书链接增加曝光'})
+        
+        # 微信公众号 (5分)
+        if any(kw in all_text for kw in ['weixin', '微信', '公众号', 'wechat', 'mp.weixin']):
+            media_score += 5
+            details.append({'icon': '✅', 'text': '有微信公众号', 'score': 5})
+        else:
+            details.append({'icon': '⚠️', 'text': '未发现微信公众号', 'score': 0, 'tip': '添加公众号链接增加私域流量'})
+        
+        # 内容格式适合搬运 (5分) - 检测是否有文章正文、图片等
+        has_article = soup.find('article') or soup.find('div', class_=lambda x: x and 'article' in x.lower()) if soup else False
+        has_images = len(soup.find_all('img')) > 2 if soup else False
+        if has_article or has_images:
+            media_score += 5
+            details.append({'icon': '✅', 'text': '内容格式适合搬运', 'score': 5})
+        else:
+            details.append({'icon': '⚠️', 'text': '内容格式一般', 'score': 2, 'tip': '使用article标签和配图'})
+            media_score += 2
+        
+        discover['media_adapt'] = {'score': media_score, 'max': 20, 'items': details.copy()}
+        score += media_score
+        details.clear()
+        
+        # ==================== 4. 权威性信号 (20分) ====================
+        auth_score = 0
+        
+        # HTTPS (4分)
+        if self.url.startswith('https://'):
+            auth_score += 4
+            details.append({'icon': '✅', 'text': '使用HTTPS', 'score': 4})
+        else:
+            details.append({'icon': '❌', 'text': '未使用HTTPS', 'score': 0, 'tip': 'HTTPS是基本信任信号'})
+        
+        # 备案号 (8分) - 国内特色
+        icp_patterns = ['京ICP', '沪ICP', '粤ICP', '浙ICP', '苏ICP', 'ICP备', 'icp', '备案']
+        has_icp = any(p in page_text for p in icp_patterns)
+        if has_icp:
+            auth_score += 8
+            details.append({'icon': '✅', 'text': '有ICP备案号', 'score': 8})
+        else:
+            details.append({'icon': '❌', 'text': '未发现ICP备案', 'score': 0, 'tip': '备案号是百度信任的重要信号'})
+        
+        # 联系方式 (8分)
+        contact_kw = ['联系', 'contact', 'about', '关于', '邮箱', 'email', '@', '电话', 'tel']
+        has_contact = any(kw in page_text for kw in contact_kw)
+        if has_contact:
+            auth_score += 8
+            details.append({'icon': '✅', 'text': '有联系方式/关于页', 'score': 8})
+        else:
+            details.append({'icon': '❌', 'text': '缺少联系方式', 'score': 0, 'tip': '增加E-E-A-T信号'})
+        
+        discover['authority'] = {'score': auth_score, 'max': 20, 'items': details.copy()}
+        score += auth_score
+        details.clear()
+        
+        # ==================== 5. 可访问性 (15分) ====================
+        access_score = 0
+        
+        # 页面可访问 (5分)
+        if self.results.get('accessible'):
+            access_score += 5
+            details.append({'icon': '✅', 'text': '页面可正常访问', 'score': 5})
+        else:
+            details.append({'icon': '❌', 'text': '页面无法访问', 'score': 0})
+        
+        # 移动端友好 (5分)
+        viewport = soup.find('meta', attrs={'name': 'viewport'}) if soup else None
+        if viewport:
+            access_score += 5
+            details.append({'icon': '✅', 'text': '移动端友好', 'score': 5})
+        else:
+            details.append({'icon': '❌', 'text': '缺少viewport', 'score': 0, 'tip': '百度优先收录移动友好页面'})
+        
+        # 响应速度 (5分)
+        resp_time = self.results.get('response_time', 999)
+        if resp_time < 3:
+            access_score += 5
+            details.append({'icon': '✅', 'text': f'响应快速 ({resp_time:.1f}秒)', 'score': 5})
+        elif resp_time < 5:
+            access_score += 3
+            details.append({'icon': '⚠️', 'text': f'响应较慢 ({resp_time:.1f}秒)', 'score': 3})
+        else:
+            details.append({'icon': '❌', 'text': f'响应超时 ({resp_time:.1f}秒)', 'score': 0, 'tip': '加载慢影响百度排名'})
+        
+        discover['accessibility'] = {'score': access_score, 'max': 15, 'items': details.copy()}
+        score += access_score
+        
+        # ==================== 总分 ====================
+        discover['total_score'] = score
+        discover['max_score'] = 100
+        discover['grade'] = 'A' if score >= 85 else 'B' if score >= 70 else 'C' if score >= 55 else 'D'
+        
+        self.results['ai_discoverability'] = discover
+    
     def _check_performance(self):
         """检测性能指标"""
         performance = {}
         
         # 检查常见性能头
         try:
+            # 使用解析的IP（如果有）或URL
+            request_url = self.url
+            headers = {'User-Agent': 'Mozilla/5.0 (compatible; SiteAnalyzer/1.0)'}
+            if 'resolved_ip' in self.results:
+                request_url = self.url.replace(self.domain, self.results['resolved_ip'])
+                headers['Host'] = self.domain
+            
             response = requests.get(
-                self.url,
+                request_url,
                 timeout=self.timeout,
-                headers={'User-Agent': 'Mozilla/5.0 (compatible; SiteAnalyzer/1.0)'}
+                headers=headers,
+                verify=False
             )
             headers = response.headers
             

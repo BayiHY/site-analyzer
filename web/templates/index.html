@@ -519,11 +519,11 @@
                 }, 1000);
                 
                 try {
-                    // 直接测试服务器能否访问GitHub
+                    // 直接测试服务器能否访问GitHub（尝试多个IP）
                     const testResp = await fetch('api/test-ip', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ip: '140.82.121.4', host: 'github.com'})
+                        body: JSON.stringify({ip: '140.82.121.3', host: 'github.com'})
                     });
                     const testData = await testResp.json();
                     
@@ -534,7 +534,7 @@
                     
                     if (testData.accessible) {
                         html += `<div style="color:#00e676;">✅ 服务器可以访问 GitHub</div>`;
-                        html += `<div style="color:#4fc3f7;font-size:11px;margin-top:4px;">IP: 140.82.121.4 | 响应: ${testData.response_time}秒</div>`;
+                        html += `<div style="color:#4fc3f7;font-size:11px;margin-top:4px;">IP: 140.82.121.3 | 响应: ${testData.response_time}秒</div>`;
                         html += `<div style="margin-top:8px;font-size:11px;color:#888;">⏱️ 检测耗时: ${dnsSeconds}秒</div>`;
                     } else {
                         html += `<div style="color:#ff5252;">❌ 服务器无法访问 GitHub</div>`;
@@ -820,6 +820,74 @@
                                 <li style="margin-bottom:4px;">• <strong>Open Graph</strong> - 社交媒体和AI引用时会优先使用</li>
                                 <li style="margin-bottom:4px;">• <strong>语义化HTML</strong> - 帮助AI理解页面结构和内容层次</li>
                                 <li style="margin-bottom:4px;">• <strong>发布日期</strong> - AI优先引用有明确时间的内容，过时内容会被降权</li>
+                            </ul>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- AI可发现性指数 -->
+                    ${data.ai_discoverability ? `
+                    <div class="info-card" style="border-left: 3px solid #ff6b35;">
+                        <h3><span class="icon" style="background:rgba(255,107,53,0.15)">🚀</span> AI可发现性指数 <span style="font-size:14px;color:${data.ai_discoverability.total_score >= 70 ? '#00e676' : data.ai_discoverability.total_score >= 50 ? '#ff9800' : '#ff5252'};margin-left:10px;">${data.ai_discoverability.total_score}/${data.ai_discoverability.max_score}分</span> <span style="font-size:16px;margin-left:8px;">${data.ai_discoverability.grade === 'A' ? '🏆' : data.ai_discoverability.grade === 'B' ? '🥈' : data.ai_discoverability.grade === 'C' ? '🥉' : '⚠️'} ${data.ai_discoverability.grade}级</span></h3>
+                        <p style="font-size:12px;color:#888;margin-bottom:15px;">面向百度AI、豆包、通义千问、微信搜一搜等国内AI搜索引擎的综合可发现性评估</p>
+                        
+                        <!-- 结构化数据 -->
+                        ${data.ai_discoverability.structured_data ? `
+                        <div style="margin-bottom:12px;">
+                            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">📋 结构化数据 <span style="color:#ff6b35;">${data.ai_discoverability.structured_data.score}/${data.ai_discoverability.structured_data.max}分</span></div>
+                            ${data.ai_discoverability.structured_data.items.map(item => `
+                                <div style="font-size:12px;margin:4px 0;color:${item.score > 0 ? '#00e676' : '#ff5252'};">${item.icon} ${item.text} ${item.tip ? '<span style="color:#888;">- ' + item.tip + '</span>' : ''}</div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                        
+                        <!-- 内容可引用性 -->
+                        ${data.ai_discoverability.content_citation ? `
+                        <div style="margin-bottom:12px;">
+                            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">📝 内容可引用性 <span style="color:#ff6b35;">${data.ai_discoverability.content_citation.score}/${data.ai_discoverability.content_citation.max}分</span></div>
+                            ${data.ai_discoverability.content_citation.items.map(item => `
+                                <div style="font-size:12px;margin:4px 0;color:${item.score > 0 ? '#00e676' : '#ff5252'};">${item.icon} ${item.text} ${item.tip ? '<span style="color:#888;">- ' + item.tip + '</span>' : ''}</div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                        
+                        <!-- 自媒体适配性 -->
+                        ${data.ai_discoverability.media_adapt ? `
+                        <div style="margin-bottom:12px;">
+                            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🎬 自媒体适配性 <span style="color:#ff6b35;">${data.ai_discoverability.media_adapt.score}/${data.ai_discoverability.media_adapt.max}分</span></div>
+                            ${data.ai_discoverability.media_adapt.items.map(item => `
+                                <div style="font-size:12px;margin:4px 0;color:${item.score > 0 ? '#00e676' : '#ff5252'};">${item.icon} ${item.text} ${item.tip ? '<span style="color:#888;">- ' + item.tip + '</span>' : ''}</div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                        
+                        <!-- 权威性信号 -->
+                        ${data.ai_discoverability.authority ? `
+                        <div style="margin-bottom:12px;">
+                            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🏆 权威性信号 <span style="color:#ff6b35;">${data.ai_discoverability.authority.score}/${data.ai_discoverability.authority.max}分</span></div>
+                            ${data.ai_discoverability.authority.items.map(item => `
+                                <div style="font-size:12px;margin:4px 0;color:${item.score > 0 ? '#00e676' : '#ff5252'};">${item.icon} ${item.text} ${item.tip ? '<span style="color:#888;">- ' + item.tip + '</span>' : ''}</div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                        
+                        <!-- 可访问性 -->
+                        ${data.ai_discoverability.accessibility ? `
+                        <div style="margin-bottom:12px;">
+                            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🔍 可访问性 <span style="color:#ff6b35;">${data.ai_discoverability.accessibility.score}/${data.ai_discoverability.accessibility.max}分</span></div>
+                            ${data.ai_discoverability.accessibility.items.map(item => `
+                                <div style="font-size:12px;margin:4px 0;color:${item.score > 0 ? '#00e676' : '#ff5252'};">${item.icon} ${item.text} ${item.tip ? '<span style="color:#888;">- ' + item.tip + '</span>' : ''}</div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                        
+                        <div style="margin-top:15px;padding:12px;background:rgba(255,107,53,0.05);border-radius:8px;">
+                            <p style="font-size:12px;color:#aaa;margin-bottom:8px;">💡 <strong>提升建议：</strong></p>
+                            <ul style="font-size:11px;color:#888;list-style:none;padding:0;">
+                                <li style="margin-bottom:4px;">• 添加抖音/小红书/公众号链接，增加私域流量入口</li>
+                                <li style="margin-bottom:4px;">• 完善ICP备案信息，提升百度信任度</li>
+                                <li style="margin-bottom:4px;">• 添加JSON-LD和Open Graph标签，让AI更好理解内容</li>
+                                <li style="margin-bottom:4px;">• 确保移动端友好，百度优先收录移动页面</li>
                             </ul>
                         </div>
                     </div>
