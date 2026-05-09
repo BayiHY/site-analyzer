@@ -587,6 +587,61 @@
                         </div>
                     </div>
 
+                    <!-- AI信任度指标 -->
+                    ${seo.ai_trust ? `
+                    <div class="info-card" style="border-left: 3px solid #00d2ff;">
+                        <h3><span class="icon" style="background:rgba(0,210,255,0.15)">🤖</span> AI信任度 <span style="font-size:14px;color:${seo.ai_trust.score >= 70 ? '#00e676' : seo.ai_trust.score >= 40 ? '#ff9800' : '#ff5252'};margin-left:10px;">${seo.ai_trust.score}/${seo.ai_trust.max_score}分</span></h3>
+                        <p style="font-size:12px;color:#888;margin-bottom:15px;">影响AI搜索引擎（如ChatGPT、Perplexity、Google SGE）对网站内容的引用倾向</p>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="label">JSON-LD结构化数据</div>
+                                <div class="value">${seo.ai_trust.json_ld.exists ? '<span class="tag tag-success">✓ ' + seo.ai_trust.json_ld.count + '个 (' + (seo.ai_trust.json_ld.types.join(', ') || '未知类型') + ')</span>' : '<span class="tag tag-error">✗ 未设置</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">Open Graph标签</div>
+                                <div class="value">${seo.ai_trust.open_graph.complete ? '<span class="tag tag-success">✓ 完整</span>' : '<span class="tag tag-warning">缺少: ' + seo.ai_trust.open_graph.missing.join(', ') + '</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">Canonical标签</div>
+                                <div class="value">${seo.ai_trust.canonical.exists ? '<span class="tag tag-success">✓ 已设置</span>' : '<span class="tag tag-warning">未设置</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">作者/发布者信息</div>
+                                <div class="value">${seo.ai_trust.authorship.has_author ? '<span class="tag tag-success">✓ 有作者</span>' : '<span class="tag tag-warning">无作者</span>'} ${seo.ai_trust.authorship.has_publisher ? '<span class="tag tag-success">有发布者</span>' : ''}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">发布日期</div>
+                                <div class="value">${seo.ai_trust.dates.has_published ? '<span class="tag tag-success">✓ ' + (seo.ai_trust.dates.published || '已设置') + '</span>' : '<span class="tag tag-warning">未设置</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">语义化HTML</div>
+                                <div class="value">${seo.ai_trust.semantic_html.count >= 3 ? '<span class="tag tag-success">✓ ' + seo.ai_trust.semantic_html.count + '种</span>' : '<span class="tag tag-warning">仅' + seo.ai_trust.semantic_html.count + '种</span>'} <span style="font-size:11px;color:#666;">(${seo.ai_trust.semantic_html.tags_found.join(', ') || '无'})</span></div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">H标签层级</div>
+                                <div class="value">${seo.ai_trust.heading_structure.proper_hierarchy ? '<span class="tag tag-success">✓ 结构清晰</span>' : '<span class="tag tag-warning">层级不完整</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">图片alt属性</div>
+                                <div class="value">${seo.ai_trust.image_alt.total_images === 0 ? '<span class="tag tag-info">无图片</span>' : (seo.ai_trust.image_alt.with_alt / seo.ai_trust.image_alt.total_images > 0.8 ? '<span class="tag tag-success">✓ ' + seo.ai_trust.image_alt.completeness + '</span>' : '<span class="tag tag-warning">' + seo.ai_trust.image_alt.completeness + '</span>')}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">页面语言声明</div>
+                                <div class="value">${seo.ai_trust.language.declared ? '<span class="tag tag-success">✓ ' + seo.ai_trust.language.value + '</span>' : '<span class="tag tag-warning">未声明</span>'}</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:15px;padding:12px;background:rgba(0,210,255,0.05);border-radius:8px;">
+                            <p style="font-size:12px;color:#aaa;margin-bottom:8px;">💡 <strong>重要性说明：</strong></p>
+                            <ul style="font-size:11px;color:#888;list-style:none;padding:0;">
+                                <li style="margin-bottom:4px;">• <strong>JSON-LD</strong> - AI搜索引擎优先解析，直接用于生成摘要和知识图谱</li>
+                                <li style="margin-bottom:4px;">• <strong>Open Graph</strong> - 社交媒体和AI引用时会优先使用</li>
+                                <li style="margin-bottom:4px;">• <strong>语义化HTML</strong> - 帮助AI理解页面结构和内容层次</li>
+                                <li style="margin-bottom:4px;">• <strong>发布日期</strong> - AI优先引用有明确时间的内容，过时内容会被降权</li>
+                            </ul>
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <!-- 性能 -->
                     <div class="info-card">
                         <h3><span class="icon" style="background:rgba(255,165,2,0.15)">⚡</span> 性能</h3>

@@ -226,11 +226,159 @@ class SiteAnalyzer:
             seo['mobile_friendly'] = mobile_friendly
             seo['mobile_type'] = mobile_type if mobile_type else ['无']
             
-            # Open Graph
+            # ==================== AI信任度指标检测 ====================
+            ai_trust = {}
+            
+            # 1. JSON-LD 结构化数据（最重要！）
+            json_ld_scripts = soup.find_all('script', attrs={'type': 'application/ld+json'})
+            json_ld_types = []
+            for script in json_ld_scripts:
+                try:
+                    import json
+                    data = json.loads(script.string)
+                    if isinstance(data, dict):
+                        json_ld_types.append(data.get('@type', 'Unknown'))
+                    elif isinstance(data, list):
+                        for item in data:
+                            if isinstance(item, dict):
+                                json_ld_types.append(item.get('@type', 'Unknown'))
+                except:
+                    pass
+            ai_trust['json_ld'] = {
+                'exists': len(json_ld_scripts) > 0,
+                'count': len(json_ld_scripts),
+                'types': json_ld_types,
+                'importance': '高 - AI搜索引擎优先解析结构化数据，直接用于生成摘要和知识图谱'
+            }
+            
+            # 2. Open Graph 标签完整性
             og_tags = {}
             for og in soup.find_all('meta', attrs={'property': lambda x: x and x.startswith('og:')}):
                 og_tags[og['property']] = og.get('content', '')
+            og_essential = ['og:title', 'og:description', 'og:image', 'og:url']
+            og_missing = [tag for tag in og_essential if tag not in og_tags]
+            ai_trust['open_graph'] = {
+                'exists': len(og_tags) > 0,
+                'count': len(og_tags),
+                'missing': og_missing,
+                'complete': len(og_missing) == 0,
+                'importance': '高 - 社交媒体和AI引用时会优先使用OG标签的内容'
+            }
             seo['open_graph'] = og_tags
+            
+            # 3. Twitter Card 标签
+            twitter_tags = {}
+            for meta in soup.find_all('meta', attrs={'name': lambda x: x and x.startswith('twitter:')}):
+                twitter_tags[meta['name']] = meta.get('content', '')
+            for meta in soup.find_all('meta', attrs={'property': lambda x: x and x.startswith('twitter:')}):
+                twitter_tags[meta['property']] = meta.get('content', '')
+            ai_trust['twitter_card'] = {
+                'exists': len(twitter_tags) > 0,
+                'count': len(twitter_tags),
+                'importance': '中 - Twitter/X平台和部分AI会参考Twitter Card数据'
+            }
+            
+            # 4. Canonical 标签
+            canonical = soup.find('link', attrs={'rel': 'canonical'})
+            seo['canonical'] = canonical['href'] if canonical and canonical.get('href') else '未设置'
+            ai_trust['canonical'] = {
+                'exists': canonical is not None,
+                'value': seo['canonical'],
+                'importance': '高 - 告诉AI这是权威版本，避免重复内容稀释权重'
+            }
+            
+            # 5. Author 和 Publisher 标签
+            author_meta = soup.find('meta', attrs={'name': 'author'})
+            publisher_meta = soup.find('meta', attrs={'name': 'publisher'})
+            author_link = soup.find('link', attrs={'rel': 'author'})
+            ai_trust['authorship'] = {
+                'has_author': author_meta is not None or author_link is not None,
+                'has_publisher': publisher_meta is not None,
+                'author': author_meta.get('content', '') if author_meta else '',
+                'importance': '中高 - 明确的内容创作者信息增加可信度，AI更倾向引用有明确来源的内容'
+            }
+            
+            # 6. 发布/修改日期
+            date_published = soup.find('meta', attrs={'property': 'article:published_time'})
+            date_modified = soup.find('meta', attrs={'property': 'article:modified_time'})
+            time_tag = soup.find('time')
+            ai_trust['dates'] = {
+                'has_published': date_published is not None,
+                'has_modified': date_modified is not None,
+                'has_time_tag': time_tag is not None,
+                'published': date_published.get('content', '') if date_published else '',
+                'importance': '高 - AI优先引用有明确时间的内容，过时内容会被降权'
+            }
+            
+            # 7. Favicon 网站图标
+            favicon = soup.find('link', attrs={'rel': lambda x: x and 'icon' in x.lower()})
+            apple_icon = soup.find('link', attrs={'rel': 'apple-touch-icon'})
+            ai_trust['favicon'] = {
+                'has_favicon': favicon is not None,
+                'has_apple_icon': apple_icon is not None,
+                'importance': '低 - 提升品牌识别度，AI在展示搜索结果时会显示图标'
+            }
+            
+            # 8. 语义化HTML标签
+            semantic_tags = ['article', 'section', 'nav', 'aside', 'header', 'footer', 'main']
+            found_semantic = [tag for tag in semantic_tags if soup.find(tag)]
+            ai_trust['semantic_html'] = {
+                'tags_found': found_semantic,
+                'count': len(found_semantic),
+                'importance': '高 - 语义化标签帮助AI理解页面结构和内容层次'
+            }
+            
+            # 9. H标签层级结构
+            h_tags = {}
+            for i in range(1, 7):
+                h_tags[f'h{i}'] = len(soup.find_all(f'h{i}'))
+            has_h1 = h_tags.get('h1', 0) > 0
+            h_hierarchy_ok = has_h1 and (h_tags.get('h2', 0) > 0 or h_tags.get('h3', 0) > 0)
+            ai_trust['heading_structure'] = {
+                'hierarchy': h_tags,
+                'has_h1': has_h1,
+                'proper_hierarchy': h_hierarchy_ok,
+                'importance': '高 - 清晰的标题层级帮助AI理解内容主题和重点'
+            }
+            
+            # 10. alt属性完整性
+            images = soup.find_all('img')
+            imgs_with_alt = [img for img in images if img.get('alt') and img.get('alt').strip()]
+            seo['total_images'] = len(images)
+            seo['images_without_alt'] = len(images) - len(imgs_with_alt)
+            ai_trust['image_alt'] = {
+                'total_images': len(images),
+                'with_alt': len(imgs_with_alt),
+                'completeness': f"{len(imgs_with_alt)}/{len(images)}" if images else 'N/A',
+                'importance': '高 - alt文本是AI理解图片内容的唯一依据，影响图片搜索排名'
+            }
+            
+            # 11. 页面语言声明
+            html_tag = soup.find('html')
+            lang = html_tag.get('lang', '') if html_tag else ''
+            ai_trust['language'] = {
+                'declared': bool(lang),
+                'value': lang,
+                'importance': '中 - 明确的语言声明帮助AI正确处理多语言内容'
+            }
+            
+            # 计算AI信任度得分
+            trust_score = 0
+            trust_max = 100
+            if ai_trust['json_ld']['exists']: trust_score += 20
+            if ai_trust['open_graph']['complete']: trust_score += 15
+            if ai_trust['canonical']['exists']: trust_score += 10
+            if ai_trust['authorship']['has_author']: trust_score += 10
+            if ai_trust['dates']['has_published']: trust_score += 10
+            if ai_trust['semantic_html']['count'] >= 3: trust_score += 15
+            if ai_trust['heading_structure']['proper_hierarchy']: trust_score += 10
+            if ai_trust['image_alt']['total_images'] == 0 or (ai_trust['image_alt']['with_alt'] / max(ai_trust['image_alt']['total_images'], 1) > 0.8): trust_score += 5
+            if ai_trust['language']['declared']: trust_score += 5
+            
+            ai_trust['score'] = trust_score
+            ai_trust['max_score'] = trust_max
+            
+            seo['ai_trust'] = ai_trust
             
             self.results['seo'] = seo
             
