@@ -193,7 +193,38 @@ class SiteAnalyzer:
             # Viewport
             viewport = soup.find('meta', attrs={'name': 'viewport'})
             seo['viewport'] = viewport['content'] if viewport and viewport.get('content') else '未设置'
-            seo['mobile_friendly'] = 'width=device' in seo.get('viewport', '').lower()
+            
+            # 移动端适配检测（增强版）
+            mobile_friendly = False
+            mobile_type = []
+            
+            # 1. 检查 viewport 标签（响应式设计）
+            if 'width=device' in seo.get('viewport', '').lower():
+                mobile_friendly = True
+                mobile_type.append('响应式设计')
+            
+            # 2. 检查是否有移动端子域名链接
+            mobile_links = soup.find_all('a', href=True)
+            for link in mobile_links:
+                href = link.get('href', '')
+                if any(m in href for m in ['m.' + self.domain, 'mobile.' + self.domain]):
+                    mobile_friendly = True
+                    mobile_type.append('移动端子域名')
+                    break
+            
+            # 3. 检查页面内是否有移动端跳转JS代码
+            scripts = soup.find_all('script')
+            for script in scripts:
+                if script.string:
+                    script_text = script.string.lower()
+                    if any(keyword in script_text for keyword in ['useragent', 'mobile', 'm.baidu', 'm.']):
+                        if 'location' in script_text or 'redirect' in script_text or 'href' in script_text:
+                            mobile_friendly = True
+                            mobile_type.append('JS跳转适配')
+                            break
+            
+            seo['mobile_friendly'] = mobile_friendly
+            seo['mobile_type'] = mobile_type if mobile_type else ['无']
             
             # Open Graph
             og_tags = {}

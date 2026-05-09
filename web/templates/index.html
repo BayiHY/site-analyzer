@@ -578,7 +578,7 @@
                             </div>
                             <div class="info-item">
                                 <div class="label">移动端适配</div>
-                                <div class="value">${seo.mobile_friendly ? '<span class="tag tag-success">是</span>' : '<span class="tag tag-error">否</span>'}</div>
+                                <div class="value">${seo.mobile_friendly ? '<span class="tag tag-success">是 (' + (seo.mobile_type ? seo.mobile_type.join('+') : '') + ')</span>' : '<span class="tag tag-error">否</span>'}</div>
                             </div>
                             <div class="info-item">
                                 <div class="label">Robots</div>
