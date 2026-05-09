@@ -189,6 +189,50 @@ def check_dns():
             'count': 0
         })
 
+@app.route('/api/test-ip', methods=['POST'])
+def test_ip():
+    """测试IP可达性"""
+    import socket
+    import ssl
+    
+    data = request.get_json()
+    ip = data.get('ip', '').strip()
+    host = data.get('host', '').strip()
+    
+    if not ip:
+        return jsonify({'error': '请输入IP地址'}), 400
+    
+    try:
+        # 测试TCP连接（443端口）
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        
+        start_time = time.time()
+        with socket.create_connection((ip, 443), timeout=5) as sock:
+            with context.wrap_socket(sock, server_hostname=host or ip) as ssock:
+                response_time = time.time() - start_time
+                return jsonify({
+                    'ip': ip,
+                    'accessible': True,
+                    'response_time': round(response_time, 3),
+                    'port': 443
+                })
+    except socket.timeout:
+        return jsonify({
+            'ip': ip,
+            'accessible': False,
+            'error': '连接超时',
+            'response_time': 5.0
+        })
+    except Exception as e:
+        return jsonify({
+            'ip': ip,
+            'accessible': False,
+            'error': str(e),
+            'response_time': 0
+        })
+
 if __name__ == '__main__':
     print(f"⚡ 频率限制: 每设备 {limiter.max_requests} 次/{limiter.window}秒")
     app.run(host='0.0.0.0', port=5000, debug=False)

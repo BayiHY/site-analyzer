@@ -559,6 +559,27 @@
                         html += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">`;
                         html += `<span style="color:#00e676;">✅ 可用IP: ${uniqueIps.join(', ')}</span>`;
                         html += `</div>`;
+                        
+                        // 测试服务器能否访问这些IP
+                        html += `<div style="margin-top:8px;font-size:11px;color:#888;">🖥️ 服务器测试: `;
+                        for (const ip of uniqueIps.slice(0, 3)) {  // 只测试前3个
+                            try {
+                                const testResp = await fetch('api/test-ip', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({ip: ip, host: 'github.com'})
+                                });
+                                const testData = await testResp.json();
+                                if (testData.accessible) {
+                                    html += `<span style="color:#00e676;">${ip} ✓</span> `;
+                                } else {
+                                    html += `<span style="color:#ff5252;">${ip} ✗</span> `;
+                                }
+                            } catch {
+                                html += `<span style="color:#ff9800;">${ip} ?</span> `;
+                            }
+                        }
+                        html += `</div>`;
                     } else {
                         html += `<div style="margin-top:8px;color:#ff5252;">❌ 所有DNS均解析失败，可能需要配置hosts或使用代理</div>`;
                     }
