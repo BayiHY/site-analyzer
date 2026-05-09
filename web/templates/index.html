@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>站长工具 - 网站SEO分析 | 一键检测网站健康度</title>
+    <meta name="description" content="免费在线网站分析工具，一键检测SEO优化、SSL证书、页面性能、移动端适配等指标，自动评分并提供优化建议。">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            color: #e0e0e0;
+        }
+
+        /* 顶部导航 */
+        .header {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 15px 20px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(90deg, #00d2ff, #928dab);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px 16px;
+        }
+
+        /* 搜索框 */
+        .search-box {
+            background: rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        .input-group input {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .input-group input::placeholder { color: rgba(255,255,255,0.4); }
+        .input-group input:focus { border-color: #00d2ff; }
+        .input-group button {
+            background: linear-gradient(135deg, #00d2ff, #7b68ee);
+            border: none;
+            border-radius: 12px;
+            padding: 14px 24px;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .input-group button:active { transform: scale(0.95); }
+        .input-group button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 快捷入口 */
+        .quick-links {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .quick-link {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .quick-link:active { background: rgba(0,210,255,0.2); color: #00d2ff; }
+
+        /* 加载动画 */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .loading.active { display: block; }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #00d2ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading p { color: rgba(255,255,255,0.6); font-size: 14px; }
+
+        /* 结果区域 */
+        .result { display: none; }
+        .result.active { display: block; }
+
+        /* 评分卡片 */
+        .score-card {
+            background: rgba(255,255,255,0.06);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        .score-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0,210,255,0.05) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+        .score-value {
+            font-size: 72px;
+            font-weight: 800;
+            position: relative;
+            line-height: 1;
+        }
+        .score-label {
+            font-size: 14px;
+            color: rgba(255,255,255,0.5);
+            margin-top: 8px;
+            position: relative;
+        }
+        .score-url {
+            font-size: 13px;
+            color: rgba(255,255,255,0.4);
+            margin-top: 12px;
+            position: relative;
+            word-break: break-all;
+        }
+
+        /* 信息卡片 */
+        .info-card {
+            background: rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .info-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+        }
+        .info-card h3 .icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        /* 信息网格 */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .info-item {
+            background: rgba(255,255,255,0.04);
+            border-radius: 10px;
+            padding: 12px;
+        }
+        .info-item .label {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            margin-bottom: 4px;
+        }
+        .info-item .value {
+            font-size: 14px;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        /* 标签 */
+        .tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .tag-success { background: rgba(46,213,115,0.15); color: #2ed573; }
+        .tag-warning { background: rgba(255,165,2,0.15); color: #ffa502; }
+        .tag-error { background: rgba(255,71,87,0.15); color: #ff4757; }
+
+        /* 问题列表 */
+        .issue-list {
+            list-style: none;
+        }
+        .issue-list li {
+            padding: 12px 14px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border-left: 3px solid rgba(255,165,2,0.5);
+        }
+        .issue-list li.error { border-left-color: rgba(255,71,87,0.5); }
+        .issue-text { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+        .issue-impact { font-size: 12px; color: rgba(255,255,255,0.45); line-height: 1.5; }
+
+        /* 建议列表 */
+        .suggestion-list {
+            list-style: none;
+        }
+        .suggestion-list li {
+            padding: 12px 14px;
+            background: rgba(0,210,255,0.05);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border-left: 3px solid rgba(0,210,255,0.5);
+        }
+        .suggestion-text { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+        .suggestion-text::before { content: '💡 '; }
+        .suggestion-effect { font-size: 12px; color: rgba(46,213,115,0.7); line-height: 1.5; }
+        .suggestion-effect::before { content: '✦ '; }
+
+        /* SEO 详情 */
+        .seo-detail {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        .seo-detail .seo-label {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            margin-bottom: 4px;
+        }
+        .seo-detail .seo-value {
+            font-size: 13px;
+            word-break: break-all;
+        }
+
+        /* H标签统计 */
+        .h-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .h-tag {
+            background: rgba(123,104,238,0.15);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #b8a9ff;
+        }
+
+        /* 底部 */
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            color: rgba(255,255,255,0.3);
+            font-size: 12px;
+        }
+
+        /* 错误提示 */
+        .error-msg {
+            background: rgba(255,71,87,0.1);
+            border: 1px solid rgba(255,71,87,0.2);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            color: #ff6b81;
+            display: none;
+            margin-bottom: 16px;
+        }
+        .error-msg.active { display: block; }
+
+        /* 手机适配 */
+        @media (max-width: 480px) {
+            .container { padding: 16px 12px; }
+            .search-box { padding: 16px; }
+            .input-group { flex-direction: column; }
+            .input-group button { padding: 14px; }
+            .score-value { font-size: 56px; }
+            .info-grid { grid-template-columns: 1fr; }
+            .score-card { padding: 24px 16px; }
+        }
+
+        /* 滑入动画 */
+        .fade-in {
+            animation: fadeIn 0.4s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 进度条 */
+        .score-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+            margin-top: 16px;
+            overflow: hidden;
+            position: relative;
+        }
+        .score-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 1s ease-out;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 站长工具 · 网站分析</h1>
+    </div>
+
+    <div class="container">
+        <!-- 搜索框 -->
+        <div class="search-box">
+            <div class="input-group">
+                <input type="text" id="urlInput" placeholder="输入网址，如 baidu.com" autocomplete="off">
+                <button id="analyzeBtn" onclick="analyze()">分析</button>
+            </div>
+            <div class="quick-links">
+                <span class="quick-link" onclick="quickAnalyze('baidu.com')">百度</span>
+                <span class="quick-link" onclick="quickAnalyze('zhihu.com')">知乎</span>
+                <span class="quick-link" onclick="quickAnalyze('bilibili.com')">B站</span>
+                <span class="quick-link" onclick="quickAnalyze('github.com')">GitHub</span>
+                <span class="quick-link" onclick="quickAnalyze('juejin.cn')">掘金</span>
+            </div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div class="error-msg" id="errorMsg"></div>
+
+        <!-- 加载动画 -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在分析网站，请稍候...</p>
+        </div>
+
+        <!-- 结果区域 -->
+        <div class="result" id="result"></div>
+    </div>
+
+    <div class="footer">
+        站长工具 H5 版 · Powered by Python
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const errorMsg = document.getElementById('errorMsg');
+
+        // 回车触发分析
+        urlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') analyze();
+        });
+
+        // 快捷分析
+        function quickAnalyze(url) {
+            urlInput.value = url;
+            analyze();
+        }
+
+        // 分析网站
+        async function analyze() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                showError('请输入网址');
+                return;
+            }
+
+            // UI 状态
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '分析中...';
+            loading.classList.add('active');
+            result.classList.remove('active');
+            errorMsg.classList.remove('active');
+
+            try {
+                const resp = await fetch('api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                const data = await resp.json();
+
+                if (resp.status === 429) {
+                    showRateLimit(data.retry_after || 60);
+                } else if (data.error) {
+                    showError(data.error);
+                } else {
+                    renderResult(data);
+                }
+            } catch (e) {
+                showError('网络错误，请重试');
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = '分析';
+                loading.classList.remove('active');
+            }
+        }
+
+        // 显示错误
+        function showError(msg) {
+            errorMsg.textContent = msg;
+            errorMsg.classList.add('active');
+        }
+
+        // 限流倒计时
+        function showRateLimit(seconds) {
+            analyzeBtn.disabled = true;
+            let remaining = seconds;
+            errorMsg.innerHTML = '⏳ 请求太频繁，<span id="countdown">' + remaining + '</span> 秒后可重试';
+            errorMsg.classList.add('active');
+            const timer = setInterval(() => {
+                remaining--;
+                const el = document.getElementById('countdown');
+                if (el) el.textContent = remaining;
+                if (remaining <= 0) {
+                    clearInterval(timer);
+                    errorMsg.classList.remove('active');
+                    analyzeBtn.disabled = false;
+                }
+            }, 1000);
+        }
+
+        // 渲染结果
+        function renderResult(data) {
+            const score = data.score || 0;
+            const scoreColor = score >= 80 ? '#2ed573' : score >= 60 ? '#ffa502' : '#ff4757';
+            const scoreText = score >= 80 ? '优秀' : score >= 60 ? '良好' : '需优化';
+            const seo = data.seo || {};
+            const ssl = data.ssl || {};
+            const perf = data.performance || {};
+
+            let html = `
+                <div class="fade-in">
+                    <!-- 评分卡片 -->
+                    <div class="score-card">
+                        <div class="score-value" style="color: ${scoreColor}">${score}</div>
+                        <div class="score-label">${scoreText} · 总分 100</div>
+                        <div class="score-url">${escHtml(data.url)}</div>
+                        <div class="score-bar">
+                            <div class="score-bar-fill" style="width: ${score}%; background: ${scoreColor};"></div>
+                        </div>
+                    </div>
+
+                    <!-- 可用性 -->
+                    <div class="info-card">
+                        <h3><span class="icon" style="background:rgba(46,213,115,0.15)">🌐</span> 可用性</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="label">状态码</div>
+                                <div class="value">${data.accessible ? '<span class="tag tag-success">' + data.status_code + '</span>' : '<span class="tag tag-error">不可访问</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">响应时间</div>
+                                <div class="value">${data.response_time || '-'}s</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">服务器</div>
+                                <div class="value">${escHtml(data.server || '未知')}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">页面大小</div>
+                                <div class="value">${perf.content_size_kb ? perf.content_size_kb + ' KB' : '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SSL 证书 -->
+                    <div class="info-card">
+                        <h3><span class="icon" style="background:rgba(0,210,255,0.15)">🔒</span> SSL 证书</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="label">状态</div>
+                                <div class="value">${ssl.valid ? '<span class="tag tag-success">' + (ssl.status || '有效') + '</span>' : '<span class="tag tag-error">' + (ssl.reason || '无效') + '</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">颁发机构</div>
+                                <div class="value">${escHtml(ssl.issuer || '-')}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">有效期至</div>
+                                <div class="value">${ssl.not_after || '-'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">剩余天数</div>
+                                <div class="value">${ssl.days_remaining != null ? ssl.days_remaining + ' 天' : '-'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SEO 信息 -->
+                    <div class="info-card">
+                        <h3><span class="icon" style="background:rgba(123,104,238,0.15)">📈</span> SEO 信息</h3>
+                        <div class="seo-detail">
+                            <div class="seo-label">页面标题</div>
+                            <div class="seo-value">${escHtml(seo.title || '未设置')} ${seo.title_length ? '<span class="tag ' + (seo.title_length > 60 ? 'tag-warning' : 'tag-success') + '">' + seo.title_length + '字</span>' : ''}</div>
+                        </div>
+                        <div class="seo-detail">
+                            <div class="seo-label">Meta 描述</div>
+                            <div class="seo-value">${escHtml((seo.description || '未设置').substring(0, 120))}${seo.description && seo.description.length > 120 ? '...' : ''} ${seo.description_length ? '<span class="tag ' + (seo.description_length > 160 ? 'tag-warning' : 'tag-success') + '">' + seo.description_length + '字</span>' : ''}</div>
+                        </div>
+                        <div class="seo-detail">
+                            <div class="seo-label">关键词</div>
+                            <div class="seo-value">${escHtml(seo.keywords || '未设置')}</div>
+                        </div>
+                        <div style="margin-top: 12px;">
+                            <div class="seo-label" style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:8px;">H 标签统计</div>
+                            <div class="h-tags">
+                                ${[1,2,3,4,5,6].map(i => seo['h'+i+'_count'] ? '<span class="h-tag">H' + i + ': ' + seo['h'+i+'_count'] + '</span>' : '').join('')}
+                            </div>
+                        </div>
+                        <div class="info-grid" style="margin-top: 12px;">
+                            <div class="info-item">
+                                <div class="label">图片总数</div>
+                                <div class="value">${seo.total_images || 0}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">缺少 alt</div>
+                                <div class="value">${seo.images_without_alt || 0}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">内部链接</div>
+                                <div class="value">${seo.internal_links || 0}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">外部链接</div>
+                                <div class="value">${seo.external_links || 0}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">移动端适配</div>
+                                <div class="value">${seo.mobile_friendly ? '<span class="tag tag-success">是</span>' : '<span class="tag tag-error">否</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">Robots</div>
+                                <div class="value">${escHtml(seo.robots || '-')}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 性能 -->
+                    <div class="info-card">
+                        <h3><span class="icon" style="background:rgba(255,165,2,0.15)">⚡</span> 性能</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="label">Gzip 压缩</div>
+                                <div class="value">${perf.compressed ? '<span class="tag tag-success">已启用</span>' : '<span class="tag tag-warning">未启用</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">缓存控制</div>
+                                <div class="value">${escHtml(perf.cache_control || '-')}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">Keep-Alive</div>
+                                <div class="value">${perf.keep_alive ? '<span class="tag tag-success">是</span>' : '<span class="tag tag-warning">否</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">ETag</div>
+                                <div class="value">${escHtml(perf.etag || '-')}</div>
+                            </div>
+                        </div>
+                    </div>`;
+
+            // 问题
+            if (data.issues && data.issues.length > 0) {
+                html += `
+                    <div class="info-card">
+                        <h3><span class="icon" style="background:rgba(255,71,87,0.15)">⚠️</span> 发现的问题</h3>
+                        <ul class="issue-list">
+                            ${data.issues.map(i => '<li><div class="issue-text">' + escHtml(i.text) + '</div><div class="issue-impact">' + escHtml(i.impact) + '</div></li>').join('')}
+                        </ul>
+                    </div>`;
+            }
+
+            // 建议
+            if (data.suggestions && data.suggestions.length > 0) {
+                html += `
+                    <div class="info-card">
+                        <h3><span class="icon" style="background:rgba(0,210,255,0.15)">💡</span> 优化建议</h3>
+                        <ul class="suggestion-list">
+                            ${data.suggestions.map(s => '<li><div class="suggestion-text">' + escHtml(s.text) + '</div><div class="suggestion-effect">' + escHtml(s.effect) + '</div></li>').join('')}
+                        </ul>
+                    </div>`;
+            }
+
+            html += '</div>';
+
+            result.innerHTML = html;
+            result.classList.add('active');
+
+            // 触发动画
+            setTimeout(() => {
+                const bar = result.querySelector('.score-bar-fill');
+                if (bar) bar.style.width = score + '%';
+            }, 100);
+        }
+
+        function escHtml(str) {
+            if (!str) return '';
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+    </script>
+</body>
+</html>

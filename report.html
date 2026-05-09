@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网站分析报告</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; color: #2c3e50; margin: 30px 0; }
+        .summary { display: flex; justify-content: space-around; flex-wrap: wrap; margin: 20px 0; }
+        .summary-card { background: white; border-radius: 10px; padding: 20px; margin: 10px; min-width: 200px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .summary-card h3 { color: #666; font-size: 14px; margin-bottom: 10px; }
+        .summary-card .value { font-size: 36px; font-weight: bold; }
+        .score-good { color: #27ae60; }
+        .score-medium { color: #f39c12; }
+        .score-bad { color: #e74c3c; }
+        .site-card { background: white; border-radius: 10px; padding: 25px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .site-card h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
+        .score-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; color: white; font-size: 18px; font-weight: bold; }
+        .section { margin: 20px 0; }
+        .section h3 { color: #34495e; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .info-item { background: #f8f9fa; padding: 12px; border-radius: 6px; }
+        .info-item label { font-size: 12px; color: #666; display: block; margin-bottom: 5px; }
+        .info-item span { font-weight: 500; }
+        .issues { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin: 10px 0; }
+        .suggestions { background: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; border-radius: 4px; margin: 10px 0; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin: 2px; }
+        .tag-valid { background: #d4edda; color: #155724; }
+        .tag-warning { background: #fff3cd; color: #856404; }
+        .tag-error { background: #f8d7da; color: #721c24; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .footer { text-align: center; padding: 30px; color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 网站分析报告</h1>
+        <p style="text-align: center; color: #666;">生成时间: 2026-05-09 00:06:51</p>
+        
+        <div class="summary">
+            <div class="summary-card">
+                <h3>分析网站数</h3>
+                <div class="value">1</div>
+            </div>
+            <div class="summary-card">
+                <h3>平均评分</h3>
+                <div class="value score-bad">50</div>
+            </div>
+            <div class="summary-card">
+                <h3>可访问</h3>
+                <div class="value score-good">1</div>
+            </div>
+            <div class="summary-card">
+                <h3>需优化</h3>
+                <div class="value score-bad">1</div>
+            </div>
+        </div>
+
+        <div class="site-card">
+            <h2>📋 汇总一览</h2>
+            <table>
+                <tr>
+                    <th>网站</th>
+                    <th>评分</th>
+                    <th>状态码</th>
+                    <th>响应时间</th>
+                    <th>SSL</th>
+                    <th>问题数</th>
+                </tr>
+
+                <tr>
+                    <td><a href="https://baidu.com" target="_blank">baidu.com</a></td>
+                    <td><span class="score-bad">50</span></td>
+                    <td>200</td>
+                    <td>0.373s</td>
+                    <td>✅</td>
+                    <td>5</td>
+                </tr>
+
+            </table>
+        </div>
+
+        <div class="site-card">
+            <h2>baidu.com <span class="score-badge" style="background: #e74c3c;">50分</span></h2>
+
+            <div class="section">
+                <h3>🌐 基础信息</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>URL</label>
+                        <span>https://baidu.com</span>
+                    </div>
+                    <div class="info-item">
+                        <label>状态码</label>
+                        <span>200</span>
+                    </div>
+                    <div class="info-item">
+                        <label>响应时间</label>
+                        <span>0.373s</span>
+                    </div>
+                    <div class="info-item">
+                        <label>服务器</label>
+                        <span>BWS/1.1</span>
+                    </div>
+                    <div class="info-item">
+                        <label>内容大小</label>
+                        <span>0.2KB</span>
+                    </div>
+                    <div class="info-item">
+                        <label>重定向</label>
+                        <span>1次</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🔒 SSL证书</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>状态</label>
+                        <span class="tag tag-valid">有效</span>
+                    </div>
+
+                    <div class="info-item">
+                        <label>颁发机构</label>
+                        <span>GlobalSign nv-sa</span>
+                    </div>
+                    <div class="info-item">
+                        <label>有效期至</label>
+                        <span>2026-08-10</span>
+                    </div>
+                    <div class="info-item">
+                        <label>剩余天数</label>
+                        <span>93天</span>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📈 SEO分析</h3>
+                <div class="info-grid">
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>标题 (0字符)</label>
+                        <span>未设置</span>
+                    </div>
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>描述 (0字符)</label>
+                        <span>未设置</span>
+                    </div>
+                    <div class="info-item">
+                        <label>关键词</label>
+                        <span>未设置</span>
+                    </div>
+                    <div class="info-item">
+                        <label>移动端适配</label>
+                        <span class="tag tag-error">否</span>
+                    </div>
+                    <div class="info-item">
+                        <label>H标签分布</label>
+                        <span>H1:0 H2:0 H3:0</span>
+                    </div>
+                    <div class="info-item">
+                        <label>图片</label>
+                        <span>0个 (缺alt: 0)</span>
+                    </div>
+                    <div class="info-item">
+                        <label>链接</label>
+                        <span>内部:0 外部:0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="issues">
+                    <strong>⚠️ 发现的问题：</strong><br>
+                    ❌ 缺少页面标题<br>
+                    ❌ 缺少Meta描述<br>
+                    ❌ 缺少H1标签<br>
+                    ❌ 未适配移动端<br>
+                    ⚠️ 未启用Gzip压缩<br>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="suggestions">
+                    <strong>💡 优化建议：</strong><br>
+                    • 添加页面标题(title标签)<br>
+                    • 添加Meta描述(description标签)<br>
+                    • 添加H1标题标签<br>
+                    • 添加viewport meta标签<br>
+                    • 启用服务器Gzip压缩<br>
+
+                </div>
+            </div>
+
+        </div>
+
+        <div class="footer">
+            <p>报告由 <strong>多功能站长工具箱</strong> 生成</p>
+            <p>2026-05-09 00:06:51</p>
+        </div>
+    </div>
+</body>
+</html>

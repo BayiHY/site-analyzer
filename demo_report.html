@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网站分析报告</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; color: #2c3e50; margin: 30px 0; }
+        .summary { display: flex; justify-content: space-around; flex-wrap: wrap; margin: 20px 0; }
+        .summary-card { background: white; border-radius: 10px; padding: 20px; margin: 10px; min-width: 200px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .summary-card h3 { color: #666; font-size: 14px; margin-bottom: 10px; }
+        .summary-card .value { font-size: 36px; font-weight: bold; }
+        .score-good { color: #27ae60; }
+        .score-medium { color: #f39c12; }
+        .score-bad { color: #e74c3c; }
+        .site-card { background: white; border-radius: 10px; padding: 25px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .site-card h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
+        .score-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; color: white; font-size: 18px; font-weight: bold; }
+        .section { margin: 20px 0; }
+        .section h3 { color: #34495e; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .info-item { background: #f8f9fa; padding: 12px; border-radius: 6px; }
+        .info-item label { font-size: 12px; color: #666; display: block; margin-bottom: 5px; }
+        .info-item span { font-weight: 500; }
+        .issues { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin: 10px 0; }
+        .suggestions { background: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; border-radius: 4px; margin: 10px 0; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin: 2px; }
+        .tag-valid { background: #d4edda; color: #155724; }
+        .tag-warning { background: #fff3cd; color: #856404; }
+        .tag-error { background: #f8d7da; color: #721c24; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .footer { text-align: center; padding: 30px; color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 网站分析报告</h1>
+        <p style="text-align: center; color: #666;">生成时间: 2026-05-09 00:08:09</p>
+        
+        <div class="summary">
+            <div class="summary-card">
+                <h3>分析网站数</h3>
+                <div class="value">5</div>
+            </div>
+            <div class="summary-card">
+                <h3>平均评分</h3>
+                <div class="value score-medium">74</div>
+            </div>
+            <div class="summary-card">
+                <h3>可访问</h3>
+                <div class="value score-good">5</div>
+            </div>
+            <div class="summary-card">
+                <h3>需优化</h3>
+                <div class="value score-bad">3</div>
+            </div>
+        </div>
+
+        <div class="site-card">
+            <h2>📋 汇总一览</h2>
+            <table>
+                <tr>
+                    <th>网站</th>
+                    <th>评分</th>
+                    <th>状态码</th>
+                    <th>响应时间</th>
+                    <th>SSL</th>
+                    <th>问题数</th>
+                </tr>
+
+                <tr>
+                    <td><a href="https://juejin.cn" target="_blank">juejin.cn</a></td>
+                    <td><span class="score-good">90</span></td>
+                    <td>200</td>
+                    <td>0.262s</td>
+                    <td>✅</td>
+                    <td>1</td>
+                </tr>
+
+                <tr>
+                    <td><a href="https://zhihu.com" target="_blank">zhihu.com</a></td>
+                    <td><span class="score-good">80</span></td>
+                    <td>200</td>
+                    <td>0.242s</td>
+                    <td>✅</td>
+                    <td>3</td>
+                </tr>
+
+                <tr>
+                    <td><a href="https://baidu.com" target="_blank">baidu.com</a></td>
+                    <td><span class="score-bad">50</span></td>
+                    <td>200</td>
+                    <td>0.427s</td>
+                    <td>✅</td>
+                    <td>5</td>
+                </tr>
+
+                <tr>
+                    <td><a href="https://bilibili.com" target="_blank">bilibili.com</a></td>
+                    <td><span class="score-medium">75</span></td>
+                    <td>200</td>
+                    <td>0.383s</td>
+                    <td>✅</td>
+                    <td>3</td>
+                </tr>
+
+                <tr>
+                    <td><a href="https://github.com" target="_blank">github.com</a></td>
+                    <td><span class="score-medium">75</span></td>
+                    <td>200</td>
+                    <td>1.01s</td>
+                    <td>✅</td>
+                    <td>5</td>
+                </tr>
+
+            </table>
+        </div>
+
+        <div class="site-card">
+            <h2>juejin.cn <span class="score-badge" style="background: #27ae60;">90分</span></h2>
+
+            <div class="section">
+                <h3>🌐 基础信息</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>URL</label>
+                        <span>https://juejin.cn</span>
+                    </div>
+                    <div class="info-item">
+                        <label>状态码</label>
+                        <span>200</span>
+                    </div>
+                    <div class="info-item">
+                        <label>响应时间</label>
+                        <span>0.262s</span>
+                    </div>
+                    <div class="info-item">
+                        <label>服务器</label>
+                        <span>Tengine</span>
+                    </div>
+                    <div class="info-item">
+                        <label>内容大小</label>
+                        <span>82.4KB</span>
+                    </div>
+                    <div class="info-item">
+                        <label>重定向</label>
+                        <span>0次</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🔒 SSL证书</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>状态</label>
+                        <span class="tag tag-valid">有效</span>
+                    </div>
+
+                    <div class="info-item">
+                        <label>颁发机构</label>
+                        <span>DigiCert Inc</span>
+                    </div>
+                    <div class="info-item">
+                        <label>有效期至</label>
+                        <span>2027-01-18</span>
+                    </div>
+                    <div class="info-item">
+                        <label>剩余天数</label>
+                        <span>254天</span>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📈 SEO分析</h3>
+                <div class="info-grid">
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>标题 (4字符)</label>
+                        <span>稀土掘金</span>
+                    </div>
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>描述 (89字符)</label>
+                        <span>掘金是面向全球中文开发者的技术内容分享与交流平台。我们通过技术文章、沸点、课程、直播等产品和服务，打造一个激发开发者创作灵感，激励开发者沉淀分享，陪伴开发者成长的综合类技术社区。</span>
+                    </div>
+                    <div class="info-item">
+                        <label>关键词</label>
+                        <span>掘金,稀土,Vue.js,前端面试题,Kotlin,ReactNative,Python, 掘金,掘金网,掘金社区,掘金</span>
+                    </div>
+                    <div class="info-item">
+                        <label>移动端适配</label>
+                        <span class="tag tag-valid">是</span>
+                    </div>
+                    <div class="info-item">
+                        <label>H标签分布</label>
+                        <span>H1:0 H2:0 H3:0</span>
+                    </div>
+                    <div class="info-item">
+                        <label>图片</label>
+                        <span>3个 (缺alt: 0)</span>
+                    </div>
+                    <div class="info-item">
+                        <label>链接</label>
+                        <span>内部:4 外部:44</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="issues">
+                    <strong>⚠️ 发现的问题：</strong><br>
+                    ❌ 缺少H1标签<br>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="suggestions">
+                    <strong>💡 优化建议：</strong><br>
+                    • 添加H1标题标签<br>
+
+                </div>
+            </div>
+
+        </div>
+
+        <div class="site-card">
+            <h2>zhihu.com <span class="score-badge" style="background: #27ae60;">80分</span></h2>
+
+            <div class="section">
+                <h3>🌐 基础信息</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>URL</label>
+                        <span>https://zhihu.com</span>
+                    </div>
+                    <div class="info-item">
+                        <label>状态码</label>
+                        <span>200</span>
+                    </div>
+                    <div class="info-item">
+                        <label>响应时间</label>
+                        <span>0.242s</span>
+                    </div>
+                    <div class="info-item">
+                        <label>服务器</label>
+                        <span>BLB/25.11.0.2</span>
+                    </div>
+                    <div class="info-item">
+                        <label>内容大小</label>
+                        <span>43.0KB</span>
+                    </div>
+                    <div class="info-item">
+                        <label>重定向</label>
+                        <span>2次</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🔒 SSL证书</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>状态</label>
+                        <span class="tag tag-valid">有效</span>
+                    </div>
+
+                    <div class="info-item">
+                        <label>颁发机构</label>
+                        <span>DigiCert, Inc.</span>
+                    </div>
+                    <div class="info-item">
+                        <label>有效期至</label>
+                        <span>2026-12-10</span>
+                    </div>
+                    <div class="info-item">
+                        <label>剩余天数</label>
+                        <span>215天</span>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📈 SEO分析</h3>
+                <div class="info-grid">
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>标题 (14字符)</label>
+                        <span>知乎 - 有问题，就会有答案</span>
+                    </div>
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>描述 (217字符)</label>
+                        <span>知乎，中文互联网高质量的问答社区和创作者聚集的原创内容平台，于 2011 年 1 月正式上线，以「让人们更好的分享知识、经验和见解，找到自己的解答」为品牌使命。知乎凭借认真、专业、友善的社区氛围、独特的产品机制以及结构化和易获得的优质内容，</span>
+                    </div>
+                    <div class="info-item">
+                        <label>关键词</label>
+                        <span>未设置</span>
+                    </div>
+                    <div class="info-item">
+                        <label>移动端适配</label>
+                        <span class="tag tag-valid">是</span>
+                    </div>
+                    <div class="info-item">
+                        <label>H标签分布</label>
+                        <span>H1:0 H2:0 H3:0</span>
+                    </div>
+                    <div class="info-item">
+                        <label>图片</label>
+                        <span>3个 (缺alt: 1)</span>
+                    </div>
+                    <div class="info-item">
+                        <label>链接</label>
+                        <span>内部:9 外部:16</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="issues">
+                    <strong>⚠️ 发现的问题：</strong><br>
+                    ⚠️ 描述过长(建议120-160字符)<br>
+                    ❌ 缺少H1标签<br>
+                    ⚠️ 1张图片缺少alt属性<br>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="suggestions">
+                    <strong>💡 优化建议：</strong><br>
+                    • 添加H1标题标签<br>
+                    • 为所有图片添加alt描述<br>
+
+                </div>
+            </div>
+
+        </div>
+
+        <div class="site-card">
+            <h2>baidu.com <span class="score-badge" style="background: #e74c3c;">50分</span></h2>
+
+            <div class="section">
+                <h3>🌐 基础信息</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>URL</label>
+                        <span>https://baidu.com</span>
+                    </div>
+                    <div class="info-item">
+                        <label>状态码</label>
+                        <span>200</span>
+                    </div>
+                    <div class="info-item">
+                        <label>响应时间</label>
+                        <span>0.427s</span>
+                    </div>
+                    <div class="info-item">
+                        <label>服务器</label>
+                        <span>BWS/1.1</span>
+                    </div>
+                    <div class="info-item">
+                        <label>内容大小</label>
+                        <span>0.2KB</span>
+                    </div>
+                    <div class="info-item">
+                        <label>重定向</label>
+                        <span>1次</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🔒 SSL证书</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>状态</label>
+                        <span class="tag tag-valid">有效</span>
+                    </div>
+
+                    <div class="info-item">
+                        <label>颁发机构</label>
+                        <span>GlobalSign nv-sa</span>
+                    </div>
+                    <div class="info-item">
+                        <label>有效期至</label>
+                        <span>2026-08-10</span>
+                    </div>
+                    <div class="info-item">
+                        <label>剩余天数</label>
+                        <span>93天</span>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📈 SEO分析</h3>
+                <div class="info-grid">
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>标题 (0字符)</label>
+                        <span>未设置</span>
+                    </div>
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>描述 (0字符)</label>
+                        <span>未设置</span>
+                    </div>
+                    <div class="info-item">
+                        <label>关键词</label>
+                        <span>未设置</span>
+                    </div>
+                    <div class="info-item">
+                        <label>移动端适配</label>
+                        <span class="tag tag-error">否</span>
+                    </div>
+                    <div class="info-item">
+                        <label>H标签分布</label>
+                        <span>H1:0 H2:0 H3:0</span>
+                    </div>
+                    <div class="info-item">
+                        <label>图片</label>
+                        <span>0个 (缺alt: 0)</span>
+                    </div>
+                    <div class="info-item">
+                        <label>链接</label>
+                        <span>内部:0 外部:0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="issues">
+                    <strong>⚠️ 发现的问题：</strong><br>
+                    ❌ 缺少页面标题<br>
+                    ❌ 缺少Meta描述<br>
+                    ❌ 缺少H1标签<br>
+                    ❌ 未适配移动端<br>
+                    ⚠️ 未启用Gzip压缩<br>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="suggestions">
+                    <strong>💡 优化建议：</strong><br>
+                    • 添加页面标题(title标签)<br>
+                    • 添加Meta描述(description标签)<br>
+                    • 添加H1标题标签<br>
+                    • 添加viewport meta标签<br>
+                    • 启用服务器Gzip压缩<br>
+
+                </div>
+            </div>
+
+        </div>
+
+        <div class="site-card">
+            <h2>bilibili.com <span class="score-badge" style="background: #f39c12;">75分</span></h2>
+
+            <div class="section">
+                <h3>🌐 基础信息</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>URL</label>
+                        <span>https://bilibili.com</span>
+                    </div>
+                    <div class="info-item">
+                        <label>状态码</label>
+                        <span>200</span>
+                    </div>
+                    <div class="info-item">
+                        <label>响应时间</label>
+                        <span>0.383s</span>
+                    </div>
+                    <div class="info-item">
+                        <label>服务器</label>
+                        <span>未知</span>
+                    </div>
+                    <div class="info-item">
+                        <label>内容大小</label>
+                        <span>108.8KB</span>
+                    </div>
+                    <div class="info-item">
+                        <label>重定向</label>
+                        <span>1次</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🔒 SSL证书</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>状态</label>
+                        <span class="tag tag-valid">有效</span>
+                    </div>
+
+                    <div class="info-item">
+                        <label>颁发机构</label>
+                        <span>GlobalSign nv-sa</span>
+                    </div>
+                    <div class="info-item">
+                        <label>有效期至</label>
+                        <span>2026-12-13</span>
+                    </div>
+                    <div class="info-item">
+                        <label>剩余天数</label>
+                        <span>218天</span>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📈 SEO分析</h3>
+                <div class="info-grid">
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>标题 (25字符)</label>
+                        <span>哔哩哔哩 (゜-゜)つロ 干杯~-bilibili</span>
+                    </div>
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>描述 (73字符)</label>
+                        <span>哔哩哔哩（bilibili.com)是国内知名的视频弹幕网站，这里有及时的动漫新番，活跃的ACG氛围，有创意的Up主。大家可以在这里找到许多欢乐。</span>
+                    </div>
+                    <div class="info-item">
+                        <label>关键词</label>
+                        <span>bilibili,哔哩哔哩,哔哩哔哩动画,哔哩哔哩弹幕网,弹幕视频,B站,弹幕,字幕,AMV,MAD,MTV,ANIME</span>
+                    </div>
+                    <div class="info-item">
+                        <label>移动端适配</label>
+                        <span class="tag tag-error">否</span>
+                    </div>
+                    <div class="info-item">
+                        <label>H标签分布</label>
+                        <span>H1:0 H2:0 H3:10</span>
+                    </div>
+                    <div class="info-item">
+                        <label>图片</label>
+                        <span>13个 (缺alt: 1)</span>
+                    </div>
+                    <div class="info-item">
+                        <label>链接</label>
+                        <span>内部:86 外部:0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="issues">
+                    <strong>⚠️ 发现的问题：</strong><br>
+                    ❌ 缺少H1标签<br>
+                    ⚠️ 1张图片缺少alt属性<br>
+                    ❌ 未适配移动端<br>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="suggestions">
+                    <strong>💡 优化建议：</strong><br>
+                    • 添加H1标题标签<br>
+                    • 为所有图片添加alt描述<br>
+                    • 添加viewport meta标签<br>
+
+                </div>
+            </div>
+
+        </div>
+
+        <div class="site-card">
+            <h2>github.com <span class="score-badge" style="background: #f39c12;">75分</span></h2>
+
+            <div class="section">
+                <h3>🌐 基础信息</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>URL</label>
+                        <span>https://github.com</span>
+                    </div>
+                    <div class="info-item">
+                        <label>状态码</label>
+                        <span>200</span>
+                    </div>
+                    <div class="info-item">
+                        <label>响应时间</label>
+                        <span>1.01s</span>
+                    </div>
+                    <div class="info-item">
+                        <label>服务器</label>
+                        <span>github.com</span>
+                    </div>
+                    <div class="info-item">
+                        <label>内容大小</label>
+                        <span>556.0KB</span>
+                    </div>
+                    <div class="info-item">
+                        <label>重定向</label>
+                        <span>0次</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>🔒 SSL证书</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>状态</label>
+                        <span class="tag tag-valid">有效</span>
+                    </div>
+
+                    <div class="info-item">
+                        <label>颁发机构</label>
+                        <span>Sectigo Limited</span>
+                    </div>
+                    <div class="info-item">
+                        <label>有效期至</label>
+                        <span>2026-08-02</span>
+                    </div>
+                    <div class="info-item">
+                        <label>剩余天数</label>
+                        <span>85天</span>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>📈 SEO分析</h3>
+                <div class="info-grid">
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>标题 (61字符)</label>
+                        <span>GitHub · Change is constant. GitHub keeps you ahead. · GitHub</span>
+                    </div>
+                    <div class="info-item" style="grid-column: span 2;">
+                        <label>描述 (186字符)</label>
+                        <span>Join the world's most widely adopted, AI-powered developer platform where millions of developers, businesses, and the la</span>
+                    </div>
+                    <div class="info-item">
+                        <label>关键词</label>
+                        <span>未设置</span>
+                    </div>
+                    <div class="info-item">
+                        <label>移动端适配</label>
+                        <span class="tag tag-valid">是</span>
+                    </div>
+                    <div class="info-item">
+                        <label>H标签分布</label>
+                        <span>H1:4 H2:10 H3:16</span>
+                    </div>
+                    <div class="info-item">
+                        <label>图片</label>
+                        <span>24个 (缺alt: 17)</span>
+                    </div>
+                    <div class="info-item">
+                        <label>链接</label>
+                        <span>内部:86 外部:66</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="issues">
+                    <strong>⚠️ 发现的问题：</strong><br>
+                    ⚠️ 标题过长(建议30-60字符)<br>
+                    ⚠️ 描述过长(建议120-160字符)<br>
+                    ⚠️ H1标签过多(建议只用1个)<br>
+                    ⚠️ 17张图片缺少alt属性<br>
+                    ⚠️ 响应时间偏慢(>1s)<br>
+
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="suggestions">
+                    <strong>💡 优化建议：</strong><br>
+                    • 为所有图片添加alt描述<br>
+
+                </div>
+            </div>
+
+        </div>
+
+        <div class="footer">
+            <p>报告由 <strong>多功能站长工具箱</strong> 生成</p>
+            <p>2026-05-09 00:08:09</p>
+        </div>
+    </div>
+</body>
+</html>
