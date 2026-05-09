@@ -484,9 +484,16 @@
         async function quickAnalyze(url) {
             urlInput.value = url;
             
+            // 获取DNS结果框
+            const dnsResult = document.getElementById('dnsResult');
+            
+            // 如果不是GitHub，隐藏DNS结果框
+            if (!url.includes('github')) {
+                dnsResult.style.display = 'none';
+            }
+            
             // 如果是GitHub，先检测DNS
             if (url.includes('github')) {
-                const dnsResult = document.getElementById('dnsResult');
                 dnsResult.style.display = 'block';
                 dnsResult.style.color = '#00d2ff';
                 
