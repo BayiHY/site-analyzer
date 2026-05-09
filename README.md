@@ -5,10 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7+-green.svg)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-Web%20Framework-orange.svg)](https://flask.palletsprojects.com/)
-[![GitHub Stars](https://img.shields.io/github/stars/BayiHY/site-analyzer?style=social)](https://github.com/BayiHY/site-analyzer)
-[![GitHub Forks](https://img.shields.io/github/forks/BayiHY/site-analyzer?style=social)](https://github.com/BayiHY/site-analyzer)
-[![GitHub Issues](https://img.shields.io/github/issues/BayiHY/site-analyzer)](https://github.com/BayiHY/site-analyzer/issues)
-[![GitHub Last Commit](https://img.shields.io/github/last-commit/BayiHY/site-analyzer)](https://github.com/BayiHY/site-analyzer)
+
+📦 **源码仓库：** [Gitee](https://gitee.com/BayiHY/site-analyzer) ｜ [GitCode](https://gitcode.com/BayiHY/site-analyzer) ｜ [GitHub](https://github.com/BayiHY/site-analyzer)
 
 ## 🎯 为什么选择这个工具？
 
@@ -176,8 +174,13 @@ MIT License - 免费使用，商业友好
 ## 👨‍💻 作者
 
 **巴依浩爷(BayiHY)**
-- GitCode: [https://gitcode.com/BayiHY](https://gitcode.com/BayiHY)
-- 在线体验: [http://111.228.14.153/tools](http://111.228.14.153/tools)
+
+📦 **源码仓库：**
+- Gitee: [https://gitee.com/BayiHY/site-analyzer](https://gitee.com/BayiHY/site-analyzer)
+- GitCode: [https://gitcode.com/BayiHY/site-analyzer](https://gitcode.com/BayiHY/site-analyzer)
+- GitHub: [https://github.com/BayiHY/site-analyzer](https://github.com/BayiHY/site-analyzer)
+
+🔗 **在线体验：** [http://111.228.14.153/tools](http://111.228.14.153/tools)
 
 ## 🤝 贡献
 
