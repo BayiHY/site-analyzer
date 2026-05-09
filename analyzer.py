@@ -12,10 +12,32 @@ import time
 import json
 import sys
 import os
+import re
 import argparse
 from datetime import datetime
 from urllib.parse import urlparse, urljoin
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def fix_encoding(response):
+    """修复 requests 编码检测不准的问题（常见于百度等中文站点）"""
+    # 1. 优先从 Content-Type header 获取 charset
+    content_type = response.headers.get('Content-Type', '')
+    charset_match = re.search(r'charset=([^\s;]+)', content_type, re.I)
+    if charset_match:
+        response.encoding = charset_match.group(1).strip()
+        return response.text
+
+    # 2. 从 HTML 前 2048 字节检测 meta charset
+    head = response.content[:2048].decode('ascii', errors='ignore')
+    meta_charset = re.search(r'<meta[^>]+charset=["\']?([^"\'\s;>]+)', head, re.I)
+    if meta_charset:
+        response.encoding = meta_charset.group(1)
+        return response.text
+
+    # 3. 兜底 utf-8（requests 默认 ISO-8859-1 会导致中文乱码）
+    response.encoding = 'utf-8'
+    return response.text
 
 # 特定域名的备用IP（当DNS解析的IP不通时使用）
 ALTERNATIVE_IPS = {
@@ -76,7 +98,7 @@ class SiteAnalyzer:
         """尝试连接URL"""
         try:
             start_time = time.time()
-            headers = {'User-Agent': 'Mozilla/5.0 (compatible; SiteAnalyzer/1.0)'}
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
             if host_header:
                 headers['Host'] = host_header
             
@@ -174,7 +196,7 @@ class SiteAnalyzer:
         try:
             # 使用解析的IP（如果有）或URL
             request_url = self.url
-            headers = {'User-Agent': 'Mozilla/5.0 (compatible; SiteAnalyzer/1.0)'}
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
             if 'resolved_ip' in self.results:
                 request_url = self.url.replace(self.domain, self.results['resolved_ip'])
                 headers['Host'] = self.domain
@@ -185,8 +207,10 @@ class SiteAnalyzer:
                 headers=headers,
                 verify=False
             )
-            soup = BeautifulSoup(response.text, 'html.parser')
+            html_text = fix_encoding(response)
+            soup = BeautifulSoup(html_text, 'html.parser')
             self._soup = soup  # 保存供AI可发现性检测使用
+            self._raw_html = html_text  # 保存原始HTML供ICP等检测
             
             seo = {}
             
@@ -271,7 +295,7 @@ class SiteAnalyzer:
                 try:
                     mobile_ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
                     mobile_response = requests.get(self.url, timeout=self.timeout, headers={'User-Agent': mobile_ua})
-                    mobile_soup = BeautifulSoup(mobile_response.text, 'html.parser')
+                    mobile_soup = BeautifulSoup(fix_encoding(mobile_response), 'html.parser')
                     
                     # 检查手机UA返回的页面是否有viewport
                     mobile_viewport = mobile_soup.find('meta', attrs={'name': 'viewport'})
@@ -594,14 +618,33 @@ class SiteAnalyzer:
             details.append({'icon': '❌', 'text': '未使用HTTPS', 'score': 0, 'tip': 'HTTPS是基本信任信号'})
         
         # 备案号 (8分) - 国内特色
-        icp_patterns = ['京ICP', '沪ICP', '粤ICP', '浙ICP', '苏ICP', 'ICP备', 'icp', '备案']
-        has_icp = any(p in page_text for p in icp_patterns)
-        if has_icp:
+        # 三级检测：可见文本 > HTML源码 > 热门站点推测
+        import re
+        icp_regex = re.compile(r'(京|沪|粤|浙|苏|鲁|豫|川|渝|鄂|湘|皖|闽|赣|桂|黔|滇|冀|晋|辽|吉|黑|蒙|陕|甘|青|藏|新|琼|宁)ICP[证备]?\d+号?', re.IGNORECASE)
+        known_icp_domains = {
+            'bilibili.com', 'douyin.com', 'toutiao.com', 'zhihu.com',
+            'weibo.com', 'baidu.com', 'jd.com', 'taobao.com',
+            'tmall.com', 'alipay.com', '163.com', 'qq.com',
+            'weixin.qq.com', 'xiaohongshu.com', 'kuaishou.com',
+            'pinduoduo.com', 'meituan.com', 'douban.com', 'juejin.cn',
+        }
+        
+        # 1. 优先检查可见文本（页脚直接展示 = 最佳）
+        icp_match = icp_regex.search(page_text)
+        if icp_match:
             auth_score += 8
-            details.append({'icon': '✅', 'text': '有ICP备案号', 'score': 8})
+            details.append({'icon': '✅', 'text': f'有ICP备案号（页脚可见）', 'score': 8})
+        # 2. 检查HTML源码（在页面中但不直接可见，如隐藏在script或data属性）
+        elif hasattr(self, '_raw_html') and icp_regex.search(self._raw_html):
+            auth_score += 5
+            details.append({'icon': '🟡', 'text': '有ICP备案号（源码中，建议移至页脚可见位置）', 'score': 5, 'tip': '页脚展示备案号可增强用户信任'})
+        # 3. 已知热门站点推测（SPA完全JS渲染，页面源码无痕迹）
+        elif any(d in self.domain for d in known_icp_domains):
+            auth_score += 3
+            details.append({'icon': '🟡', 'text': '可能有ICP备案（SPA站点，页面未展示）', 'score': 3, 'tip': '建议在页脚添加备案号，提升百度信任度'})
         else:
             details.append({'icon': '❌', 'text': '未发现ICP备案', 'score': 0, 'tip': '备案号是百度信任的重要信号'})
-        
+
         # 联系方式 (8分)
         contact_kw = ['联系', 'contact', 'about', '关于', '邮箱', 'email', '@', '电话', 'tel']
         has_contact = any(kw in page_text for kw in contact_kw)
@@ -662,7 +705,7 @@ class SiteAnalyzer:
         try:
             # 使用解析的IP（如果有）或URL
             request_url = self.url
-            headers = {'User-Agent': 'Mozilla/5.0 (compatible; SiteAnalyzer/1.0)'}
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
             if 'resolved_ip' in self.results:
                 request_url = self.url.replace(self.domain, self.results['resolved_ip'])
                 headers['Host'] = self.domain

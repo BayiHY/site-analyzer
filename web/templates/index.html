@@ -399,6 +399,40 @@
             .score-card { padding: 24px 16px; }
         }
 
+        /* 分享按钮栏 */
+        .share-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .share-btn {
+            flex: 1;
+            min-width: 100px;
+            padding: 10px 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            color: #ccc;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .share-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border-color: rgba(255,255,255,0.2);
+        }
+        .share-btn:active { transform: scale(0.97); }
+        .share-screenshot:hover { border-color: #00d2ff; color: #00d2ff; }
+        .share-link:hover { border-color: #2ed573; color: #2ed573; }
+
+        @media (max-width: 480px) {
+            .share-bar { gap: 8px; }
+            .share-btn { padding: 10px 12px; font-size: 12px; }
+        }
+
         /* 滑入动画 */
         .fade-in {
             animation: fadeIn 0.4s ease-out;
@@ -425,6 +459,7 @@
             position: relative;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body>
     <header class="header">
@@ -470,7 +505,7 @@
             站长工具 · © <a href="https://gitcode.com/BayiHY" target="_blank" style="color: inherit;">巴依浩爷(BayiHY)</a> · 免费开源 · 隐私优先 · 数据不存储
         </div>
         <div style="font-size:11px;color:#888;margin-bottom:6px;">
-            📧 95440881@qq.com · 💬 微信: BayiHY · 🎵 抖音: BayiHY · 🐧 QQ: 95440881
+            <a href="#" onclick="copyText('95440881@qq.com', this);return false;" style="color:inherit;text-decoration:none;">📧 95440881@qq.com</a> · <a href="#" onclick="showWechatQR();return false;" style="color:inherit;text-decoration:none;">💬 微信: BayiHY</a> · <a href="#" onclick="showDouyinQR();return false;" style="color:inherit;text-decoration:none;">🎵 抖音: BayiHY</a> · <a href="#" onclick="showXhsQR();return false;" style="color:inherit;text-decoration:none;">📕 小红书: 26501111419</a> · <a href="#" onclick="showQQQR();return false;" style="color:inherit;text-decoration:none;">🐧 QQ: 95440881</a>
         </div>
         <div style="font-size:11px;color:#666;">
             <a href="https://gitcode.com/BayiHY/site-analyzer" target="_blank" style="color:#888;margin:0 8px;">⭐ 给个Star</a> · 
@@ -509,12 +544,101 @@
         </div>
     </div>
 
+    <!-- 微信二维码弹窗 -->
+    <div id="wechatModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:min(420px,90vw);width:90%;text-align:center;border:1px solid #333;">
+            <h3 style="color:#07c160;margin-bottom:15px;">💬 微信扫码添加</h3>
+            <img src="/tools/static/images/wechat-qr.jpg" alt="微信二维码" style="max-width:100%;max-height:60vh;border-radius:8px;margin-bottom:10px;object-fit:contain;">
+            <p style="color:#aaa;font-size:13px;margin-bottom:12px;">微信号：BayiHY <button onclick="copyText('BayiHY', this)" style="background:#07c160;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;margin-left:6px;">📋 复制</button></p>
+            <button onclick="document.getElementById('wechatModal').style.display='none'" style="margin-top:15px;padding:8px 24px;background:#07c160;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">关闭</button>
+        </div>
+    </div>
+
+    <!-- 抖音二维码弹窗 -->
+    <div id="douyinModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:min(420px,90vw);width:90%;text-align:center;border:1px solid #333;">
+            <h3 style="color:#fe2c55;margin-bottom:15px;">🎵 抖音扫码关注</h3>
+            <img src="/tools/static/images/douyin-qr.jpg" alt="抖音二维码" style="max-width:100%;max-height:60vh;border-radius:8px;margin-bottom:10px;object-fit:contain;">
+            <p style="color:#aaa;font-size:13px;margin-bottom:12px;">抖音号：BayiHY <button onclick="copyText('BayiHY', this)" style="background:#fe2c55;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;margin-left:6px;">📋 复制</button></p>
+            <button onclick="document.getElementById('douyinModal').style.display='none'" style="margin-top:15px;padding:8px 24px;background:#fe2c55;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">关闭</button>
+        </div>
+    </div>
+
+    <!-- 小红书二维码弹窗 -->
+    <div id="xhsModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:min(420px,90vw);width:90%;text-align:center;border:1px solid #333;">
+            <h3 style="color:#ff2442;margin-bottom:15px;">📕 小红书扫码关注</h3>
+            <img src="/tools/static/images/xiaohongshu-qr.jpg" alt="小红书二维码" style="max-width:100%;max-height:60vh;border-radius:8px;margin-bottom:10px;object-fit:contain;">
+            <p style="color:#aaa;font-size:13px;margin-bottom:12px;">小红书号：26501111419 <button onclick="copyText('26501111419', this)" style="background:#ff2442;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;margin-left:6px;">📋 复制</button></p>
+            <button onclick="document.getElementById('xhsModal').style.display='none'" style="margin-top:15px;padding:8px 24px;background:#ff2442;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">关闭</button>
+        </div>
+    </div>
+
+    <!-- QQ二维码弹窗 -->
+    <div id="qqModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:min(420px,90vw);width:90%;text-align:center;border:1px solid #333;">
+            <h3 style="color:#12b7f5;margin-bottom:15px;">🐧 QQ扫码添加</h3>
+            <img src="/tools/static/images/qq-qr.jpg" alt="QQ二维码" style="max-width:100%;max-height:60vh;border-radius:8px;margin-bottom:10px;object-fit:contain;">
+            <p style="color:#aaa;font-size:13px;margin-bottom:12px;">QQ号：95440881 <button onclick="copyText('95440881', this)" style="background:#12b7f5;color:#fff;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;margin-left:6px;">📋 复制</button></p>
+            <button onclick="document.getElementById('qqModal').style.display='none'" style="margin-top:15px;padding:8px 24px;background:#12b7f5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">关闭</button>
+        </div>
+    </div>
+
     <script>
         function showPrivacy() {
             document.getElementById('privacyModal').style.display = 'flex';
         }
         function showDisclaimer() {
             document.getElementById('disclaimerModal').style.display = 'flex';
+        }
+        function showWechatQR() {
+            document.getElementById('wechatModal').style.display = 'flex';
+        }
+        function showDouyinQR() {
+            document.getElementById('douyinModal').style.display = 'flex';
+        }
+        function showXhsQR() {
+            document.getElementById('xhsModal').style.display = 'flex';
+        }
+        function showQQQR() {
+            document.getElementById('qqModal').style.display = 'flex';
+        }
+        function copyText(text, btn) {
+            var done = function() { showToast('已复制: ' + text, btn); };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done, function() { fallbackCopy(text, done); });
+            } else {
+                fallbackCopy(text, done);
+            }
+        }
+        function fallbackCopy(text, cb) {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+            document.body.appendChild(ta);
+            ta.focus(); ta.select();
+            try { document.execCommand('copy'); } catch(e) {}
+            document.body.removeChild(ta);
+            cb();
+        }
+        function showToast(msg, anchor) {
+            var toast = document.getElementById('copyToast');
+            toast.textContent = (msg.startsWith('正在') || msg.startsWith('截图') ? '⏳ ' : '✅ ') + msg;
+            if (anchor) {
+                var r = anchor.getBoundingClientRect();
+                toast.style.left = (r.left + r.width / 2) + 'px';
+                toast.style.top = (r.top - 40) + 'px';
+                toast.style.transform = 'translateX(-50%)';
+            } else {
+                toast.style.left = '50%';
+                toast.style.top = '50%';
+                toast.style.transform = 'translate(-50%, -50%)';
+            }
+            toast.style.display = 'block';
+            toast.style.opacity = '1';
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(function() { toast.style.opacity = '0'; }, 1500);
+            setTimeout(function() { toast.style.display = 'none'; }, 1800);
         }
     </script>
 
@@ -723,6 +847,13 @@
                         <div class="score-bar">
                             <div class="score-bar-fill" style="width: ${score}%; background: ${scoreColor};"></div>
                         </div>
+                    </div>
+
+                    <!-- 分享按钮 -->
+                    <div class="share-bar" id="shareBar">
+                        <button onclick="shareScreenshot()" class="share-btn share-screenshot">📸 长图分享</button>
+                        <button onclick="shareLink()" class="share-btn share-link">🔗 链接分享</button>
+
                     </div>
 
                     <!-- 可用性 -->
@@ -1006,6 +1137,52 @@
             d.textContent = str;
             return d.innerHTML;
         }
+
+        // ========== 分享功能 ==========
+
+        // 截长图
+        async function shareScreenshot() {
+            const el = document.getElementById('result');
+            if (!el) return;
+            showToast('正在生成截图...', null);
+            try {
+                const canvas = await html2canvas(el, {
+                    backgroundColor: '#0a0a1a',
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
+                const link = document.createElement('a');
+                link.download = 'site-analysis-' + (document.getElementById('urlInput').value.replace(/[^a-zA-Z0-9]/g, '_')) + '.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showToast('截图已保存', null);
+            } catch(e) {
+                showToast('截图失败，请重试', null);
+            }
+        }
+
+        // 复制分享链接
+        function shareLink() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) return;
+            const shareUrl = window.location.origin + window.location.pathname + '?url=' + encodeURIComponent(url);
+            copyText(shareUrl, null);
+        }
+
+
+
+        // ========== URL参数自动分析 ==========
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            const autoUrl = params.get('url');
+            if (autoUrl) {
+                document.getElementById('urlInput').value = autoUrl;
+                // 等页面加载完再触发
+                setTimeout(function() { analyze(); }, 300);
+            }
+        })();
     </script>
+    <div id="copyToast" style="display:none;position:fixed;background:rgba(0,0,0,0.85);color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;z-index:99999;transition:opacity 0.3s;pointer-events:none;white-space:nowrap;backdrop-filter:blur(4px);box-shadow:0 4px 12px rgba(0,0,0,0.3);"></div>
 </body>
 </html>
