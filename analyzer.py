@@ -223,6 +223,28 @@ class SiteAnalyzer:
                             mobile_type.append('JS跳转适配')
                             break
             
+            # 4. 如果桌面版没检测到，用手机UA再访问一次（百度等网站会根据UA返回不同内容）
+            if not mobile_friendly:
+                try:
+                    mobile_ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+                    mobile_response = requests.get(self.url, timeout=self.timeout, headers={'User-Agent': mobile_ua})
+                    mobile_soup = BeautifulSoup(mobile_response.text, 'html.parser')
+                    
+                    # 检查手机UA返回的页面是否有viewport
+                    mobile_viewport = mobile_soup.find('meta', attrs={'name': 'viewport'})
+                    if mobile_viewport and mobile_viewport.get('content'):
+                        if 'width=device' in mobile_viewport['content'].lower():
+                            mobile_friendly = True
+                            mobile_type.append('UA自适应')
+                    
+                    # 检查是否重定向到了移动子域名
+                    if mobile_response.url and any(m in mobile_response.url for m in ['m.', 'mobile.']):
+                        if 'UA重定向' not in mobile_type:
+                            mobile_friendly = True
+                            mobile_type.append('UA重定向')
+                except:
+                    pass
+            
             seo['mobile_friendly'] = mobile_friendly
             seo['mobile_type'] = mobile_type if mobile_type else ['无']
             
