@@ -86,6 +86,25 @@ def check_rate_limit():
         }), 429
     return None
 
+
+# ==================== 响应头注入速率限制信息 ====================
+
+@app.after_request
+def add_rate_limit_headers(response):
+    """给所有 /api/ 响应加上标准速率限制头"""
+    if request.path.startswith('/api/'):
+        fp = limiter._get_fingerprint()
+        now = time.time()
+        with limiter._lock:
+            # 只读取，不消耗配额
+            active = [t for t in limiter._records.get(fp, []) if now - t < limiter.window]
+            remaining = limiter.max_requests - len(active)
+        response.headers['X-RateLimit-Limit'] = str(limiter.max_requests)
+        response.headers['X-RateLimit-Remaining'] = str(max(0, remaining))
+        response.headers['X-RateLimit-Window'] = str(limiter.window)
+    return response
+
+
 # ==================== 路由 ====================
 
 @app.route('/')
@@ -105,13 +124,20 @@ def health():
             'POST /api/batch': '批量分析（最多10个）',
             'POST /api/dns': 'DNS解析检测',
             'POST /api/test-ip': 'IP可达性测试',
-            'GET /api/docs': 'API详细文档'
+            'GET /api/docs': 'API详细文档(JSON)',
+            'GET /api/docs.html': 'API详细文档(HTML)'
         },
         'rate_limit': {
             'max_requests': limiter.max_requests,
             'window_seconds': limiter.window
         }
     })
+
+
+@app.route('/api/docs.html')
+def api_docs_html():
+    """API文档 - HTML格式，对人类和AI智能体都友好"""
+    return render_template('api_docs.html')
 
 
 @app.route('/api/docs')
@@ -255,6 +281,10 @@ def batch_analyze():
 @app.route('/api/dns', methods=['POST'])
 def check_dns():
     """检测域名DNS解析"""
+    rate_resp = check_rate_limit()
+    if rate_resp:
+        return rate_resp
+
     import socket
     
     data = request.get_json()
@@ -307,6 +337,10 @@ def check_dns():
 @app.route('/api/test-ip', methods=['POST'])
 def test_ip():
     """测试IP可达性"""
+    rate_resp = check_rate_limit()
+    if rate_resp:
+        return rate_resp
+
     import socket
     import ssl
     

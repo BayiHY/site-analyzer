@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 智能体 API 文档 - 站长工具</title>
+    <meta name="description" content="站长工具开放API接口，支持AI智能体和程序化调用网站SEO分析、SSL检测、性能分析等能力。">
+    <meta name="robots" content="index, follow">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            min-height: 100vh;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        .header {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 15px 20px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(90deg, #00d2ff, #928dab);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header a {
+            color: #00d2ff;
+            text-decoration: none;
+            font-size: 13px;
+            margin-left: 12px;
+        }
+        .container {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 32px 20px;
+            margin-bottom: 24px;
+        }
+        .hero-icon { font-size: 48px; margin-bottom: 12px; }
+        .hero h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .hero p {
+            color: rgba(255,255,255,0.6);
+            font-size: 14px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .hero-badges {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .badge {
+            background: rgba(0,210,255,0.1);
+            border: 1px solid rgba(0,210,255,0.2);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 12px;
+            color: #00d2ff;
+        }
+
+        /* Quick Start */
+        .quick-start {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .quick-start h3 {
+            font-size: 16px;
+            color: #fff;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .code-block {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+            overflow-x: auto;
+            position: relative;
+        }
+        .code-block code {
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 13px;
+            color: #a8e6cf;
+            white-space: pre;
+            line-height: 1.6;
+        }
+        .code-block .comment { color: #666; }
+        .code-block .string { color: #ffd3b6; }
+        .code-block .keyword { color: #c792ea; }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 6px;
+            padding: 4px 10px;
+            color: #aaa;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .copy-btn:hover { background: rgba(0,210,255,0.2); color: #00d2ff; }
+
+        /* Endpoint Card */
+        .endpoint-card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        .endpoint-header {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .endpoint-header:hover { background: rgba(255,255,255,0.03); }
+        .method-badge {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 6px;
+            min-width: 50px;
+            text-align: center;
+        }
+        .method-get { background: rgba(76,175,80,0.2); color: #66bb6a; }
+        .method-post { background: rgba(33,150,243,0.2); color: #42a5f5; }
+        .endpoint-path {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 14px;
+            color: #fff;
+            font-weight: 600;
+        }
+        .endpoint-desc {
+            font-size: 13px;
+            color: rgba(255,255,255,0.5);
+            margin-left: auto;
+        }
+        .endpoint-toggle {
+            color: #666;
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+        .endpoint-body {
+            display: none;
+            padding: 0 20px 20px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        .endpoint-body.open { display: block; }
+        .endpoint-body h4 {
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+            margin: 16px 0 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Params Table */
+        .params-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        .params-table th {
+            text-align: left;
+            padding: 8px 12px;
+            color: rgba(255,255,255,0.4);
+            font-weight: 500;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .params-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .params-table .param-name {
+            font-family: monospace;
+            color: #00d2ff;
+        }
+        .params-table .param-type {
+            color: #c792ea;
+            font-size: 12px;
+        }
+        .params-table .param-required {
+            color: #ff6b6b;
+            font-size: 11px;
+        }
+        .params-table .param-optional {
+            color: #666;
+            font-size: 11px;
+        }
+
+        /* Response Fields */
+        .response-tree {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-family: monospace;
+            font-size: 12px;
+            line-height: 1.8;
+            color: #a8e6cf;
+            overflow-x: auto;
+        }
+        .response-tree .key { color: #82aaff; }
+        .response-tree .type { color: #c792ea; font-size: 11px; }
+        .response-tree .desc { color: #666; }
+
+        /* Info Banner */
+        .info-banner {
+            background: rgba(0,210,255,0.08);
+            border: 1px solid rgba(0,210,255,0.15);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+        .info-banner strong { color: #00d2ff; }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 32px 20px;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            margin-top: 32px;
+        }
+        .footer a { color: #888; text-decoration: none; }
+        .footer a:hover { color: #00d2ff; }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(0,210,255,0.9);
+            color: #000;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 9999;
+            transition: transform 0.3s ease;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* JSON link */
+        .json-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 6px 14px;
+            color: #aaa;
+            font-size: 12px;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .json-link:hover { border-color: rgba(0,210,255,0.3); color: #00d2ff; }
+
+        @media (max-width: 600px) {
+            .endpoint-header { flex-wrap: wrap; }
+            .endpoint-desc { margin-left: 0; margin-top: 4px; width: 100%; }
+            .hero h2 { font-size: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>🤖 AI 智能体 API 文档 <a href="/tools/">← 返回首页</a></h1>
+    </header>
+
+    <div class="container">
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero-icon">🤖</div>
+            <h2>站长工具 · 开放 API</h2>
+            <p>为 AI 智能体和开发者提供的网站分析接口，支持 SEO 检测、SSL 验证、性能分析、AI 可信度评估等能力。</p>
+            <div class="hero-badges">
+                <span class="badge">REST API</span>
+                <span class="badge">JSON 格式</span>
+                <span class="badge">无需认证</span>
+                <span class="badge">免费调用</span>
+            </div>
+        </section>
+
+        <!-- Quick Start -->
+        <section class="quick-start">
+            <h3>⚡ 快速开始</h3>
+            <p style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:12px;">三行命令即可开始分析任意网站：</p>
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">复制</button>
+                <code><span class="comment"># 1. 检查服务是否在线</span>
+curl http://111.228.14.153/tools/api/health
+
+<span class="comment"># 2. 分析一个网站</span>
+curl -X POST http://111.228.14.153/tools/api/analyze \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"url":"baidu.com"}'</span>
+
+<span class="comment"># 3. 获取完整 API 文档 (JSON)</span>
+curl http://111.228.14.153/tools/api/docs</code>
+            </div>
+            <div style="text-align:right;margin-top:8px;">
+                <a href="/tools/api/docs" class="json-link">📄 查看 JSON 格式文档</a>
+            </div>
+        </section>
+
+        <!-- Rate Limit Info -->
+        <section class="quick-start" style="border-color:rgba(255,152,0,0.2);background:rgba(255,152,0,0.06);">
+            <h3>⏱️ 速率限制</h3>
+            <div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.8;">
+                <p style="margin-bottom:12px;">
+                    所有 <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">/api/*</code> 接口均受速率限制保护，基于 <strong style="color:#ff9800;">IP + User-Agent 指纹</strong>识别客户端。
+                </p>
+                <table class="params-table" style="margin-bottom:16px;">
+                    <tr><th>参数</th><th>值</th><th>说明</th></tr>
+                    <tr><td class="param-name">限制</td><td>10 次</td><td>每个客户端每窗口最多请求次数</td></tr>
+                    <tr><td class="param-name">窗口</td><td>60 秒</td><td>滑动时间窗口</td></tr>
+                    <tr><td class="param-name">识别</td><td>IP + UA</td><td>MD5 哈希指纹，换 UA 可重置</td></tr>
+                </table>
+
+                <p style="margin-bottom:8px;"><strong style="color:#ff9800;">响应头（每个 /api/ 响应都包含）：</strong></p>
+                <div class="response-tree" style="margin-bottom:16px;"><span class="key">X-RateLimit-Limit</span>: 10        <span class="desc">// 窗口内最大请求数</span>
+<span class="key">X-RateLimit-Remaining</span>: 7    <span class="desc">// 剩余可用次数</span>
+<span class="key">X-RateLimit-Window</span>: 60       <span class="desc">// 窗口秒数</span></div>
+
+                <p style="margin-bottom:8px;"><strong style="color:#ff9800;">超限响应（HTTP 429）：</strong></p>
+                <div class="response-tree">{
+  <span class="key">"error"</span>: <span class="string">"请求太频繁，请 45 秒后重试"</span>,
+  <span class="key">"retry_after"</span>: <span class="type">45</span>,     <span class="desc">// 建议等待秒数</span>
+  <span class="key">"limit"</span>: <span class="type">10</span>,
+  <span class="key">"window"</span>: <span class="type">60</span>
+}</div>
+            </div>
+        </section>
+
+        <!-- Endpoints -->
+        <h3 style="font-size:16px;color:#fff;margin-bottom:16px;display:flex;align-items:center;gap:8px;">📡 接口列表</h3>
+
+        <!-- GET /api/health -->
+        <div class="endpoint-card">
+            <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-get">GET</span>
+                <span class="endpoint-path">/api/health</span>
+                <span class="endpoint-desc">健康检查 · 服务状态探测</span>
+                <span class="endpoint-toggle">▼</span>
+            </div>
+            <div class="endpoint-body">
+                <h4>说明</h4>
+                <p style="font-size:13px;color:rgba(255,255,255,0.7);">快速探测服务是否在线，返回服务名称、版本、可用端点列表和频率限制信息。适合 AI 智能体在调用其他接口前先检查服务可用性。</p>
+
+                <h4>响应示例</h4>
+                <div class="response-tree">{
+  <span class="key">"status"</span>: <span class="string">"ok"</span>,
+  <span class="key">"service"</span>: <span class="string">"site-analyzer"</span>,
+  <span class="key">"version"</span>: <span class="string">"1.0.0"</span>,
+  <span class="key">"endpoints"</span>: { ... },
+  <span class="key">"rate_limit"</span>: { <span class="key">"max_requests"</span>: <span class="type">10</span>, <span class="key">"window_seconds"</span>: <span class="type">60</span> }
+}</div>
+
+                <h4>cURL</h4>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">复制</button>
+                    <code>curl http://111.228.14.153/tools/api/health</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- POST /api/analyze -->
+        <div class="endpoint-card">
+            <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-post">POST</span>
+                <span class="endpoint-path">/api/analyze</span>
+                <span class="endpoint-desc">分析单个网站</span>
+                <span class="endpoint-toggle">▼</span>
+            </div>
+            <div class="endpoint-body">
+                <h4>说明</h4>
+                <p style="font-size:13px;color:rgba(255,255,255,0.7);">对指定网站进行全面分析，包括 SEO 优化、SSL 证书、页面性能、移动端适配、AI 可信度、ICP 备案等维度。返回综合评分和详细指标。</p>
+
+                <h4>请求参数</h4>
+                <table class="params-table">
+                    <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+                    <tr>
+                        <td class="param-name">url</td>
+                        <td class="param-type">string</td>
+                        <td>目标网址 <span class="param-required">必填</span> 支持裸域名或完整URL</td>
+                    </tr>
+                </table>
+
+                <h4>响应字段</h4>
+                <div class="response-tree">{
+  <span class="key">"score"</span>: <span class="type">int</span> <span class="desc">// 综合评分 0-100</span>
+  <span class="key">"seo"</span>: {
+    <span class="key">"title"</span>: <span class="type">string</span>,     <span class="desc">// 页面标题</span>
+    <span class="key">"meta_description"</span>: <span class="type">string</span>,
+    <span class="key">"h1_count"</span>: <span class="type">int</span>,
+    <span class="key">"img_without_alt"</span>: <span class="type">int</span>,
+    <span class="key">"has_sitemap"</span>: <span class="type">bool</span>,
+    <span class="key">"structured_data"</span>: <span class="type">list</span>,
+    <span class="key">"open_graph"</span>: <span class="type">dict</span>
+  },
+  <span class="key">"performance"</span>: {
+    <span class="key">"response_time"</span>: <span class="type">float</span>,  <span class="desc">// 秒</span>
+    <span class="key">"content_size_kb"</span>: <span class="type">float</span>,
+    <span class="key">"compressed"</span>: <span class="type">bool</span>
+  },
+  <span class="key">"security"</span>: {
+    <span class="key">"ssl"</span>: <span class="type">bool</span>,
+    <span class="key">"ssl_issuer"</span>: <span class="type">string</span>,
+    <span class="key">"ssl_expires"</span>: <span class="type">string</span>
+  },
+  <span class="key">"ai_trust"</span>: {
+    <span class="key">"score"</span>: <span class="type">int</span>,         <span class="desc">// AI可信度 0-100</span>
+    <span class="key">"has_structured_data"</span>: <span class="type">bool</span>,
+    <span class="key">"has_open_graph"</span>: <span class="type">bool</span>
+  },
+  <span class="key">"ai_discoverability"</span>: {
+    <span class="key">"score"</span>: <span class="type">int</span>,         <span class="desc">// AI可发现性 0-100</span>
+    <span class="key">"level"</span>: <span class="type">string</span>       <span class="desc">// A/B/C/D 等级</span>
+  },
+  <span class="key">"icp_filing"</span>: {
+    <span class="key">"has_icp"</span>: <span class="type">bool</span>,
+    <span class="key">"icp_number"</span>: <span class="type">string</span>,
+    <span class="key">"confidence"</span>: <span class="type">int</span>     <span class="desc">// 0-8 置信度</span>
+  }
+}</div>
+
+                <h4>cURL</h4>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">复制</button>
+                    <code>curl -X POST http://111.228.14.153/tools/api/analyze \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"url":"baidu.com"}'</span></code>
+                </div>
+
+                <h4>Python</h4>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">复制</button>
+                    <code><span class="keyword">import</span> requests
+
+resp = requests.post(
+    <span class="string">'http://111.228.14.153/tools/api/analyze'</span>,
+    json={<span class="string">'url'</span>: <span class="string">'baidu.com'</span>}
+)
+data = resp.json()
+print(f<span class="string">"评分: {data['score']}, AI可信度: {data['ai_trust']['score']}"</span>)</code>
+                </div>
+
+                <h4>错误码</h4>
+                <table class="params-table">
+                    <tr><th>状态码</th><th>说明</th></tr>
+                    <tr><td class="param-name">400</td><td>缺少 url 参数</td></tr>
+                    <tr><td class="param-name">429</td><td>频率限制（10次/60秒）</td></tr>
+                    <tr><td class="param-name">500</td><td>分析失败（目标站点不可达等）</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- POST /api/batch -->
+        <div class="endpoint-card">
+            <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-post">POST</span>
+                <span class="endpoint-path">/api/batch</span>
+                <span class="endpoint-desc">批量分析多个网站</span>
+                <span class="endpoint-toggle">▼</span>
+            </div>
+            <div class="endpoint-body">
+                <h4>说明</h4>
+                <p style="font-size:13px;color:rgba(255,255,255,0.7);">一次请求分析多个网站（最多 10 个），内部使用 5 线程并发处理。适合需要对比多个站点的场景。</p>
+
+                <h4>请求参数</h4>
+                <table class="params-table">
+                    <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+                    <tr>
+                        <td class="param-name">urls</td>
+                        <td class="param-type">string[]</td>
+                        <td>网址数组 <span class="param-required">必填</span> 最多 10 个</td>
+                    </tr>
+                </table>
+
+                <h4>cURL</h4>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">复制</button>
+                    <code>curl -X POST http://111.228.14.153/tools/api/batch \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"urls":["baidu.com","zhihu.com","bilibili.com"]}'</span></code>
+                </div>
+            </div>
+        </div>
+
+        <!-- POST /api/dns -->
+        <div class="endpoint-card">
+            <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-post">POST</span>
+                <span class="endpoint-path">/api/dns</span>
+                <span class="endpoint-desc">DNS 解析检测</span>
+                <span class="endpoint-toggle">▼</span>
+            </div>
+            <div class="endpoint-body">
+                <h4>说明</h4>
+                <p style="font-size:13px;color:rgba(255,255,255,0.7);">检测域名的 DNS 解析结果，返回 IPv4 和 IPv6 地址列表。</p>
+
+                <h4>请求参数</h4>
+                <table class="params-table">
+                    <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+                    <tr>
+                        <td class="param-name">domain</td>
+                        <td class="param-type">string</td>
+                        <td>域名 <span class="param-required">必填</span></td>
+                    </tr>
+                </table>
+
+                <h4>响应字段</h4>
+                <div class="response-tree">{
+  <span class="key">"domain"</span>: <span class="type">string</span>,
+  <span class="key">"resolved"</span>: <span class="type">bool</span>,    <span class="desc">// 是否解析成功</span>
+  <span class="key">"ipv4"</span>: <span class="type">string[]</span>,     <span class="desc">// IPv4 地址列表</span>
+  <span class="key">"ipv6"</span>: <span class="type">string[]</span>,     <span class="desc">// IPv6 地址列表</span>
+  <span class="key">"count"</span>: <span class="type">int</span>          <span class="desc">// 总 IP 数</span>
+}</div>
+
+                <h4>cURL</h4>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">复制</button>
+                    <code>curl -X POST http://111.228.14.153/tools/api/dns \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"domain":"baidu.com"}'</span></code>
+                </div>
+            </div>
+        </div>
+
+        <!-- POST /api/test-ip -->
+        <div class="endpoint-card">
+            <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                <span class="method-badge method-post">POST</span>
+                <span class="endpoint-path">/api/test-ip</span>
+                <span class="endpoint-desc">IP 可达性测试</span>
+                <span class="endpoint-toggle">▼</span>
+            </div>
+            <div class="endpoint-body">
+                <h4>说明</h4>
+                <p style="font-size:13px;color:rgba(255,255,255,0.7);">测试指定 IP 的 443 端口是否可达，支持指定 SNI 主机名。适合诊断网络连通性问题（如 GFW 封锁）。</p>
+
+                <h4>请求参数</h4>
+                <table class="params-table">
+                    <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+                    <tr>
+                        <td class="param-name">ip</td>
+                        <td class="param-type">string</td>
+                        <td>IP 地址 <span class="param-required">必填</span></td>
+                    </tr>
+                    <tr>
+                        <td class="param-name">host</td>
+                        <td class="param-type">string</td>
+                        <td>SNI 主机名 <span class="param-optional">可选</span></td>
+                    </tr>
+                </table>
+
+                <h4>cURL</h4>
+                <div class="code-block">
+                    <button class="copy-btn" onclick="copyCode(this)">复制</button>
+                    <code>curl -X POST http://111.228.14.153/tools/api/test-ip \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"ip":"110.242.68.66","host":"baidu.com"}'</span></code>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Agent Tips -->
+        <section class="quick-start" style="margin-top:24px;">
+            <h3>🧠 AI 智能体集成指南</h3>
+            <div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.8;">
+                <p style="margin-bottom:12px;"><strong style="color:#00d2ff;">推荐调用顺序：</strong></p>
+                <ol style="padding-left:20px;margin-bottom:16px;">
+                    <li><code>GET /api/health</code> — 确认服务在线</li>
+                    <li><code>POST /api/analyze</code> — 分析目标网站</li>
+                    <li>根据 <code>score</code> 和 <code>ai_trust.score</code> 评估网站质量</li>
+                </ol>
+                <p style="margin-bottom:8px;"><strong style="color:#00d2ff;">注意事项：</strong></p>
+                <ul style="padding-left:20px;">
+                    <li>无需认证，直接调用</li>
+                    <li>频率限制：10 次/60 秒</li>
+                    <li>分析耗时 5-30 秒，建议设置 60 秒超时</li>
+                    <li>返回数据不存储，每次请求实时分析</li>
+                    <li>批量分析最多 10 个 URL</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Skill Reference -->
+        <section class="info-banner" style="border-color:rgba(138,43,226,0.2);background:rgba(138,43,226,0.08);">
+            <strong>📋 技能文档：</strong>AI 智能体可加载 <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">site-analyzer-api</code> 技能获取完整调用指南，包含 Python 示例、错误处理和最佳实践。
+        </section>
+    </div>
+
+    <footer class="footer">
+        <div style="margin-bottom:8px;">
+            站长工具 API · © <a href="https://gitcode.com/BayiHY" target="_blank">巴依浩爷(BayiHY)</a> · 免费开源
+        </div>
+        <div>
+            <a href="/tools/">🏠 返回首页</a> ·
+            <a href="/tools/api/docs">📄 JSON 文档</a> ·
+            <a href="https://gitcode.com/BayiHY/site-analyzer" target="_blank">⭐ 开源仓库</a>
+        </div>
+    </footer>
+
+    <div class="toast" id="toast">已复制</div>
+
+    <script>
+        function toggleEndpoint(header) {
+            var body = header.nextElementSibling;
+            var toggle = header.querySelector('.endpoint-toggle');
+            if (body.classList.contains('open')) {
+                body.classList.remove('open');
+                toggle.textContent = '▼';
+            } else {
+                body.classList.add('open');
+                toggle.textContent = '▲';
+            }
+        }
+
+        function copyCode(btn) {
+            var code = btn.parentElement.querySelector('code');
+            var text = code.textContent || code.innerText;
+            var done = function() {
+                var toast = document.getElementById('toast');
+                toast.textContent = '已复制到剪贴板';
+                toast.classList.add('show');
+                clearTimeout(toast._timer);
+                toast._timer = setTimeout(function() { toast.classList.remove('show'); }, 2000);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done);
+            } else {
+                var ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                done();
+            }
+        }
+
+        // Auto-expand endpoint from URL hash
+        (function() {
+            var hash = window.location.hash;
+            if (hash) {
+                var cards = document.querySelectorAll('.endpoint-card');
+                cards.forEach(function(card) {
+                    var path = card.querySelector('.endpoint-path');
+                    if (path && path.textContent.includes(hash.slice(1))) {
+                        toggleEndpoint(card.querySelector('.endpoint-header'));
+                    }
+                });
+            }
+        })();
+    </script>
+</body>
+</html>
