@@ -5,6 +5,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7+-green.svg)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-Web%20Framework-orange.svg)](https://flask.palletsprojects.com/)
+[![GitHub Stars](https://img.shields.io/github/stars/BayiHY/site-analyzer?style=social)](https://github.com/BayiHY/site-analyzer)
+[![GitHub Forks](https://img.shields.io/github/forks/BayiHY/site-analyzer?style=social)](https://github.com/BayiHY/site-analyzer)
+[![GitHub Issues](https://img.shields.io/github/issues/BayiHY/site-analyzer)](https://github.com/BayiHY/site-analyzer/issues)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/BayiHY/site-analyzer)](https://github.com/BayiHY/site-analyzer)
 
 ## 🎯 为什么选择这个工具？
 
