@@ -454,7 +454,10 @@
         <!-- 加载动画 -->
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>正在分析网站，请稍候...</p>
+            <p id="loadingText">正在分析网站，请稍候...</p>
+            <div id="countdownTimer" style="margin-top:10px;font-size:14px;color:#00d2ff;">
+                预计响应时间：<span id="countdown">15</span> 秒
+            </div>
         </div>
 
         <!-- 结果区域 -->
@@ -565,6 +568,7 @@
         }
 
         // 分析网站
+        let countdownInterval = null;
         async function analyze() {
             const url = urlInput.value.trim();
             if (!url) {
@@ -578,6 +582,18 @@
             loading.classList.add('active');
             result.classList.remove('active');
             errorMsg.classList.remove('active');
+            
+            // 开始倒计时
+            let seconds = 15;
+            document.getElementById('countdown').textContent = seconds;
+            countdownInterval = setInterval(() => {
+                seconds--;
+                document.getElementById('countdown').textContent = seconds;
+                if (seconds <= 0) {
+                    clearInterval(countdownInterval);
+                    document.getElementById('loadingText').textContent = '正在努力连接...';
+                }
+            }, 1000);
 
             try {
                 const resp = await fetch('api/analyze', {
@@ -597,9 +613,11 @@
             } catch (e) {
                 showError('网络错误，请重试');
             } finally {
+                clearInterval(countdownInterval);
                 analyzeBtn.disabled = false;
                 analyzeBtn.textContent = '分析';
                 loading.classList.remove('active');
+                document.getElementById('loadingText').textContent = '正在分析网站，请稍候...';
             }
         }
 
