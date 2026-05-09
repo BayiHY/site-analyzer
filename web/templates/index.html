@@ -442,9 +442,10 @@
                 <span class="quick-link" onclick="quickAnalyze('baidu.com')">百度</span>
                 <span class="quick-link" onclick="quickAnalyze('zhihu.com')">知乎</span>
                 <span class="quick-link" onclick="quickAnalyze('bilibili.com')">B站</span>
-
+                <span class="quick-link" onclick="quickAnalyze('github.com')">GitHub</span>
                 <span class="quick-link" onclick="quickAnalyze('juejin.cn')">掘金</span>
             </div>
+            <div id="dnsResult" style="display:none;margin-top:10px;padding:10px;background:rgba(0,210,255,0.1);border-radius:8px;font-size:12px;"></div>
         </section>
 
         <!-- 错误提示 -->
@@ -477,8 +478,39 @@
         });
 
         // 快捷分析
-        function quickAnalyze(url) {
+        async function quickAnalyze(url) {
             urlInput.value = url;
+            
+            // 如果是GitHub，先检测DNS
+            if (url.includes('github')) {
+                const dnsResult = document.getElementById('dnsResult');
+                dnsResult.style.display = 'block';
+                dnsResult.innerHTML = '🔍 正在检测DNS解析...';
+                dnsResult.style.color = '#00d2ff';
+                
+                try {
+                    const resp = await fetch('api/dns', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({domain: 'github.com'})
+                    });
+                    const data = await resp.json();
+                    
+                    if (data.resolved) {
+                        const ipv4Str = data.ipv4.length > 0 ? `IPv4: ${data.ipv4.join(', ')}` : '';
+                        const ipv6Str = data.ipv6.length > 0 ? `IPv6: ${data.ipv6.join(', ')}` : '';
+                        dnsResult.innerHTML = `✅ DNS解析正常<br>${ipv4Str}${ipv4Str && ipv6Str ? '<br>' : ''}${ipv6Str}`;
+                        dnsResult.style.color = '#00e676';
+                    } else {
+                        dnsResult.innerHTML = `❌ ${data.error || 'DNS解析失败，可能需要配置hosts或使用代理'}`;
+                        dnsResult.style.color = '#ff5252';
+                    }
+                } catch (e) {
+                    dnsResult.innerHTML = '⚠️ DNS检测失败';
+                    dnsResult.style.color = '#ff9800';
+                }
+            }
+            
             analyze();
         }
 

@@ -137,6 +137,58 @@ def batch_analyze():
 
     return jsonify(results)
 
+@app.route('/api/dns', methods=['POST'])
+def check_dns():
+    """检测域名DNS解析"""
+    import socket
+    
+    data = request.get_json()
+    domain = data.get('domain', '').strip()
+    if not domain:
+        return jsonify({'error': '请输入域名'}), 400
+    
+    # 去掉协议前缀
+    if '://' in domain:
+        domain = domain.split('://')[1].split('/')[0]
+    
+    try:
+        # 获取所有IP地址
+        ips = socket.getaddrinfo(domain, None)
+        ip_list = list(set([ip[4][0] for ip in ips]))
+        
+        # 区分IPv4和IPv6
+        ipv4 = [ip for ip in ip_list if ':' not in ip]
+        ipv6 = [ip for ip in ip_list if ':' in ip]
+        
+        return jsonify({
+            'domain': domain,
+            'resolved': True,
+            'ipv4': ipv4,
+            'ipv6': ipv6,
+            'all_ips': ip_list,
+            'count': len(ip_list)
+        })
+    except socket.gaierror as e:
+        return jsonify({
+            'domain': domain,
+            'resolved': False,
+            'error': f'DNS解析失败: {str(e)}',
+            'ipv4': [],
+            'ipv6': [],
+            'all_ips': [],
+            'count': 0
+        })
+    except Exception as e:
+        return jsonify({
+            'domain': domain,
+            'resolved': False,
+            'error': str(e),
+            'ipv4': [],
+            'ipv6': [],
+            'all_ips': [],
+            'count': 0
+        })
+
 if __name__ == '__main__':
     print(f"⚡ 频率限制: 每设备 {limiter.max_requests} 次/{limiter.window}秒")
     app.run(host='0.0.0.0', port=5000, debug=False)
