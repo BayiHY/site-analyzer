@@ -445,7 +445,7 @@
                 <span class="quick-link" onclick="quickAnalyze('github.com')">GitHub</span>
                 <span class="quick-link" onclick="quickAnalyze('juejin.cn')">掘金</span>
             </div>
-            <div id="dnsResult" style="display:none;margin-top:10px;padding:10px;background:rgba(0,210,255,0.1);border-radius:8px;font-size:12px;"></div>
+            <div id="dnsResult" style="display:none;margin-top:10px;padding:12px;background:rgba(0,210,255,0.1);border-radius:8px;font-size:12px;line-height:1.8;"></div>
         </section>
 
         <!-- 错误提示 -->
@@ -489,24 +489,74 @@
                 dnsResult.style.color = '#00d2ff';
                 
                 try {
-                    const resp = await fetch('api/dns', {
+                    // 1. 服务器端解析
+                    const serverResp = await fetch('api/dns', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({domain: 'github.com'})
                     });
-                    const data = await resp.json();
+                    const serverData = await serverResp.json();
                     
-                    if (data.resolved) {
-                        const ipv4Str = data.ipv4.length > 0 ? `IPv4: ${data.ipv4.join(', ')}` : '';
-                        const ipv6Str = data.ipv6.length > 0 ? `IPv6: ${data.ipv6.join(', ')}` : '';
-                        dnsResult.innerHTML = `✅ DNS解析正常<br>${ipv4Str}${ipv4Str && ipv6Str ? '<br>' : ''}${ipv6Str}`;
-                        dnsResult.style.color = '#00e676';
-                    } else {
-                        dnsResult.innerHTML = `❌ ${data.error || 'DNS解析失败，可能需要配置hosts或使用代理'}`;
-                        dnsResult.style.color = '#ff5252';
+                    // 2. 通过DoH查询多个公共DNS
+                    const domain = 'github.com';
+                    const dohServers = [
+                        {name: 'Google DNS', url: `https://dns.google/resolve?name=${domain}&type=A`},
+                        {name: 'Cloudflare', url: `https://cloudflare-dns.com/dns-query?name=${domain}&type=A`, header: 'application/dns-json'},
+                        {name: '阿里 DNS', url: `https://dns.alidns.com/resolve?name=${domain}&type=A`},
+                    ];
+                    
+                    let html = '<div style="font-weight:600;margin-bottom:8px;">📡 DNS解析检测</div>';
+                    
+                    // 显示服务器解析结果
+                    if (serverData.resolved) {
+                        html += `<div style="color:#4fc3f7;">🖥️ 服务器: ${serverData.ipv4.join(', ') || '无IPv4'}</div>`;
                     }
+                    
+                    // 查询各个DoH服务
+                    const dohResults = await Promise.allSettled(
+                        dohServers.map(async (server) => {
+                            const headers = {'Accept': 'application/dns-json'};
+                            if (server.header) headers['Accept'] = server.header;
+                            const resp = await fetch(server.url, {headers});
+                            const data = await resp.json();
+                            const ips = data.Answer ? data.Answer.filter(a => a.type === 1).map(a => a.data) : [];
+                            return {name: server.name, ips, status: data.Status};
+                        })
+                    );
+                    
+                    // 整理结果
+                    let allIps = new Set();
+                    let results = [];
+                    dohResults.forEach((result, i) => {
+                        if (result.status === 'fulfilled' && result.value.ips.length > 0) {
+                            results.push(result.value);
+                            result.value.ips.forEach(ip => allIps.add(ip));
+                        } else {
+                            results.push({name: dohServers[i].name, ips: [], status: -1});
+                        }
+                    });
+                    
+                    // 显示各DNS结果
+                    results.forEach(r => {
+                        const icon = r.ips.length > 0 ? '✅' : '❌';
+                        const color = r.ips.length > 0 ? '#00e676' : '#ff5252';
+                        html += `<div style="color:${color};">${icon} ${r.name}: ${r.ips.join(', ') || '解析失败'}</div>`;
+                    });
+                    
+                    // 总结
+                    const uniqueIps = [...allIps];
+                    if (uniqueIps.length > 0) {
+                        html += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);">`;
+                        html += `<span style="color:#00e676;">✅ 可用IP: ${uniqueIps.join(', ')}</span>`;
+                        html += `</div>`;
+                    } else {
+                        html += `<div style="margin-top:8px;color:#ff5252;">❌ 所有DNS均解析失败，可能需要配置hosts或使用代理</div>`;
+                    }
+                    
+                    dnsResult.innerHTML = html;
+                    
                 } catch (e) {
-                    dnsResult.innerHTML = '⚠️ DNS检测失败';
+                    dnsResult.innerHTML = '⚠️ DNS检测失败: ' + e.message;
                     dnsResult.style.color = '#ff9800';
                 }
             }
