@@ -92,6 +92,121 @@ def check_rate_limit():
 def index():
     return render_template('index.html')
 
+
+@app.route('/api/health')
+def health():
+    """健康检查 - 供其他AI智能体探测服务状态"""
+    return jsonify({
+        'status': 'ok',
+        'service': 'site-analyzer',
+        'version': '1.0.0',
+        'endpoints': {
+            'POST /api/analyze': '分析单个网站',
+            'POST /api/batch': '批量分析（最多10个）',
+            'POST /api/dns': 'DNS解析检测',
+            'POST /api/test-ip': 'IP可达性测试',
+            'GET /api/docs': 'API详细文档'
+        },
+        'rate_limit': {
+            'max_requests': limiter.max_requests,
+            'window_seconds': limiter.window
+        }
+    })
+
+
+@app.route('/api/docs')
+def api_docs():
+    """API完整文档 - JSON格式，方便AI智能体理解接口用法"""
+    return jsonify({
+        'service': '站长工具 - 网站分析API',
+        'base_url': 'http://111.228.14.153/tools',
+        'endpoints': [
+            {
+                'method': 'POST',
+                'path': '/api/analyze',
+                'description': '分析单个网站的SEO、性能、安全性、AI可信度等',
+                'content_type': 'application/json',
+                'request_body': {'url': 'string (必填，支持裸域名或完整URL)'},
+                'response_fields': {
+                    'score': 'int 综合评分 0-100',
+                    'seo': {
+                        'title': 'string 页面标题',
+                        'title_length': 'int 标题长度',
+                        'meta_description': 'string 描述',
+                        'meta_keywords': 'string 关键词',
+                        'h1_count': 'int H1标签数量',
+                        'img_without_alt': 'int 缺少alt的图片数',
+                        'internal_links': 'int 内部链接数',
+                        'external_links': 'int 外部链接数',
+                        'has_sitemap': 'bool 是否有sitemap',
+                        'has_robots': 'bool 是否有robots.txt',
+                        'structured_data': 'list 结构化数据类型',
+                        'open_graph': 'dict Open Graph标签'
+                    },
+                    'performance': {
+                        'response_time': 'float 响应时间(秒)',
+                        'content_size_kb': 'float 页面大小(KB)',
+                        'compressed': 'bool 是否启用压缩'
+                    },
+                    'security': {
+                        'ssl': 'bool 是否HTTPS',
+                        'ssl_issuer': 'string SSL颁发机构',
+                        'ssl_expires': 'string SSL过期时间',
+                        'headers_security': 'dict 安全相关HTTP头'
+                    },
+                    'ai_trust': {
+                        'score': 'int AI可信度评分 0-100',
+                        'has_structured_data': 'bool',
+                        'has_open_graph': 'bool',
+                        'has_meta_description': 'bool',
+                        'content_quality': 'string 内容质量评估'
+                    },
+                    'icp_filing': {
+                        'has_icp': 'bool 是否检测到ICP备案',
+                        'icp_number': 'string 备案号',
+                        'confidence': 'int 置信度 0-8'
+                    }
+                },
+                'example_request': {'url': 'baidu.com'},
+                'example_curl': 'curl -X POST http://111.228.14.153/tools/api/analyze -H "Content-Type: application/json" -d \'{"url":"baidu.com"}\'',
+                'errors': {
+                    '400': '缺少url参数',
+                    '429': '频率限制（10次/60秒）',
+                    '500': '分析失败'
+                }
+            },
+            {
+                'method': 'POST',
+                'path': '/api/batch',
+                'description': '批量分析多个网站（最多10个，并发5线程）',
+                'request_body': {'urls': 'string[] 网址数组'},
+                'example_request': {'urls': ['baidu.com', 'github.com', 'juejin.cn']},
+                'example_curl': 'curl -X POST http://111.228.14.153/tools/api/batch -H "Content-Type: application/json" -d \'{"urls":["baidu.com","github.com"]}\''
+            },
+            {
+                'method': 'POST',
+                'path': '/api/dns',
+                'description': '检测域名DNS解析结果',
+                'request_body': {'domain': 'string 域名'},
+                'response_fields': {
+                    'domain': 'string',
+                    'resolved': 'bool 是否解析成功',
+                    'ipv4': 'string[] IPv4地址列表',
+                    'ipv6': 'string[] IPv6地址列表',
+                    'count': 'int 总IP数'
+                },
+                'example_curl': 'curl -X POST http://111.228.14.153/tools/api/dns -H "Content-Type: application/json" -d \'{"domain":"baidu.com"}\''
+            },
+            {
+                'method': 'POST',
+                'path': '/api/test-ip',
+                'description': '测试IP地址的443端口可达性',
+                'request_body': {'ip': 'string IP地址', 'host': 'string (可选) SNI主机名'},
+                'example_curl': 'curl -X POST http://111.228.14.153/tools/api/test-ip -H "Content-Type: application/json" -d \'{"ip":"110.242.68.66","host":"baidu.com"}\''
+            }
+        ]
+    })
+
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
     """分析单个网站"""
