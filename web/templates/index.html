@@ -5,8 +5,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>站长工具 - 网站SEO分析 | 一键检测网站健康度</title>
     <meta name="description" content="免费在线网站分析工具，一键检测SEO优化、SSL证书、页面性能、移动端适配等指标，自动评分并提供优化建议。">
+    <meta name="keywords" content="站长工具,SEO分析,网站检测,SSL检测,移动端适配,网站评分">
+    <meta name="author" content="巴依浩爷(BayiHY)">
+    <meta name="publisher" content="巴依浩爷(BayiHY)">
+    <meta name="robots" content="index, follow">
+    <meta property="article:published_time" content="2025-05-09T00:00:00+08:00">
+    <meta property="article:modified_time" content="2025-05-09T00:00:00+08:00">
+    <link rel="canonical" href="http://111.228.14.153/tools">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="站长工具 - 网站SEO分析">
+    <meta property="og:description" content="免费在线网站分析工具，一键检测SEO优化、SSL证书、页面性能、移动端适配等指标，自动评分并提供优化建议。">
+    <meta property="og:url" content="http://111.228.14.153/tools">
+    <meta property="og:site_name" content="站长工具 by 巴依浩爷">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630'><rect fill='%230f0c29' width='1200' height='630'/><text x='600' y='280' text-anchor='middle' fill='%2300d2ff' font-size='60' font-family='sans-serif'>🔍 站长工具</text><text x='600' y='360' text-anchor='middle' fill='white' font-size='30' font-family='sans-serif'>网站SEO分析 · AI信任度检测</text><text x='600' y='450' text-anchor='middle' fill='%23888' font-size='20' font-family='sans-serif'>by 巴依浩爷(BayiHY)</text></svg>">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="站长工具 - 网站SEO分析">
+    <meta name="twitter:description" content="免费在线网站分析工具，一键检测SEO优化、SSL证书、页面性能、移动端适配等指标。">
+    
+    <!-- JSON-LD 结构化数据 -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "站长工具 - 网站SEO分析",
+        "description": "免费在线网站分析工具，一键检测SEO优化、SSL证书、页面性能、移动端适配等指标，自动评分并提供优化建议。",
+        "url": "http://111.228.14.153/tools",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Web Browser",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "CNY"
+        },
+        "author": {
+            "@type": "Person",
+            "name": "巴依浩爷(BayiHY)",
+            "url": "https://gitee.com/BayiHY"
+        },
+        "publisher": {
+            "@type": "Person",
+            "name": "巴依浩爷(BayiHY)",
+            "url": "https://gitee.com/BayiHY"
+        },
+        "datePublished": "2025-05-09",
+        "dateModified": "2025-05-09",
+        "inLanguage": "zh-CN",
+        "isAccessibleForFree": true,
+        "featureList": [
+            "SEO优化检测",
+            "SSL证书检测",
+            "页面性能分析",
+            "移动端适配检测",
+            "AI信任度指标",
+            "批量网站分析"
+        ]
+    }
+    </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
             background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
@@ -353,13 +426,14 @@
     </style>
 </head>
 <body>
-    <div class="header">
+    <header class="header">
         <h1>🔍 站长工具 · 网站分析</h1>
-    </div>
+    </header>
 
-    <div class="container">
+    <main class="container">
         <!-- 搜索框 -->
-        <div class="search-box">
+        <section class="search-box" aria-label="网站分析">
+            <h2 class="sr-only">输入网址进行分析</h2>
             <div class="input-group">
                 <input type="text" id="urlInput" placeholder="输入网址，如 baidu.com" autocomplete="off">
                 <button id="analyzeBtn" onclick="analyze()">分析</button>
@@ -371,7 +445,7 @@
 
                 <span class="quick-link" onclick="quickAnalyze('juejin.cn')">掘金</span>
             </div>
-        </div>
+        </section>
 
         <!-- 错误提示 -->
         <div class="error-msg" id="errorMsg"></div>
@@ -383,12 +457,12 @@
         </div>
 
         <!-- 结果区域 -->
-        <div class="result" id="result"></div>
-    </div>
+        <section class="result" id="result" aria-label="分析结果"></section>
+    </main>
 
-    <div class="footer">
+    <footer class="footer">
         站长工具 H5 版 · &copy; <a href="https://gitee.com/BayiHY/site-analyzer" target="_blank" style="color: inherit;">巴依浩爷(BayiHY)</a> · Powered by Python
-    </div>
+    </footer>
 
     <script>
         const urlInput = document.getElementById('urlInput');
