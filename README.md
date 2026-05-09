@@ -76,7 +76,7 @@ Web版采用响应式设计，手机、平板、电脑均可使用。
 
 ```bash
 # 克隆项目
-git clone https://gitee.com/BayiHY/site-analyzer.git
+git clone https://gitcode.com/BayiHY/site-analyzer.git
 
 # 进入目录
 cd site-analyzer/web
@@ -117,7 +117,7 @@ AI信任度得分: 100/100
 ## 👨‍💻 作者
 
 **巴依浩爷(BayiHY)**
-- Gitee: https://gitee.com/BayiHY
+- GitCode: https://gitcode.com/BayiHY
 
 ## 📄 许可证
 
