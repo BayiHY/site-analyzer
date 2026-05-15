@@ -327,15 +327,15 @@
             <div class="code-block">
                 <button class="copy-btn" onclick="copyCode(this)">复制</button>
                 <code><span class="comment"># 1. 检查服务是否在线</span>
-curl http://111.228.14.153/tools/api/health
+curl https://www.bayihy.cn/tools/api/health
 
 <span class="comment"># 2. 分析一个网站</span>
-curl -X POST http://111.228.14.153/tools/api/analyze \
+curl -X POST https://www.bayihy.cn/tools/api/analyze \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{"url":"baidu.com"}'</span>
 
 <span class="comment"># 3. 获取完整 API 文档 (JSON)</span>
-curl http://111.228.14.153/tools/api/docs</code>
+curl https://www.bayihy.cn/tools/api/docs</code>
             </div>
             <div style="text-align:right;margin-top:8px;">
                 <a href="/tools/api/docs" class="json-link">📄 查看 JSON 格式文档</a>
@@ -398,7 +398,7 @@ curl http://111.228.14.153/tools/api/docs</code>
                 <h4>cURL</h4>
                 <div class="code-block">
                     <button class="copy-btn" onclick="copyCode(this)">复制</button>
-                    <code>curl http://111.228.14.153/tools/api/health</code>
+                    <code>curl https://www.bayihy.cn/tools/api/health</code>
                 </div>
             </div>
         </div>
@@ -466,7 +466,7 @@ curl http://111.228.14.153/tools/api/docs</code>
                 <h4>cURL</h4>
                 <div class="code-block">
                     <button class="copy-btn" onclick="copyCode(this)">复制</button>
-                    <code>curl -X POST http://111.228.14.153/tools/api/analyze \
+                    <code>curl -X POST https://www.bayihy.cn/tools/api/analyze \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{"url":"baidu.com"}'</span></code>
                 </div>
@@ -477,7 +477,7 @@ curl http://111.228.14.153/tools/api/docs</code>
                     <code><span class="keyword">import</span> requests
 
 resp = requests.post(
-    <span class="string">'http://111.228.14.153/tools/api/analyze'</span>,
+    <span class="string">'https://www.bayihy.cn/tools/api/analyze'</span>,
     json={<span class="string">'url'</span>: <span class="string">'baidu.com'</span>}
 )
 data = resp.json()
@@ -519,7 +519,7 @@ print(f<span class="string">"评分: {data['score']}, AI可信度: {data['ai_tru
                 <h4>cURL</h4>
                 <div class="code-block">
                     <button class="copy-btn" onclick="copyCode(this)">复制</button>
-                    <code>curl -X POST http://111.228.14.153/tools/api/batch \
+                    <code>curl -X POST https://www.bayihy.cn/tools/api/batch \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{"urls":["baidu.com","zhihu.com","bilibili.com"]}'</span></code>
                 </div>
@@ -560,7 +560,7 @@ print(f<span class="string">"评分: {data['score']}, AI可信度: {data['ai_tru
                 <h4>cURL</h4>
                 <div class="code-block">
                     <button class="copy-btn" onclick="copyCode(this)">复制</button>
-                    <code>curl -X POST http://111.228.14.153/tools/api/dns \
+                    <code>curl -X POST https://www.bayihy.cn/tools/api/dns \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{"domain":"baidu.com"}'</span></code>
                 </div>
@@ -597,7 +597,7 @@ print(f<span class="string">"评分: {data['score']}, AI可信度: {data['ai_tru
                 <h4>cURL</h4>
                 <div class="code-block">
                     <button class="copy-btn" onclick="copyCode(this)">复制</button>
-                    <code>curl -X POST http://111.228.14.153/tools/api/test-ip \
+                    <code>curl -X POST https://www.bayihy.cn/tools/api/test-ip \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{"ip":"110.242.68.66","host":"baidu.com"}'</span></code>
                 </div>
@@ -634,6 +634,7 @@ print(f<span class="string">"评分: {data['score']}, AI可信度: {data['ai_tru
     <footer class="footer">
         <div style="margin-bottom:8px;">
             站长工具 API · © <a href="https://gitcode.com/BayiHY" target="_blank">巴依浩爷(BayiHY)</a> · 免费开源
+            <br><a href="https://beian.miit.gov.cn/" target="_blank" style="color:#888;font-size:11px;" onclick="copyICP('新ICP备2026003879号-1', this);return false;">新ICP备2026003879号-1</a>
         </div>
         <div>
             <a href="/tools/">🏠 返回首页</a> ·

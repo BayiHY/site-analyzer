@@ -7,17 +7,72 @@
 import sys
 import os
 import time
+import signal
 import hashlib
+import logging
+from logging.handlers import RotatingFileHandler
 from collections import defaultdict
 from threading import Lock
+from functools import wraps
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, render_template, request, jsonify
 from analyzer import SiteAnalyzer
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 app = Flask(__name__)
+
+# ==================== 日志配置 ====================
+
+# 创建日志目录
+log_dir = '/var/log/site-analyzer'
+os.makedirs(log_dir, exist_ok=True)
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# 文件日志（轮转，最大 10MB，保留 5 个备份）
+file_handler = RotatingFileHandler(
+    f'{log_dir}/app.log',
+    maxBytes=10*1024*1024,
+    backupCount=5,
+    encoding='utf-8'
+)
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+))
+app.logger.addHandler(file_handler)
+app.logger.setLevel(logging.INFO)
+
+# 错误日志单独文件
+error_handler = RotatingFileHandler(
+    f'{log_dir}/error.log',
+    maxBytes=10*1024*1024,
+    backupCount=5,
+    encoding='utf-8'
+)
+error_handler.setLevel(logging.ERROR)
+error_handler.setFormatter(logging.Formatter(
+    '%(asctime)s [%(levelname)s] %(pathname)s:%(lineno)d\n%(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+))
+app.logger.addHandler(error_handler)
+
+app.logger.info('🚀 站长工具服务启动')
+
+# ==================== 超时控制 ====================
+
+ANALYZE_TIMEOUT = 30  # 分析超时时间（秒）
+
+def timeout_handler(signum, frame):
+    """超时信号处理"""
+    raise TimeoutError("分析超时")
 
 # ==================== 频率限制 ====================
 
@@ -25,9 +80,9 @@ class RateLimiter:
     """基于 IP + 设备指纹的频率限制器"""
 
     def __init__(self, max_requests=10, window_seconds=60):
-        self.max_requests = max_requests      # 窗口内最大请求数
-        self.window = window_seconds           # 时间窗口（秒）
-        self._records = defaultdict(list)      # {fingerprint: [timestamps]}
+        self.max_requests = max_requests
+        self.window = window_seconds
+        self._records = defaultdict(list)
         self._lock = Lock()
 
     def _get_fingerprint(self):
@@ -43,14 +98,12 @@ class RateLimiter:
         now = time.time()
 
         with self._lock:
-            # 清理过期记录
             self._records[fp] = [
                 t for t in self._records[fp]
                 if now - t < self.window
             ]
 
             if len(self._records[fp]) >= self.max_requests:
-                # 计算需要等待的时间
                 oldest = self._records[fp][0]
                 retry_after = int(self.window - (now - oldest)) + 1
                 return False, {
@@ -87,6 +140,24 @@ def check_rate_limit():
     return None
 
 
+# ==================== 全局错误处理 ====================
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': '页面不存在'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    app.logger.error(f'500 错误: {error}')
+    return jsonify({'error': '服务器内部错误'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """捕获所有未处理的异常"""
+    app.logger.error(f'未处理的异常: {type(e).__name__}: {e}', exc_info=True)
+    return jsonify({'error': '服务器错误，请稍后重试'}), 500
+
+
 # ==================== 响应头注入速率限制信息 ====================
 
 @app.after_request
@@ -96,7 +167,6 @@ def add_rate_limit_headers(response):
         fp = limiter._get_fingerprint()
         now = time.time()
         with limiter._lock:
-            # 只读取，不消耗配额
             active = [t for t in limiter._records.get(fp, []) if now - t < limiter.window]
             remaining = limiter.max_requests - len(active)
         response.headers['X-RateLimit-Limit'] = str(limiter.max_requests)
@@ -145,7 +215,7 @@ def api_docs():
     """API完整文档 - JSON格式，方便AI智能体理解接口用法"""
     return jsonify({
         'service': '站长工具 - 网站分析API',
-        'base_url': 'http://111.228.14.153/tools',
+        'base_url': 'https://www.bayihy.cn/tools',
         'endpoints': [
             {
                 'method': 'POST',
@@ -194,7 +264,7 @@ def api_docs():
                     }
                 },
                 'example_request': {'url': 'baidu.com'},
-                'example_curl': 'curl -X POST http://111.228.14.153/tools/api/analyze -H "Content-Type: application/json" -d \'{"url":"baidu.com"}\'',
+                'example_curl': 'curl -X POST https://www.bayihy.cn/tools/api/analyze -H "Content-Type: application/json" -d \'{"url":"baidu.com"}\'',
                 'errors': {
                     '400': '缺少url参数',
                     '429': '频率限制（10次/60秒）',
@@ -207,7 +277,7 @@ def api_docs():
                 'description': '批量分析多个网站（最多10个，并发5线程）',
                 'request_body': {'urls': 'string[] 网址数组'},
                 'example_request': {'urls': ['baidu.com', 'github.com', 'juejin.cn']},
-                'example_curl': 'curl -X POST http://111.228.14.153/tools/api/batch -H "Content-Type: application/json" -d \'{"urls":["baidu.com","github.com"]}\''
+                'example_curl': 'curl -X POST https://www.bayihy.cn/tools/api/batch -H "Content-Type: application/json" -d \'{"urls":["baidu.com","github.com"]}\''
             },
             {
                 'method': 'POST',
@@ -221,14 +291,14 @@ def api_docs():
                     'ipv6': 'string[] IPv6地址列表',
                     'count': 'int 总IP数'
                 },
-                'example_curl': 'curl -X POST http://111.228.14.153/tools/api/dns -H "Content-Type: application/json" -d \'{"domain":"baidu.com"}\''
+                'example_curl': 'curl -X POST https://www.bayihy.cn/tools/api/dns -H "Content-Type: application/json" -d \'{"domain":"baidu.com"}\''
             },
             {
                 'method': 'POST',
                 'path': '/api/test-ip',
                 'description': '测试IP地址的443端口可达性',
                 'request_body': {'ip': 'string IP地址', 'host': 'string (可选) SNI主机名'},
-                'example_curl': 'curl -X POST http://111.228.14.153/tools/api/test-ip -H "Content-Type: application/json" -d \'{"ip":"110.242.68.66","host":"baidu.com"}\''
+                'example_curl': 'curl -X POST https://www.bayihy.cn/tools/api/test-ip -H "Content-Type: application/json" -d \'{"ip":"110.242.68.66","host":"baidu.com"}\''
             }
         ]
     })
@@ -246,14 +316,27 @@ def analyze():
     if not url:
         return jsonify({'error': '请输入网址'}), 400
 
+    client_ip = request.headers.get('X-Real-IP', request.remote_addr)
+    app.logger.info(f'分析请求: {url} (来自 {client_ip})')
+
     try:
         analyzer = SiteAnalyzer(url)
-        results = analyzer.analyze()
+        
+        # 设置超时
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(analyzer.analyze)
+            try:
+                results = future.result(timeout=ANALYZE_TIMEOUT)
+            except TimeoutError:
+                app.logger.warning(f'分析超时: {url} (超过 {ANALYZE_TIMEOUT} 秒)')
+                return jsonify({'error': f'分析超时（超过{ANALYZE_TIMEOUT}秒），请稍后重试'}), 504
+        
+        app.logger.info(f'分析完成: {url} (评分: {results.get("score", "N/A")})')
         resp = jsonify(results)
-        # 响应头里带上限流信息
         return resp
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f'分析失败: {url} - {type(e).__name__}: {e}', exc_info=True)
+        return jsonify({'error': f'分析失败: {str(e)}'}), 500
 
 @app.route('/api/batch', methods=['POST'])
 def batch_analyze():
@@ -267,15 +350,21 @@ def batch_analyze():
     if not urls:
         return jsonify({'error': '请输入网址'}), 400
 
+    client_ip = request.headers.get('X-Real-IP', request.remote_addr)
+    app.logger.info(f'批量分析: {len(urls)} 个网站 (来自 {client_ip})')
+
     results = []
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(SiteAnalyzer(u).analyze): u for u in urls[:10]}
         for future in futures:
             try:
-                results.append(future.result())
+                results.append(future.result(timeout=ANALYZE_TIMEOUT))
+            except TimeoutError:
+                results.append({'url': futures[future], 'error': '分析超时', 'score': 0})
             except Exception as e:
                 results.append({'url': futures[future], 'error': str(e), 'score': 0})
 
+    app.logger.info(f'批量分析完成: {len(results)} 个结果')
     return jsonify(results)
 
 @app.route('/api/dns', methods=['POST'])
@@ -382,6 +471,18 @@ def test_ip():
             'response_time': 0
         })
 
+# ==================== 优雅关闭 ====================
+
+def graceful_shutdown(signum, frame):
+    """优雅关闭"""
+    app.logger.info('收到关闭信号，正在优雅关闭...')
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, graceful_shutdown)
+signal.signal(signal.SIGINT, graceful_shutdown)
+
 if __name__ == '__main__':
     print(f"⚡ 频率限制: 每设备 {limiter.max_requests} 次/{limiter.window}秒")
+    print(f"⏱️  分析超时: {ANALYZE_TIMEOUT}秒")
+    print(f"📝 日志目录: {log_dir}")
     app.run(host='0.0.0.0', port=5000, debug=False)

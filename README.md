@@ -74,7 +74,7 @@
 
 ### 在线使用
 
-访问 **http://111.228.14.153/tools** 即可免费使用
+访问 **https://www.bayihy.cn/tools** 即可免费使用
 
 支持：
 - 📊 单个网站深度分析
@@ -180,7 +180,7 @@ MIT License - 免费使用，商业友好
 - GitCode: [https://gitcode.com/BayiHY/site-analyzer](https://gitcode.com/BayiHY/site-analyzer)
 - GitHub: [https://github.com/BayiHY/site-analyzer](https://github.com/BayiHY/site-analyzer)
 
-🔗 **在线体验：** [http://111.228.14.153/tools](http://111.228.14.153/tools)
+🔗 **在线体验：** [https://www.bayihy.cn/tools](https://www.bayihy.cn/tools)
 
 ## 🤝 贡献
 
