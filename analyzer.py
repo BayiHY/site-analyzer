@@ -726,11 +726,20 @@ class SiteAnalyzer:
         details.clear()
 
         # ==================== 6. API友好性 (15分) ====================
+        # 新评分体系（AI视角）：
+        # - API入口可发现 (4分)：没入口一切白搭
+        # - OpenAPI文档 (5分)：AI读懂文档才能正确调用，权重最高
+        # - CORS跨域支持 (2分)：允许前端/AI直接跨域调用
+        # - 错误信息规范 (2分)：清晰错误码帮AI自我修正
+        # - 版本号标识 (1分)：知道API版本避免兼容问题
+        # - 认证说明 (1分)：API Key获取方式是否明确
+        
         api_score = 0
         api_details = []
         api_found = False
         api_endpoints = []
         docs_found = None
+        docs_content = None  # 保存文档内容用于提取信息
 
         domain = self.domain
         base_url = 'https://' + domain
@@ -772,6 +781,7 @@ class SiteAnalyzer:
             if sub_path:
                 all_probe_urls.append((base_with_sub, path))  # https://domain/tools/api
 
+        # ========== 1. API入口探测 (4分) ==========
         for base, path in all_probe_urls:
             try:
                 resp = requests.get(
@@ -788,33 +798,26 @@ class SiteAnalyzer:
                    (resp.status_code in (200, 401, 403, 404, 405) and 'application/json' in ct):
                     api_found = True
                     api_endpoints.append(base.replace('https://', '') + path)
-                    if path in ['/api', '/api/']:
-                        api_score = max(api_score, 3)
-                        api_details.append({'icon': '✅', 'text': f'发现API入口 {base.replace("https://","")}{path}', 'score': 3})
-                    else:
-                        # 非标准路径（如 /tools/api）也记录
-                        api_score = max(api_score, 3)
-                        api_details.append({'icon': '✅', 'text': f'发现API入口 {base.replace("https://","")}{path}', 'score': 3})
-                    break  # 找到入口就不再继续探测细节
+                    api_score += 4
+                    api_details.append({'icon': '✅', 'text': f'发现API入口 {base.replace("https://","")}{path}', 'score': 4})
+                    break
             except:
                 pass
 
-        # 未发现 /api 入口，但根路径返回JSON
+        # 未发现 /api 入口，尝试跟随重定向探测
         if not api_found:
             for probe_base in ([base_with_sub] if sub_path else []) + [base_url]:
                 try:
                     root_resp = requests.get(probe_base + '/api', timeout=8, allow_redirects=True)
                     ct = root_resp.headers.get('Content-Type', '')
-                    # 只要返回的是合法JSON（不是HTML错误页），就认为是API入口
                     if 'application/json' in ct and root_resp.status_code == 200:
                         try:
                             data = root_resp.json()
-                            # 只要返回合法 JSON 就认为是 API 入口（即使只是健康检查）
                             if isinstance(data, dict):
                                 api_found = True
                                 api_endpoints.append(probe_base.replace('https://', '') + '/api')
-                                api_score = max(api_score, 3)
-                                api_details.append({'icon': '✅', 'text': f'发现API入口 {probe_base.replace("https://","")}/api', 'score': 3})
+                                api_score += 4
+                                api_details.append({'icon': '✅', 'text': f'发现API入口 {probe_base.replace("https://","")}/api', 'score': 4})
                                 break
                         except:
                             pass
@@ -825,7 +828,6 @@ class SiteAnalyzer:
         if not api_found and redirect_domains:
             for redir_domain in sorted(redirect_domains):
                 redir_base = 'https://' + redir_domain
-                # 重定向域名探测路径（优先 /tools/api，再 /api）
                 redir_probe_bases = [redir_base + '/tools', redir_base]
                 for probe_base in redir_probe_bases:
                     try:
@@ -838,8 +840,8 @@ class SiteAnalyzer:
                                     api_found = True
                                     relative_path = probe_base.replace('https://' + redir_domain, '') + '/api'
                                     api_endpoints.append(redir_domain + relative_path)
-                                    api_score = max(api_score, 3)
-                                    api_details.append({'icon': '✅', 'text': f'发现API入口 {redir_domain}{relative_path}（跟随重定向）', 'score': 3})
+                                    api_score += 4
+                                    api_details.append({'icon': '✅', 'text': f'发现API入口 {redir_domain}{relative_path}（跟随重定向）', 'score': 4})
                                     break
                             except:
                                 pass
@@ -848,14 +850,62 @@ class SiteAnalyzer:
                 if api_found:
                     break
 
-        # 探测 OPTIONS /api 是否支持 CORS（2分）
-        # 优先使用已确认的 API 入口路径；其次按子路径→根域名→重定向域名的顺序探测
+        if not api_found:
+            api_details.append({'icon': '❌', 'text': '未发现API入口', 'score': 0, 'tip': '提供GET /api返回JSON，让AI能发现你的API'})
+
+        # ========== 2. OpenAPI文档探测 (5分) ==========
+        docs_paths = [
+            '/openapi.json',
+            '/swagger.json',
+            '/api/swagger.json',
+            '/api/docs',
+            '/api/docs.html',
+            '/api/v1/docs',
+            '/.well-known/openapi.json',
+        ]
+        doc_bases = ([base_with_sub] if sub_path else []) + \
+                     [base_url] + \
+                     ['https://' + d for d in sorted(redirect_domains)] + \
+                     ['https://' + d + '/tools' for d in sorted(redirect_domains)]
+        
+        for doc_path in docs_paths:
+            for doc_base in doc_bases:
+                try:
+                    doc_resp = requests.get(doc_base + doc_path, timeout=8, allow_redirects=False)
+                    if doc_resp.status_code == 200:
+                        ct = doc_resp.headers.get('Content-Type', '')
+                        # JSON 文档或 HTML 文档页面
+                        is_doc = ('application/json' in ct) or ('text/html' in ct and 'docs' in doc_path)
+                        if is_doc:
+                            docs_found = doc_base + doc_path
+                            api_score += 5
+                            api_details.append({'icon': '✅', 'text': f'发现API文档 {docs_found}', 'score': 5})
+                            # 尝试解析文档内容
+                            if 'application/json' in ct:
+                                try:
+                                    docs_content = doc_resp.json()
+                                except:
+                                    pass
+                            break
+                except:
+                    pass
+            if docs_found:
+                break
+        
+        if not docs_found:
+            api_details.append({'icon': '❌', 'text': '未发现OpenAPI文档', 'score': 0, 'tip': '添加/openapi.json，AI才能读懂你的API结构'})
+        else:
+            # 如果找到了文档但没找到入口，把文档路径视为入口
+            if not api_found:
+                api_found = True
+                api_score += 4
+                api_details.insert(-1, {'icon': '✅', 'text': f'通过文档发现API {docs_found}', 'score': 4})
+
+        # ========== 3. CORS跨域支持 (2分) ==========
         known_api_paths = []
         if api_endpoints:
-            # api_endpoints 格式如 www.bayihy.cn/api，需要提取 base
             first_ep = api_endpoints[0]
             if first_ep:
-                # / 分割取第一段得到域名，加协议得到 base
                 api_base = 'https://' + first_ep.split('/')[0]
                 known_api_paths = [api_base]
 
@@ -864,6 +914,8 @@ class SiteAnalyzer:
                     [base_url] + \
                     ['https://' + d for d in sorted(redirect_domains)] + \
                     ['https://' + d + '/tools' for d in sorted(redirect_domains)]
+        
+        cors_found = False
         for opt_base in opt_bases:
             try:
                 opts_resp = requests.options(
@@ -876,54 +928,145 @@ class SiteAnalyzer:
                     'access-control-allow-methods',
                 ]
                 if any(h in opts_resp.headers for h in cors_headers):
+                    cors_found = True
                     api_score += 2
-                    api_details.append({'icon': '✅', 'text': f'支持跨域调用({opt_base}/api)', 'score': 2})
-                    break
-                else:
-                    api_details.append({'icon': '⚠️', 'text': f'不支持跨域调用({opt_base}/api)', 'score': 0, 'tip': '添加CORS头方便AI跨域调用'})
+                    api_details.append({'icon': '✅', 'text': f'支持CORS跨域调用', 'score': 2})
                     break
             except:
                 continue
-        else:
-            api_details.append({'icon': '⚠️', 'text': 'OPTIONS请求失败', 'score': 0, 'tip': '确保/api支持OPTIONS方法'})
+        
+        if not cors_found and api_found:
+            api_details.append({'icon': '⚠️', 'text': '不支持CORS跨域', 'score': 0, 'tip': '添加Access-Control-Allow-Origin头，方便AI跨域调用'})
 
-        # 探测 OpenAPI/Swagger 文档（3分）
-        docs_paths = [
-            '/api/docs',
-            '/api/swagger.json',
-            '/swagger.json',
-            '/openapi.json',
-            '/api/docs.html',
-            '/api/v1/docs',
-        ]
-        # 探测顺序：子路径 → 根域名 → 重定向域名
-        doc_bases = ([base_with_sub] if sub_path else []) + \
-                     [base_url] + \
-                     ['https://' + d for d in sorted(redirect_domains)] + \
-                     ['https://' + d + '/tools' for d in sorted(redirect_domains)]
-        for doc_path in docs_paths:
-            # 同时探测子路径（优先）和根路径
-            for doc_base in doc_bases:
-                try:
-                    doc_resp = requests.get(doc_base + doc_path, timeout=8, allow_redirects=False)
-                    if doc_resp.status_code == 200:
-                        ct = doc_resp.headers.get('Content-Type', '')
-                        is_doc = ('application/json' in ct) or ('text/html' in ct)
-                        if is_doc:
-                            docs_found = doc_base + doc_path
-                            api_score += 3
-                            api_details.append({'icon': '✅', 'text': f'发现API文档 {docs_found}', 'score': 3})
-                            break
-                except:
-                    pass
-            if docs_found:
-                break
-        if not docs_found:
-            api_details.append({'icon': '❌', 'text': '未发现OpenAPI/Swagger文档', 'score': 0, 'tip': '添加/api/docs或/swagger.json帮助AI快速发现端点'})
+        # ========== 4. 错误信息规范性 (2分) ==========
+        # 检查文档中是否定义了错误码，或测试一个错误请求看返回格式
+        error_format_found = False
+        if docs_content and isinstance(docs_content, dict):
+            # 检查 OpenAPI 文档中是否有错误响应定义
+            responses = docs_content.get('components', {}).get('responses', {})
+            paths = docs_content.get('paths', {})
+            # 检查是否有 4xx/5xx 响应定义
+            for path_item in paths.values():
+                for method_item in path_item.values() if isinstance(path_item, dict) else []:
+                    if isinstance(method_item, dict):
+                        for code in ['400', '401', '403', '404', '500']:
+                            if code in method_item.get('responses', {}):
+                                error_format_found = True
+                                break
+            if not error_format_found:
+                for key in responses:
+                    if key.startswith('4') or key.startswith('5') or 'error' in key.lower():
+                        error_format_found = True
+                        break
+        
+        # 如果文档没有定义，尝试实际测试一个错误请求
+        if not error_format_found and api_found:
+            try:
+                api_base = 'https://' + api_endpoints[0].split('/')[0] if api_endpoints else base_url
+                err_resp = requests.get(api_base + '/api/__nonexistent_endpoint_test__', timeout=5)
+                if err_resp.status_code >= 400:
+                    ct = err_resp.headers.get('Content-Type', '')
+                    if 'application/json' in ct:
+                        try:
+                            err_data = err_resp.json()
+                            # 检查是否有规范的错误结构（code/message/error 等字段）
+                            if isinstance(err_data, dict):
+                                error_fields = ['code', 'message', 'error', 'msg', 'detail', 'reason']
+                                if any(f in err_data for f in error_fields):
+                                    error_format_found = True
+                        except:
+                            pass
+            except:
+                pass
+        
+        if error_format_found:
+            api_score += 2
+            api_details.append({'icon': '✅', 'text': '错误信息结构规范', 'score': 2})
+        elif api_found:
+            api_details.append({'icon': '⚠️', 'text': '错误信息格式待规范', 'score': 0, 'tip': '返回 {code, message} 结构的错误，帮AI理解失败原因'})
 
-        # 无API（纯前端工具站等）不扣分，但给引导性提示（兜底给1分，避免完全空白）
+        # ========== 5. 版本号标识 (1分) ==========
+        version_found = False
+        # 从文档中提取版本
+        if docs_content and isinstance(docs_content, dict):
+            info = docs_content.get('info', {})
+            if info.get('version'):
+                version_found = True
+        
+        # 从 API 入口 URL 或响应中检查
+        if not version_found and api_endpoints:
+            for ep in api_endpoints:
+                if '/v1' in ep or '/v2' in ep or '/v3' in ep:
+                    version_found = True
+                    break
+        
+        # 尝试从 /api 响应中检查版本字段
+        if not version_found and api_found:
+            try:
+                api_base = 'https://' + api_endpoints[0].split('/')[0] if api_endpoints else base_url
+                api_resp = requests.get(api_base + '/api', timeout=5)
+                if api_resp.status_code == 200 and 'application/json' in api_resp.headers.get('Content-Type', ''):
+                    data = api_resp.json()
+                    if isinstance(data, dict):
+                        version_fields = ['version', 'api_version', 'v', 'apiVersion']
+                        if any(f in data for f in version_fields):
+                            version_found = True
+            except:
+                pass
+        
+        if version_found:
+            api_score += 1
+            api_details.append({'icon': '✅', 'text': 'API版本号明确', 'score': 1})
+        elif api_found:
+            api_details.append({'icon': '⚠️', 'text': '未标明API版本', 'score': 0, 'tip': '在响应或URL中加入版本号（如/v1/或version字段）'})
+
+        # ========== 6. 认证说明 (1分) ==========
+        auth_found = False
+        # 从文档中检查认证定义
+        if docs_content and isinstance(docs_content, dict):
+            # OpenAPI 3.0 的 security 定义
+            security = docs_content.get('security', [])
+            components = docs_content.get('components', {}).get('securitySchemes', {})
+            if security or components:
+                auth_found = True
+            # 检查描述中是否提到认证
+            info = docs_content.get('info', {})
+            desc = info.get('description', '') or info.get('title', '')
+            auth_keywords = ['api key', 'apikey', 'token', 'auth', 'bearer', 'oauth', '认证', '密钥']
+            if any(kw in desc.lower() for kw in auth_keywords):
+                auth_found = True
+        
+        # 从 API 响应检查
+        if not auth_found and api_found:
+            try:
+                api_base = 'https://' + api_endpoints[0].split('/')[0] if api_endpoints else base_url
+                # 测试一个需要认证的端点
+                auth_resp = requests.get(api_base + '/api', timeout=5)
+                # 401 说明需要认证
+                if auth_resp.status_code == 401:
+                    auth_found = True
+                # 或者响应中有 auth 相关字段
+                elif auth_resp.status_code == 200:
+                    ct = auth_resp.headers.get('Content-Type', '')
+                    if 'application/json' in ct:
+                        data = auth_resp.json()
+                        if isinstance(data, dict):
+                            auth_fields = ['auth', 'authentication', 'api_key', 'token']
+                            if any(f in str(data).lower() for f in auth_fields):
+                                auth_found = True
+            except:
+                pass
+        
+        if auth_found:
+            api_score += 1
+            api_details.append({'icon': '✅', 'text': '认证方式明确', 'score': 1})
+        elif api_found:
+            api_details.append({'icon': '⚠️', 'text': '未说明认证方式', 'score': 0, 'tip': '在文档中说明API Key获取方式'})
+
+        # 无API（纯前端工具站等）给引导性提示
         if not api_found and not docs_found:
-            api_details.append({'icon': 'ℹ️', 'text': '未发现HTTP API', 'score': 0, 'tip': '如提供API建议添加GET /api、GET /api/docs、OPTIONS /api'})
+            # 清除之前的扣分项，替换为友好提示
+            api_details = [{'icon': 'ℹ️', 'text': '未发现HTTP API', 'score': 0, 'tip': '如需AI调用，建议提供RESTful API'}]
 
         discover['api_friendly'] = {'score': api_score, 'max': 15, 'items': api_details}
         score += api_score

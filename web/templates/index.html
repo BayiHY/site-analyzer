@@ -1145,10 +1145,24 @@
                         <div style="margin-bottom:12px;">
                             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🔌 API友好性 <span style="color:#ff6b35;">${data.ai_discoverability.api_friendly.score}/${data.ai_discoverability.api_friendly.max}分</span></div>
                             ${data.ai_discoverability.api_friendly.items.map(item => `
-                                <div style="font-size:12px;margin:4px 0;color:${item.score > 0 ? '#00e676' : '#ff5252'};">${item.icon} ${item.text} ${item.tip ? '<span style="color:#888;">- ' + item.tip + '</span>' : ''}</div>
+                                <div style="font-size:12px;margin:4px 0;color:${item.score > 0 ? '#00e676' : '#ff5252'};">${item.icon} ${item.text} ${item.score === 0 && item.tip ? '<span style="color:#888;">- ' + item.tip + '</span>' : ''}</div>
                             `).join('')}
                         </div>
                         ` : ''}
+                        ${(function(){
+                            var af = data.ai_discoverability.api_friendly;
+                            if(!af) return '';
+                            var tips = [];
+                            if(af.items.every(function(i){return i.score===0;})){
+                                tips.push('提供API服务（GET /api返回JSON、OPTIONS支持CORS、添加/api/docs文档）');
+                            } else {
+                                af.items.forEach(function(item){
+                                    if(item.score === 0 && item.tip) tips.push(item.tip.replace(/^添加/, '添加').replace(/^确保/, '确保'));
+                                });
+                            }
+                            if(tips.length === 0) return '';
+                            return '<div style="margin-top:8px;padding:10px;background:rgba(255,107,53,0.08);border-radius:6px;font-size:11px;color:#aaa;"><strong style="color:#ff9800;">💡 API提升建议：</strong><ul style="margin:4px 0 0 0;padding-left:16px;color:#888;"><li style="margin-bottom:2px;">'+tips.join('</li><li>')+'</li></ul></div>';
+                        })()}
 
                         <div style="margin-top:15px;padding:12px;background:rgba(255,107,53,0.05);border-radius:8px;">
                             <p style="font-size:12px;color:#aaa;margin-bottom:8px;">💡 <strong>提升建议：</strong></p>

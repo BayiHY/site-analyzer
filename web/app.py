@@ -144,26 +144,38 @@ def check_rate_limit():
 
 @app.errorhandler(404)
 def not_found(error):
-    return jsonify({'error': '页面不存在'}), 404
+    return jsonify({
+        'code': 404,
+        'message': '页面不存在',
+        'error': 'NotFound'
+    }), 404
 
 @app.errorhandler(500)
 def internal_error(error):
     app.logger.error(f'500 错误: {error}')
-    return jsonify({'error': '服务器内部错误'}), 500
+    return jsonify({
+        'code': 500,
+        'message': '服务器内部错误',
+        'error': 'InternalServerError'
+    }), 500
 
 @app.errorhandler(Exception)
 def handle_exception(e):
     """捕获所有未处理的异常"""
     app.logger.error(f'未处理的异常: {type(e).__name__}: {e}', exc_info=True)
-    return jsonify({'error': '服务器错误，请稍后重试'}), 500
+    return jsonify({
+        'code': 500,
+        'message': '服务器错误，请稍后重试',
+        'error': type(e).__name__
+    }), 500
 
 
 # ==================== 响应头注入速率限制信息 ====================
 
 @app.after_request
 def add_rate_limit_headers(response):
-    """给所有 /api/ 响应加上标准速率限制头"""
-    if request.path.startswith('/api/'):
+    """给所有 /api/ 响应加上标准速率限制头和CORS头"""
+    if request.path.startswith('/api') or request.path in ['/openapi.json', '/swagger.json']:
         fp = limiter._get_fingerprint()
         now = time.time()
         with limiter._lock:
@@ -172,6 +184,11 @@ def add_rate_limit_headers(response):
         response.headers['X-RateLimit-Limit'] = str(limiter.max_requests)
         response.headers['X-RateLimit-Remaining'] = str(max(0, remaining))
         response.headers['X-RateLimit-Window'] = str(limiter.window)
+        
+        # CORS 支持 - 允许跨域调用
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     return response
 
 
@@ -180,6 +197,53 @@ def add_rate_limit_headers(response):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/api', methods=['GET', 'OPTIONS'])
+def api_root():
+    """API根路径 - 返回服务基本信息，方便AI智能体快速了解"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    return jsonify({
+        'service': '站长工具 - 网站分析API',
+        'version': '1.0.0',
+        'status': 'ok',
+        'description': '免费在线网站分析工具，检测SEO、性能、安全性、AI可信度等',
+        'base_url': 'https://www.bayihy.cn/tools',
+        'endpoints': {
+            'GET /api': 'API基本信息（本端点）',
+            'POST /api/analyze': '分析单个网站',
+            'POST /api/batch': '批量分析（最多10个）',
+            'POST /api/dns': 'DNS解析检测',
+            'POST /api/test-ip': 'IP可达性测试',
+            'GET /api/docs': 'API详细文档(JSON)',
+            'GET /api/docs.html': 'API详细文档(HTML)',
+            'GET /openapi.json': 'OpenAPI 3.0 规范文档'
+        },
+        'auth': '公开API，无需认证，但有频率限制',
+        'rate_limit': {
+            'limit': limiter.max_requests,
+            'window': f'{limiter.window}秒',
+            'remaining': limiter.max_requests
+        }
+    })
+
+
+@app.route('/openapi.json')
+def openapi_spec():
+    """OpenAPI 3.0 规范文档 - 标准格式，方便AI智能体解析"""
+    import json
+    from pathlib import Path
+    spec_file = Path(__file__).parent / 'static' / 'openapi.json'
+    if spec_file.exists():
+        return spec_file.read_text(encoding='utf-8'), 200, {'Content-Type': 'application/json'}
+    return jsonify({'error': 'OpenAPI文档未找到'}), 404
+
+
+@app.route('/swagger.json')
+def swagger_spec():
+    """Swagger 2.0 别名 - 重定向到 OpenAPI"""
+    return openapi_spec()
 
 
 @app.route('/api/health')

@@ -1,0 +1,327 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "站长工具 - 网站分析API",
+    "description": "免费在线网站分析工具，一键检测SEO优化、SSL证书、页面性能、移动端适配等指标，自动评分并提供优化建议。\n\n## 认证说明\n本API为公开服务，无需API Key即可调用。但设有频率限制：每IP每60秒最多10次请求。\n\n## 使用示例\n```bash\ncurl -X POST https://www.bayihy.cn/tools/api/analyze \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"url\":\"baidu.com\"}'\n```\n\n## 支持的分析项\n- SEO优化（标题、描述、关键词、H标签、链接结构）\n- SSL证书（HTTPS、证书有效期、颁发机构）\n- 性能指标（响应时间、页面大小、压缩）\n- 安全性（安全头、CSP、XSS防护）\n- AI可信度（结构化数据、Open Graph、内容质量）\n- ICP备案检测",
+    "version": "1.0.0",
+    "contact": {
+      "name": "巴依浩爷",
+      "url": "https://www.bayihy.cn"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://www.bayihy.cn/tools",
+      "description": "生产环境"
+    }
+  ],
+  "paths": {
+    "/api": {
+      "get": {
+        "summary": "API基本信息",
+        "description": "获取API服务基本信息和健康状态",
+        "responses": {
+          "200": {
+            "description": "API信息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service": {"type": "string", "example": "站长工具 - 网站分析API"},
+                    "version": {"type": "string", "example": "1.0.0"},
+                    "status": {"type": "string", "example": "ok"},
+                    "endpoints": {"type": "array", "items": {"type": "string"}}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "summary": "CORS预检",
+        "description": "支持跨域请求的OPTIONS预检",
+        "responses": {
+          "200": {
+            "description": "CORS头信息",
+            "headers": {
+              "Access-Control-Allow-Origin": {"schema": {"type": "string"}},
+              "Access-Control-Allow-Methods": {"schema": {"type": "string"}},
+              "Access-Control-Allow-Headers": {"schema": {"type": "string"}}
+            }
+          }
+        }
+      }
+    },
+    "/api/analyze": {
+      "post": {
+        "summary": "分析网站",
+        "description": "分析单个网站的SEO、性能、安全性、AI可信度等综合指标",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "网站URL，支持裸域名或完整URL",
+                    "example": "baidu.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "分析成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzeResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "频率限制",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/batch": {
+      "post": {
+        "summary": "批量分析",
+        "description": "批量分析多个网站（最多10个，并发5线程）",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["urls"],
+                "properties": {
+                  "urls": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 10,
+                    "description": "网站URL数组",
+                    "example": ["baidu.com", "github.com"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "批量分析结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {"type": "integer"},
+                    "results": {
+                      "type": "array",
+                      "items": {"$ref": "#/components/schemas/AnalyzeResult"}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dns": {
+      "post": {
+        "summary": "DNS解析",
+        "description": "检测域名DNS解析结果",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["domain"],
+                "properties": {
+                  "domain": {
+                    "type": "string",
+                    "description": "域名",
+                    "example": "baidu.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DNS解析结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "domain": {"type": "string"},
+                    "resolved": {"type": "boolean"},
+                    "ipv4": {"type": "array", "items": {"type": "string"}},
+                    "ipv6": {"type": "array", "items": {"type": "string"}},
+                    "count": {"type": "integer"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalyzeResult": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string"},
+          "score": {"type": "integer", "minimum": 0, "maximum": 100},
+          "seo": {
+            "type": "object",
+            "properties": {
+              "title": {"type": "string"},
+              "title_length": {"type": "integer"},
+              "meta_description": {"type": "string"},
+              "meta_keywords": {"type": "string"},
+              "h1_count": {"type": "integer"},
+              "img_without_alt": {"type": "integer"},
+              "internal_links": {"type": "integer"},
+              "external_links": {"type": "integer"},
+              "has_sitemap": {"type": "boolean"},
+              "has_robots": {"type": "boolean"},
+              "structured_data": {"type": "array", "items": {"type": "string"}},
+              "open_graph": {"type": "object"}
+            }
+          },
+          "performance": {
+            "type": "object",
+            "properties": {
+              "response_time": {"type": "number"},
+              "content_size_kb": {"type": "number"},
+              "compressed": {"type": "boolean"}
+            }
+          },
+          "security": {
+            "type": "object",
+            "properties": {
+              "ssl": {"type": "boolean"},
+              "ssl_issuer": {"type": "string"},
+              "ssl_expires": {"type": "string"},
+              "headers_security": {"type": "object"}
+            }
+          },
+          "ai_trust": {
+            "type": "object",
+            "properties": {
+              "score": {"type": "integer"},
+              "has_structured_data": {"type": "boolean"},
+              "has_open_graph": {"type": "boolean"},
+              "has_meta_description": {"type": "boolean"},
+              "content_quality": {"type": "string"}
+            }
+          },
+          "icp_filing": {
+            "type": "object",
+            "properties": {
+              "has_icp": {"type": "boolean"},
+              "icp_number": {"type": "string"},
+              "confidence": {"type": "integer"}
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {"type": "integer", "description": "HTTP状态码"},
+          "message": {"type": "string", "description": "错误信息"},
+          "error": {"type": "string", "description": "错误类型"},
+          "detail": {"type": "string", "description": "详细说明"}
+        },
+        "required": ["code", "message"],
+        "example": {
+          "code": 400,
+          "message": "缺少url参数",
+          "error": "BadRequest"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "请求参数错误",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/Error"}
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "请求频率超限",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/Error"},
+            "example": {
+              "code": 429,
+              "message": "请求过于频繁，请稍后再试",
+              "error": "RateLimited",
+              "detail": "每60秒最多10次请求"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "服务器内部错误",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/Error"},
+            "example": {
+              "code": 500,
+              "message": "服务器错误，请稍后重试",
+              "error": "InternalServerError"
+            }
+          }
+        }
+      }
+    }
+  }
+}
