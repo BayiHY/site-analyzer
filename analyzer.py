@@ -73,6 +73,7 @@ class SiteAnalyzer:
         
         # 执行各项检测
         self._check_accessibility()
+        self._check_ipv6()
         self._check_ssl()
         self._check_seo()
         self._check_ai_discoverability(getattr(self, '_soup', None))
@@ -142,7 +143,40 @@ class SiteAnalyzer:
                 self.results['accessible'] = False
                 self.results['error'] = str(e)
             return False
-    
+
+    def _check_ipv6(self):
+        """检测IPv6支持（通过dig查询DNS AAAA记录，不依赖本机网络栈）"""
+        import subprocess
+        try:
+            # 查 IPv6 (AAAA) — 用 1.1.1.1 避免本机 stub-resolver 行为异常
+            r6 = subprocess.run(['dig', '@1.1.1.1', '+short', 'AAAA', self.domain],
+                                 capture_output=True, text=True, timeout=5)
+            ipv6_addresses = [line.strip() for line in r6.stdout.splitlines() if line.strip()]
+
+            # 查 IPv4 (A)
+            r4 = subprocess.run(['dig', '@1.1.1.1', '+short', 'A', self.domain],
+                                 capture_output=True, text=True, timeout=5)
+            ipv4_addresses = [line.strip() for line in r4.stdout.splitlines() if line.strip()]
+
+            self.results['ipv6'] = {
+                'supported': len(ipv6_addresses) > 0,
+                'ipv6_count': len(ipv6_addresses),
+                'ipv4_count': len(ipv4_addresses),
+                'ipv6_addresses': ipv6_addresses,
+                'ipv4_addresses': ipv4_addresses,
+                'all_ips': ipv6_addresses + ipv4_addresses
+            }
+        except Exception as e:
+            self.results['ipv6'] = {
+                'supported': False,
+                'error': str(e),
+                'ipv6_count': 0,
+                'ipv4_count': 0,
+                'ipv6_addresses': [],
+                'ipv4_addresses': [],
+                'all_ips': []
+            }
+
     def _check_ssl(self):
         """检测SSL证书"""
         if not self.url.startswith('https://'):
@@ -689,12 +723,216 @@ class SiteAnalyzer:
         
         discover['accessibility'] = {'score': access_score, 'max': 15, 'items': details.copy()}
         score += access_score
-        
+        details.clear()
+
+        # ==================== 6. API友好性 (15分) ====================
+        api_score = 0
+        api_details = []
+        api_found = False
+        api_endpoints = []
+        docs_found = None
+
+        domain = self.domain
+        base_url = 'https://' + domain
+
+        # 如果发生了重定向，收集所有跳转目标域名一并探测
+        redirect_domains = set()
+        for url in self.results.get('redirect_chain', []):
+            parsed = urlparse(url)
+            if parsed.netloc:
+                redirect_domains.add(parsed.netloc)
+        # 探测顺序：原域名 → 重定向域名（去重）
+        all_domains = [domain] + sorted(redirect_domains - {domain})
+
+        # 探测路径列表（优先级从高到低）
+        # 注意：如果当前 URL 有子路径（如 /tools/），API 可能同前缀
+        sub_path = self.parsed_url.path.rstrip('/')  # 如 /tools
+        base_with_sub = base_url + sub_path  # https://www.bayihy.cn/tools
+
+        probe_paths = [
+            '/api',
+            '/api/',
+            '/api/docs',
+            '/api/swagger.json',
+            '/swagger.json',
+            '/openapi.json',
+            '/api/docs.html',
+            '/docs',
+            '/docs/',
+            '/api/v1',
+            '/api/v1/',
+            '/.well-known/api',
+            '/.well-known/openapi.json',
+        ]
+
+        # 对于有子路径的 URL（如 /tools/），同时探测子路径前缀
+        all_probe_urls = []
+        for path in probe_paths:
+            all_probe_urls.append((base_url, path))  # https://domain/api
+            if sub_path:
+                all_probe_urls.append((base_with_sub, path))  # https://domain/tools/api
+
+        for base, path in all_probe_urls:
+            try:
+                resp = requests.get(
+                    base + path,
+                    timeout=8,
+                    allow_redirects=False,
+                    headers={'User-Agent': 'Mozilla/5.0 SiteAnalyzer/1.0'}
+                )
+                ct = resp.headers.get('Content-Type', '')
+                is_json = 'application/json' in ct or 'openapi' in ct.lower() or 'swagger' in ct.lower()
+
+                # 找到了API入口（返回200 JSON，或返回JSON格式错误说明路由存在）
+                if (resp.status_code == 200 and is_json) or \
+                   (resp.status_code in (200, 401, 403, 404, 405) and 'application/json' in ct):
+                    api_found = True
+                    api_endpoints.append(base.replace('https://', '') + path)
+                    if path in ['/api', '/api/']:
+                        api_score = max(api_score, 3)
+                        api_details.append({'icon': '✅', 'text': f'发现API入口 {base.replace("https://","")}{path}', 'score': 3})
+                    else:
+                        # 非标准路径（如 /tools/api）也记录
+                        api_score = max(api_score, 3)
+                        api_details.append({'icon': '✅', 'text': f'发现API入口 {base.replace("https://","")}{path}', 'score': 3})
+                    break  # 找到入口就不再继续探测细节
+            except:
+                pass
+
+        # 未发现 /api 入口，但根路径返回JSON
+        if not api_found:
+            for probe_base in ([base_with_sub] if sub_path else []) + [base_url]:
+                try:
+                    root_resp = requests.get(probe_base + '/api', timeout=8, allow_redirects=True)
+                    ct = root_resp.headers.get('Content-Type', '')
+                    # 只要返回的是合法JSON（不是HTML错误页），就认为是API入口
+                    if 'application/json' in ct and root_resp.status_code == 200:
+                        try:
+                            data = root_resp.json()
+                            # 只要返回合法 JSON 就认为是 API 入口（即使只是健康检查）
+                            if isinstance(data, dict):
+                                api_found = True
+                                api_endpoints.append(probe_base.replace('https://', '') + '/api')
+                                api_score = max(api_score, 3)
+                                api_details.append({'icon': '✅', 'text': f'发现API入口 {probe_base.replace("https://","")}/api', 'score': 3})
+                                break
+                        except:
+                            pass
+                except:
+                    pass
+
+        # 如果原域名没找到，自动探测重定向目标域名
+        if not api_found and redirect_domains:
+            for redir_domain in sorted(redirect_domains):
+                redir_base = 'https://' + redir_domain
+                # 重定向域名探测路径（优先 /tools/api，再 /api）
+                redir_probe_bases = [redir_base + '/tools', redir_base]
+                for probe_base in redir_probe_bases:
+                    try:
+                        test_resp = requests.get(probe_base + '/api', timeout=8, allow_redirects=False)
+                        ct = test_resp.headers.get('Content-Type', '')
+                        if 'application/json' in ct and test_resp.status_code == 200:
+                            try:
+                                data = test_resp.json()
+                                if isinstance(data, dict):
+                                    api_found = True
+                                    relative_path = probe_base.replace('https://' + redir_domain, '') + '/api'
+                                    api_endpoints.append(redir_domain + relative_path)
+                                    api_score = max(api_score, 3)
+                                    api_details.append({'icon': '✅', 'text': f'发现API入口 {redir_domain}{relative_path}（跟随重定向）', 'score': 3})
+                                    break
+                            except:
+                                pass
+                    except:
+                        pass
+                if api_found:
+                    break
+
+        # 探测 OPTIONS /api 是否支持 CORS（2分）
+        # 优先使用已确认的 API 入口路径；其次按子路径→根域名→重定向域名的顺序探测
+        known_api_paths = []
+        if api_endpoints:
+            # api_endpoints 格式如 www.bayihy.cn/api，需要提取 base
+            first_ep = api_endpoints[0]
+            if first_ep:
+                # / 分割取第一段得到域名，加协议得到 base
+                api_base = 'https://' + first_ep.split('/')[0]
+                known_api_paths = [api_base]
+
+        opt_bases = known_api_paths + \
+                    ([base_with_sub] if sub_path else []) + \
+                    [base_url] + \
+                    ['https://' + d for d in sorted(redirect_domains)] + \
+                    ['https://' + d + '/tools' for d in sorted(redirect_domains)]
+        for opt_base in opt_bases:
+            try:
+                opts_resp = requests.options(
+                    opt_base + '/api',
+                    timeout=5,
+                    headers={'Origin': 'https://example.com', 'Access-Control-Request-Method': 'GET'}
+                )
+                cors_headers = [
+                    'access-control-allow-origin',
+                    'access-control-allow-methods',
+                ]
+                if any(h in opts_resp.headers for h in cors_headers):
+                    api_score += 2
+                    api_details.append({'icon': '✅', 'text': f'支持跨域调用({opt_base}/api)', 'score': 2})
+                    break
+                else:
+                    api_details.append({'icon': '⚠️', 'text': f'不支持跨域调用({opt_base}/api)', 'score': 0, 'tip': '添加CORS头方便AI跨域调用'})
+                    break
+            except:
+                continue
+        else:
+            api_details.append({'icon': '⚠️', 'text': 'OPTIONS请求失败', 'score': 0, 'tip': '确保/api支持OPTIONS方法'})
+
+        # 探测 OpenAPI/Swagger 文档（3分）
+        docs_paths = [
+            '/api/docs',
+            '/api/swagger.json',
+            '/swagger.json',
+            '/openapi.json',
+            '/api/docs.html',
+            '/api/v1/docs',
+        ]
+        # 探测顺序：子路径 → 根域名 → 重定向域名
+        doc_bases = ([base_with_sub] if sub_path else []) + \
+                     [base_url] + \
+                     ['https://' + d for d in sorted(redirect_domains)] + \
+                     ['https://' + d + '/tools' for d in sorted(redirect_domains)]
+        for doc_path in docs_paths:
+            # 同时探测子路径（优先）和根路径
+            for doc_base in doc_bases:
+                try:
+                    doc_resp = requests.get(doc_base + doc_path, timeout=8, allow_redirects=False)
+                    if doc_resp.status_code == 200:
+                        ct = doc_resp.headers.get('Content-Type', '')
+                        is_doc = ('application/json' in ct) or ('text/html' in ct)
+                        if is_doc:
+                            docs_found = doc_base + doc_path
+                            api_score += 3
+                            api_details.append({'icon': '✅', 'text': f'发现API文档 {docs_found}', 'score': 3})
+                            break
+                except:
+                    pass
+            if docs_found:
+                break
+        if not docs_found:
+            api_details.append({'icon': '❌', 'text': '未发现OpenAPI/Swagger文档', 'score': 0, 'tip': '添加/api/docs或/swagger.json帮助AI快速发现端点'})
+
+        # 无API（纯前端工具站等）不扣分，但给引导性提示（兜底给1分，避免完全空白）
+        if not api_found and not docs_found:
+            api_details.append({'icon': 'ℹ️', 'text': '未发现HTTP API', 'score': 0, 'tip': '如提供API建议添加GET /api、GET /api/docs、OPTIONS /api'})
+
+        discover['api_friendly'] = {'score': api_score, 'max': 15, 'items': api_details}
+        score += api_score
+
         # ==================== 总分 ====================
-        discover['total_score'] = score
-        discover['max_score'] = 100
-        discover['grade'] = 'A' if score >= 85 else 'B' if score >= 70 else 'C' if score >= 55 else 'D'
-        
+        discover['total_score'] = round(score, 1)
+        discover['max_score'] = 115
+        discover['grade'] = 'A+' if score >= 100 else 'A' if score >= 90 else 'B' if score >= 75 else 'C' if score >= 60 else 'D'
+
         self.results['ai_discoverability'] = discover
     
     def _check_performance(self):
@@ -873,6 +1111,19 @@ class SiteAnalyzer:
             suggestions.append({
                 'text': '压缩图片、合并CSS/JS、使用CDN加速',
                 'effect': '页面加载时间缩短50%以上，用户体验和留存率明显改善'
+            })
+
+        # IPv6检查
+        ipv6_info = self.results.get('ipv6', {})
+        if not ipv6_info.get('supported'):
+            score -= 5
+            issues.append({
+                'text': '⚠️ 不支持IPv6',
+                'impact': 'IPv6是下一代互联网协议，国内外运营商正在逐步推广，不支持会导致部分用户访问不畅'
+            })
+            suggestions.append({
+                'text': '联系域名商/服务器商添加AAAA记录',
+                'effect': '覆盖IPv6用户，提升全球访问覆盖率'
             })
 
         # 响应时间

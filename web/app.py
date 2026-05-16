@@ -68,7 +68,7 @@ app.logger.info('🚀 站长工具服务启动')
 
 # ==================== 超时控制 ====================
 
-ANALYZE_TIMEOUT = 30  # 分析超时时间（秒）
+ANALYZE_TIMEOUT = 90  # 分析超时时间（秒）
 
 def timeout_handler(signum, frame):
     """超时信号处理"""
