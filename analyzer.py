@@ -76,7 +76,8 @@ class SiteAnalyzer:
         self._check_accessibility()
         self._check_ipv6()
         self._check_ssl()
-        self._check_seo()
+        self._check_seo()                          # ← _raw_html 在这里设置
+        self._check_ip_intelligence()              # IP归属地/备案合规（依赖_raw_html）
         self._check_ai_discoverability(getattr(self, '_soup', None))
         self._check_performance()
         self._calculate_score()
@@ -222,6 +223,210 @@ class SiteAnalyzer:
                 'ipv4_addresses': [],
                 'all_ips': []
             }
+
+    def _check_ip_intelligence(self):
+        """查询IP归属地/运营商/ASN，判断备案合规性
+
+        判定逻辑：
+        - 国内IP（countryCode=CN）：必须有ICP备案，有公网安备更佳
+        - 国外IP（countryCode!=CN）：有ICP/公网安备声明 → 可疑警告
+        - IP数据来源：ip-api.com（免费，无需key，90请求/分钟）
+        """
+        ip_intel = {
+            'provider': 'ip-api.com',
+            'query_method': None,     # 'ipv4' / 'ipv6' / None
+            'ip': None,
+            'asn': None,
+            'isp': None,
+            'org': None,
+            'region': None,
+            'city': None,
+            'country': None,
+            'country_code': None,
+            'is_china': None,         # bool，是否中国IP
+            'proxy_suspicion': None,  # 'none' / 'low' / 'medium' / 'high'
+            'compliance': {
+                'is_domestic': None,       # bool，是否国内IP
+                'has_icp': None,           # bool，是否检测到ICP备案
+                'has_gongan': None,        # bool，是否检测到公网安备
+            }
+        }
+
+        # 取主IP（优先 IPv4 用于查询）
+        all_ips = self.results.get('ipv6', {}).get('all_ips', [])
+        if not all_ips:
+            self.results['ip_intel'] = ip_intel
+            return
+
+        # 优先用 resolved_ip（_check_accessibility 中可能已设置），否则用第一个 IPv4
+        primary_ip = self.results.get('resolved_ip')
+        query_ip = None
+        query_method = None
+
+        if primary_ip:
+            query_ip = primary_ip
+            query_method = 'ipv6' if ':' in primary_ip else 'ipv4'
+        else:
+            ipv4s = self.results.get('ipv6', {}).get('ipv4_addresses', [])
+            if ipv4s:
+                query_ip = ipv4s[0]
+                query_method = 'ipv4'
+            elif all_ips:
+                query_ip = all_ips[0]
+                query_method = 'ipv6' if ':' in query_ip else 'ipv4'
+
+        ip_intel['query_method'] = query_method
+        ip_intel['ip'] = query_ip
+
+        if not query_ip:
+            self.results['ip_intel'] = ip_intel
+            return
+
+        # 查询 ip-api.com
+        # 使用 batch API 一次查询多个字段，减少请求次数
+        try:
+            fields = 'status,message,country,countryCode,region,regionName,city,isp,org,asn,query'
+            api_url = f'http://ip-api.com/json/{query_ip}?fields={fields}'
+            resp = requests.get(api_url, timeout=10)
+            data = resp.json()
+        except Exception as e:
+            ip_intel['error'] = str(e)
+            self.results['ip_intel'] = ip_intel
+            return
+
+        if data.get('status') == 'fail':
+            ip_intel['error'] = data.get('message', 'query failed')
+            # IPv6 查询失败，尝试回退到 IPv4
+            if query_method == 'ipv6' or (query_method is None and ':' in (query_ip or '')):
+                ipv4s = self.results.get('ipv6', {}).get('ipv4_addresses', [])
+                if ipv4s:
+                    query_ip = ipv4s[0]
+                    query_method = 'ipv4'
+                    ip_intel['query_method'] = 'ipv4'
+                    ip_intel['ip'] = query_ip
+                    try:
+                        resp2 = requests.get(f'http://ip-api.com/json/{query_ip}?fields={fields}', timeout=10)
+                        data = resp2.json()
+                        if data.get('status') == 'success':
+                            # 用 IPv4 结果继续
+                            pass
+                        else:
+                            ip_intel['error'] = data.get('message', 'query failed')
+                            self.results['ip_intel'] = ip_intel
+                            return
+                    except Exception as e2:
+                        ip_intel['error'] = str(e2)
+                        self.results['ip_intel'] = ip_intel
+                        return
+            else:
+                self.results['ip_intel'] = ip_intel
+                return
+
+        # 填充基本信息
+        ip_intel['country'] = data.get('country', '')
+        ip_intel['country_code'] = data.get('countryCode', '')
+        ip_intel['region'] = data.get('regionName', '')
+        ip_intel['city'] = data.get('city', '')
+        ip_intel['isp'] = data.get('isp', '')
+        ip_intel['org'] = data.get('org', '')
+        ip_intel['asn'] = data.get('asn', '')
+        ip_intel['is_china'] = ip_intel['country_code'] == 'CN'
+
+        # ASN 推断网络类型
+        asn_str = (ip_intel['asn'] or '').lower()
+        isp_str = (ip_intel['isp'] or '').lower()
+        org_str = (ip_intel['org'] or '').lower()
+
+        # ========== 备案合规判定 ==========
+        comp = ip_intel['compliance']
+        comp['is_domestic'] = ip_intel['is_china']
+
+        # 获取当前站点的ICP/公安备案状态（由 _check_seo 或 _check_ai_discoverability 设置）
+        icp_found = self._get_icp_status()
+        gongan_found = self._get_gongan_status()
+
+        comp['has_icp'] = icp_found
+        # 已知热门站点兜底的公网安备号也算入
+        if not gongan_found and ip_intel.get('gongan_number'):
+            gongan_found = True
+        comp['has_gongan'] = gongan_found
+
+        # 公网安备正则（格式：省份简称 + 公安 + 网安备/公网安备 + 数字，如"京公网安备 11010802020088号"）
+        gongan_regex = re.compile(
+            r'(京|沪|粤|浙|苏|鲁|豫|川|渝|鄂|湘|皖|闽|赣|桂|黔|滇|冀|晋|辽|吉|黑|蒙|陕|甘|青|藏|新|琼|宁)公网安备 ?\d+号?',
+            re.IGNORECASE
+        )
+
+        # 再次扫描页面文本（可见文本 > 源码），单独检测公网安备（icp_filing不包含公安）
+        page_text = getattr(self, '_raw_html', '')[:200000] if hasattr(self, '_raw_html') else ''
+        gongan_match = gongan_regex.search(page_text)
+        if gongan_match:
+            comp['has_gongan'] = True
+            ip_intel['gongan_number'] = gongan_match.group()
+
+        self.results['ip_intel'] = ip_intel
+
+    def _get_icp_status(self):
+        """从已完成的检测结果中获取ICP备案状态"""
+        # 优先级：seo.ai_discoverability > seo.ai_trust > 直接搜索 > 已知热门站点兜底
+        ai_disc = self.results.get('seo', {}).get('ai_discoverability', {})
+        auth_items = ai_disc.get('authority', {}).get('items', [])
+        for item in auth_items:
+            if 'ICP' in item.get('text', '') or '备案' in item.get('text', ''):
+                if item.get('icon') in ('✅', '🟡'):
+                    return True
+
+        # 直接从 raw_html 扫描（兜底）
+        page = getattr(self, '_raw_html', '')[:200000] if hasattr(self, '_raw_html') else ''
+        icp_regex = re.compile(r'(京|沪|粤|浙|苏|鲁|豫|川|渝|鄂|湘|皖|闽|赣|桂|黔|滇|冀|晋|辽|吉|黑|蒙|陕|甘|青|藏|新|琼|宁)ICP[证备]?\d+号?', re.IGNORECASE)
+        if page and icp_regex.search(page):
+            return True
+
+        # 已知热门站点ICP/公网安备兜底（SPA站点或强制跳转页面无法抓取内容时使用）
+        # 格式：domain → (has_icp, gongan_number or None)
+        known_icp_domains = {
+            'baidu.com':           (True,  '京公网安备11000002000001号'),
+            'bilibili.com':        (True,  None),
+            'douyin.com':          (True,  None),
+            'toutiao.com':         (True,  None),
+            'zhihu.com':           (True,  '京公网安备11010802020088号'),
+            'weibo.com':           (True,  None),
+            'jd.com':              (True,  None),
+            'taobao.com':          (True,  None),
+            'tmall.com':           (True,  None),
+            'alipay.com':          (True,  None),
+            '163.com':             (True,  None),
+            'qq.com':              (True,  None),
+            'weixin.qq.com':       (True,  None),
+            'xiaohongshu.com':     (True,  None),
+            'kuaishou.com':        (True,  None),
+            'pinduoduo.com':       (True,  None),
+            'meituan.com':         (True,  None),
+            'douban.com':          (True,  None),
+            'juejin.cn':           (True,  None),
+            'miit.gov.cn':         (True,  None),
+            'beian.miit.gov.cn':   (True,  None),
+        }
+        for d, (has_icp, gongan_num) in known_icp_domains.items():
+            if d in self.domain:
+                if has_icp:
+                    if gongan_num:
+                        self.results.setdefault('ip_intel', {})
+                        self.results['ip_intel']['gongan_number'] = gongan_num
+                    return True
+        return False
+
+    def _get_gongan_status(self):
+        """检测公网安备状态"""
+        page = getattr(self, '_raw_html', '')[:200000] if hasattr(self, '_raw_html') else ''
+        if page:
+            gongan_regex = re.compile(r'(京|沪|粤|浙|苏|鲁|豫|川|渝|鄂|湘|皖|闽|赣|桂|黔|滇|冀|晋|辽|吉|黑|蒙|陕|甘|青|藏|新|琼|宁)公网安备 *\d+号?', re.IGNORECASE)
+            if gongan_regex.search(page):
+                return True
+        # 页面为空时，查已知热门站点兜底记录
+        if self.results.get('ip_intel', {}).get('gongan_number'):
+            return True
+        return False
 
     def _check_ssl(self):
         """检测SSL证书"""

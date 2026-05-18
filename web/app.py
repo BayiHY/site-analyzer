@@ -10,6 +10,7 @@ import time
 import signal
 import hashlib
 import logging
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from collections import defaultdict
 from threading import Lock
@@ -196,7 +197,10 @@ def add_rate_limit_headers(response):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    current_year = datetime.now().strftime('%Y')
+    published_time = f"{current_year}-01-01T00:00:00+08:00"
+    modified_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S+08:00')
+    return render_template('index.html', published_time=published_time, modified_time=modified_time)
 
 
 @app.route('/api', methods=['GET', 'OPTIONS'])

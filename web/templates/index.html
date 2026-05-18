@@ -9,8 +9,8 @@
     <meta name="author" content="巴依浩爷(BayiHY)">
     <meta name="publisher" content="巴依浩爷(BayiHY)">
     <meta name="robots" content="index, follow">
-    <meta property="article:published_time" content="2025-05-09T00:00:00+08:00">
-    <meta property="article:modified_time" content="2025-05-09T00:00:00+08:00">
+    <meta property="article:published_time" content="{{ published_time }}">
+    <meta property="article:modified_time" content="{{ modified_time }}">
     <link rel="canonical" href="https://www.bayihy.cn/tools">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
     
@@ -486,6 +486,7 @@
             </div>
             <div class="quick-links">
                 <span class="quick-link" onclick="quickAnalyze('baidu.com')">百度</span>
+                <span class="quick-link" onclick="quickAnalyze('github.com')">GitHub</span>
                 <span class="quick-link" onclick="quickAnalyze('zhihu.com')">知乎</span>
                 <span class="quick-link" onclick="quickAnalyze('bilibili.com')">B站</span>
                 <span class="quick-link" onclick="quickAnalyze('juejin.cn')">掘金</span>
@@ -979,6 +980,41 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- IP 归属地 + 备案合规 -->
+                    ${data.ip_intel && data.ip_intel.ip ? `
+                    <div class="info-card">
+                        <h3><span class="icon" style="background:rgba(0,230,118,0.15)">🌍</span> IP 归属地 & 备案合规</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="label">IP 地址</div>
+                                <div class="value" style="font-family:monospace;font-size:12px;">${escHtml(data.ip_intel.ip || '-')}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">所在地区</div>
+                                <div class="value">${escHtml(data.ip_intel.region || '-')} · ${escHtml(data.ip_intel.city || '-')}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">国家/地区</div>
+                                <div class="value">${escHtml(data.ip_intel.country || '-')} <span style="color:#888;">(${data.ip_intel.country_code || '-'})</span></div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">运营商 / 组织</div>
+                                <div class="value" style="font-size:12px;">${escHtml(data.ip_intel.isp || data.ip_intel.org || '-')}</div>
+                            </div>
+                            ${data.ip_intel.compliance ? `
+                            <div class="info-item">
+                                <div class="label">ICP 备案</div>
+                                <div class="value">${data.ip_intel.compliance.has_icp ? '<span class="tag tag-success">✅ 有</span>' : '<span class="tag tag-error">❌ 无</span>'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="label">公网安备</div>
+                                <div class="value">${data.ip_intel.compliance.has_gongan ? '<span class="tag tag-success">✅ 有</span>' : '<span class="tag tag-default">❌ 无</span>'}</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
 
                     <!-- SEO 信息 -->
                     <div class="info-card">
