@@ -8,6 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 import ssl
 import socket
+import subprocess
 import time
 import json
 import sys
@@ -120,6 +121,21 @@ class SiteAnalyzer:
             self.results['content_type'] = response.headers.get('Content-Type', '未知')
             self.results['server'] = response.headers.get('Server', '未知')
             
+            # 检测 Cloudflare JS 挑战页（521 + JS redirect + __jsluid_s cookie）
+            # __jsluid_s 在 Set-Cookie 响应头中，不在 body 里
+            raw_text = response.text
+            has_cf_cookie = any('jsluid' in str(v) for v in response.headers.values())
+            is_cloudflare_challenge = (
+                response.status_code == 521
+                and 'location.href' in raw_text
+                and has_cf_cookie
+            )
+            if is_cloudflare_challenge:
+                # JS 挑战页说明目标返回了 SPA 入口（可能需要 hash 路由）
+                # 记录真实 final_url 用于 hash 路由探测
+                self.results['is_spa'] = True
+                self.results['spa_final_url'] = response.url
+            
             # 重定向链
             if response.history:
                 self.results['redirect_chain'] = [r.url for r in response.history]
@@ -143,6 +159,36 @@ class SiteAnalyzer:
                 self.results['accessible'] = False
                 self.results['error'] = str(e)
             return False
+
+    def _render_headless(self, url):
+        """使用 chromium headless 渲染 SPA 页面，返回渲染后的 HTML 或 None"""
+        try:
+            cmd = [
+                '/usr/bin/chromium-browser',
+                '--headless=new',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--dump-dom',
+                f'--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                url
+            ]
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode == 0 and result.stdout:
+                return result.stdout
+        except subprocess.TimeoutExpired:
+            pass
+        except FileNotFoundError:
+            pass
+        except Exception:
+            pass
+        return None
 
     def _check_ipv6(self):
         """检测IPv6支持（通过dig查询DNS AAAA记录，不依赖本机网络栈）"""
@@ -234,7 +280,7 @@ class SiteAnalyzer:
             if 'resolved_ip' in self.results:
                 request_url = self.url.replace(self.domain, self.results['resolved_ip'])
                 headers['Host'] = self.domain
-            
+
             response = requests.get(
                 request_url,
                 timeout=self.timeout,
@@ -242,6 +288,58 @@ class SiteAnalyzer:
                 verify=False
             )
             html_text = fix_encoding(response)
+
+            # 检测 Cloudflare JS 挑战页（521 + JS redirect + __jsluid）
+            # 尝试抓取 SPA hash 路由页面
+            is_cloudflare = (
+                response.status_code == 521
+                and 'location.href' in html_text
+                and ('__jsluid' in html_text or '__jsl_clearance' in html_text)
+            )
+            if is_cloudflare:
+                # 尝试常见的 hash 路由路径
+                hash_paths = [
+                    '/#/Integrated/index',
+                    '/#/recordcheck/index',
+                    '/#/service/index',
+                    '/#/',
+                ]
+                for hash_path in hash_paths:
+                    try:
+                        hash_url = request_url.rstrip('/') + hash_path
+                        hresp = requests.get(
+                            hash_url,
+                            timeout=self.timeout,
+                            headers=headers,
+                            verify=False
+                        )
+                        if hresp.status_code == 200 and len(hresp.text) > 500:
+                            html_text = fix_encoding(hresp)
+                            self.results['spa_final_url'] = hash_url
+                            break
+                    except:
+                        pass
+
+            # 检测普通 Vue SPA（返回 200 但内容是 JS 渲染的）
+            # 特征：HTML 中有 chunk-vendors、id="app"、Vue app 初始化
+            if not self.results.get('is_spa'):
+                spa_indicators = ['chunk-vendors', 'id="app"', '__VUE_DEVTOOLS_PLUGIN__', '__VUE_OPTIONS_API__']
+                if sum(1 for ind in spa_indicators if ind in html_text) >= 2:
+                    self.results['is_spa'] = True
+                # URL 中有 hash 路由也视为 SPA
+                if '/#/' in self.url:
+                    self.results['is_spa'] = True
+
+            # 如果是 SPA（Cloudflare 521 或 hash 路由）但页面内容仍是挑战页或为空
+            is_cf_521 = self.results.get('status_code') == 521
+            # SPA + (Cloudflare 521 或 内容太短 或 普通Vue SPA) → headless 渲染
+            if self.results.get('is_spa') and (is_cf_521 or len(html_text) < 500 or
+                (self.results.get('status_code') == 200 and 'chunk-vendors' in html_text)):
+                rendered_html = self._render_headless(self.url)
+                if rendered_html:
+                    html_text = rendered_html
+                    self.results['headless_rendered'] = True
+
             soup = BeautifulSoup(html_text, 'html.parser')
             self._soup = soup  # 保存供AI可发现性检测使用
             self._raw_html = html_text  # 保存原始HTML供ICP等检测
@@ -661,22 +759,50 @@ class SiteAnalyzer:
             'tmall.com', 'alipay.com', '163.com', 'qq.com',
             'weixin.qq.com', 'xiaohongshu.com', 'kuaishou.com',
             'pinduoduo.com', 'meituan.com', 'douban.com', 'juejin.cn',
+            'miit.gov.cn', 'beian.miit.gov.cn',
         }
-        
+
+        icp_found = False
+        icp_number = None
+
         # 1. 优先检查可见文本（页脚直接展示 = 最佳）
         icp_match = icp_regex.search(page_text)
         if icp_match:
             auth_score += 8
+            icp_found = True
+            icp_number = icp_match.group()
             details.append({'icon': '✅', 'text': f'有ICP备案号（页脚可见）', 'score': 8})
         # 2. 检查HTML源码（在页面中但不直接可见，如隐藏在script或data属性）
         elif hasattr(self, '_raw_html') and icp_regex.search(self._raw_html):
             auth_score += 5
+            icp_found = True
+            icp_number = icp_regex.search(self._raw_html).group()
             details.append({'icon': '🟡', 'text': '有ICP备案号（源码中，建议移至页脚可见位置）', 'score': 5, 'tip': '页脚展示备案号可增强用户信任'})
-        # 3. 已知热门站点推测（SPA完全JS渲染，页面源码无痕迹）
-        elif any(d in self.domain for d in known_icp_domains):
+        # 3. 检查 JSON-LD 结构化数据中的备案信息
+        elif hasattr(self, '_raw_html'):
+            import json as _json
+            for match in re.finditer(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', self._raw_html, re.DOTALL):
+                try:
+                    ld_data = _json.loads(match.group(1))
+                    for item in ([ld_data] if isinstance(ld_data, dict) else ld_data):
+                        item_str = _json.dumps(item, ensure_ascii=False)
+                        icp_m = icp_regex.search(item_str)
+                        if icp_m:
+                            auth_score += 5
+                            icp_found = True
+                            icp_number = icp_m.group()
+                            details.append({'icon': '🟡', 'text': '有ICP备案号（结构化数据中）', 'score': 5})
+                            break
+                    if icp_found:
+                        break
+                except:
+                    pass
+        # 4. 已知热门站点推测（SPA完全JS渲染，页面源码无痕迹）
+        if not icp_found and any(d in self.domain for d in known_icp_domains):
             auth_score += 3
+            icp_found = True
             details.append({'icon': '🟡', 'text': '可能有ICP备案（SPA站点，页面未展示）', 'score': 3, 'tip': '建议在页脚添加备案号，提升百度信任度'})
-        else:
+        elif not icp_found:
             details.append({'icon': '❌', 'text': '未发现ICP备案', 'score': 0, 'tip': '备案号是百度信任的重要信号'})
 
         # 联系方式 (8分)
@@ -1077,6 +1203,13 @@ class SiteAnalyzer:
         discover['grade'] = 'A+' if score >= 100 else 'A' if score >= 90 else 'B' if score >= 75 else 'C' if score >= 60 else 'D'
 
         self.results['ai_discoverability'] = discover
+
+        # 写入 icp_filing 字段（供 API 响应）
+        has_icp = any(d['icon'] in ('✅', '🟡') and 'ICP' in d['text'] for d in details + discover.get('authority', {}).get('items', []))
+        self.results['icp_filing'] = {
+            'has_icp': icp_found,
+            'icp_number': icp_number,
+        }
     
     def _check_performance(self):
         """检测性能指标"""
