@@ -347,13 +347,13 @@ curl https://www.bayihy.cn/tools/api/docs</code>
             <h3>⏱️ 速率限制</h3>
             <div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.8;">
                 <p style="margin-bottom:12px;">
-                    所有 <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">/api/*</code> 接口均受速率限制保护，基于 <strong style="color:#ff9800;">IP + User-Agent 标识</strong>识别客户端。
+                    所有 <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">/api/*</code> 接口均受速率限制保护，基于 <strong style="color:#ff9800;">IP + User-Agent 特征</strong>识别客户端。
                 </p>
                 <table class="params-table" style="margin-bottom:16px;">
                     <tr><th>参数</th><th>值</th><th>说明</th></tr>
                     <tr><td class="param-name">限制</td><td>10 次</td><td>每个客户端每窗口最多请求次数</td></tr>
                     <tr><td class="param-name">窗口</td><td>60 秒</td><td>滑动时间窗口</td></tr>
-                    <tr><td class="param-name">识别</td><td>IP + UA</td><td>MD5 哈希标识，换 UA 可重置</td></tr>
+                    <tr><td class="param-name">识别</td><td>IP + UA</td><td>MD5 哈希，换 UA 可重置</td></tr>
                 </table>
 
                 <p style="margin-bottom:8px;"><strong style="color:#ff9800;">响应头（每个 /api/ 响应都包含）：</strong></p>

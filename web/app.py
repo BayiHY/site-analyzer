@@ -77,7 +77,7 @@ def timeout_handler(signum, frame):
 # ==================== 频率限制 ====================
 
 class RateLimiter:
-    """基于 IP + 设备客户端标识的频率限制器"""
+    """基于 IP + 设备特征的频率限制器"""
 
     def __init__(self, max_requests=10, window_seconds=60):
         self.max_requests = max_requests
@@ -86,7 +86,7 @@ class RateLimiter:
         self._lock = Lock()
 
     def _get_fingerprint(self):
-        """生成设备客户端标识：IP + User-Agent"""
+        """生成设备特征：IP + User-Agent"""
         ip = request.headers.get('X-Real-IP', request.remote_addr)
         ua = request.headers.get('User-Agent', 'unknown')
         raw = f"{ip}|{ua}"
