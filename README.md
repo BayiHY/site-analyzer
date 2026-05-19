@@ -1,6 +1,6 @@
 # 🌐 站长工具 - AI时代的SEO分析平台
 
-> **支持AI可信度分析的开源SEO工具** — 帮助网站优化在ChatGPT、Perplexity、Google SGE等AI搜索引擎中的表现
+> **支持AI可信度分析的开源SEO工具** — 帮助网站优化在AI搜索引擎中的表现
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.7+](https://img.shields.io/badge/Python-3.7+-green.svg)](https://python.org)
