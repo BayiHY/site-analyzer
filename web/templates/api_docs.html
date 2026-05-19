@@ -448,9 +448,16 @@ curl https://www.bayihy.cn/tools/api/docs</code>
     <span class="key">"ssl_expires"</span>: <span class="type">string</span>
   },
   <span class="key">"ai_trust"</span>: {
-    <span class="key">"score"</span>: <span class="type">int</span>,         <span class="desc">// AI可信度 0-100</span>
-    <span class="key">"has_structured_data"</span>: <span class="type">bool</span>,
-    <span class="key">"has_open_graph"</span>: <span class="type">bool</span>
+    <span class="key">"score"</span>: <span class="type">int</span>,         <span class="desc">// AI可信度评分 0-100</span>
+    <span class="key">"max_score"</span>: <span class="type">int</span>,        <span class="desc">// 满分</span>
+    <span class="key">"json_ld"</span>: <span class="type">object</span>,     <span class="desc">// JSON-LD结构化数据 {exists, count, types[]}</span>
+    <span class="key">"open_graph"</span>: <span class="type">object</span>,   <span class="desc">// Open Graph完整度 {exists, complete}</span>
+    <span class="key">"canonical"</span>: <span class="type">object</span>,   <span class="desc">// canonical标签 {exists}</span>
+    <span class="key">"authorship"</span>: <span class="type">object</span>,   <span class="desc">// 作者信息 {has_author, platform}</span>
+    <span class="key">"dates"</span>: <span class="type">object</span>,       <span class="desc">// 发布/更新时间 {has_published, has_modified}</span>
+    <span class="key">"semantic_html"</span>: <span class="type">object</span>, <span class="desc">// 语义化HTML {count}</span>
+    <span class="key">"heading_structure"</span>: <span class="type">object</span>, <span class="desc">// 标题层级 {proper_hierarchy}</span>
+    <span class="key">"language"</span>: <span class="type">object</span>,   <span class="desc">// 语言声明 {declared, matches_content}</span>
   },
   <span class="key">"ai_discoverability"</span>: {
     <span class="key">"score"</span>: <span class="type">int</span>,         <span class="desc">// AI可发现性 0-100</span>

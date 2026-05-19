@@ -340,10 +340,15 @@ def api_docs():
                     },
                     'ai_trust': {
                         'score': 'int AI可信度评分 0-100',
-                        'has_structured_data': 'bool',
-                        'has_open_graph': 'bool',
-                        'has_meta_description': 'bool',
-                        'content_quality': 'string 内容质量评估'
+                        'max_score': 'int 满分',
+                        'json_ld': '{exists, count, types[]} JSON-LD结构化数据',
+                        'open_graph': '{exists, complete} Open Graph完整度',
+                        'canonical': '{exists} canonical标签',
+                        'authorship': '{has_author, platform} 作者信息',
+                        'dates': '{has_published, has_modified} 发布/更新时间',
+                        'semantic_html': '{count} 语义化HTML标签数',
+                        'heading_structure': '{proper_hierarchy} 标题层级',
+                        'language': '{declared, matches_content} 语言声明'
                     },
                     'icp_filing': {
                         'has_icp': 'bool 是否检测到ICP备案',
@@ -420,6 +425,9 @@ def analyze():
                 return jsonify({'error': f'分析超时（超过{ANALYZE_TIMEOUT}秒），请稍后重试'}), 504
         
         app.logger.info(f'分析完成: {url} (评分: {results.get("score", "N/A")})')
+        # 将 seo.ai_trust 提升到顶级 ai_trust 字段
+        if 'seo' in results and 'ai_trust' in results['seo']:
+            results['ai_trust'] = results['seo']['ai_trust']
         resp = jsonify(results)
         return resp
     except Exception as e:
