@@ -47,12 +47,14 @@
 - **页面语言声明** — 多语言AI的匹配依据
 
 ### 🚀 AI可发现性指数（AI Discoverability Index）
-**面向国内平台**的综合可发现性评估：
-- **结构化数据 (20分)** — JSON-LD、Open Graph
+**面向AI/SEO综合可发现性评估（满分125）：**
+- **结构化数据 (30分)** — JSON-LD、Open Graph、robots.txt、llms.txt、sitemap.xml
 - **内容可引用性 (25分)** — 标题、描述、长度、作者、日期
-- **自媒体适配性 (20分)** — 抖音/小红书/微信公众号引流、内容格式
-- **权威性信号 (20分)** — HTTPS、ICP备案号、联系方式
+- **AI爬虫导航 (10分)** — robots.txt/llms.txt/sitemap.xml存在、AI爬虫显式放行
+- **API友好性 (15分)** — OpenAPI文档、认证方式明确
 - **可访问性 (15分)** — 页面可访问、移动端友好、响应速度
+- **媒体适配 (15分)** — 图片、视频、音频可访问
+- **权威性信号 (15分)** — HTTPS、ICP备案号
 
 ### 🔒 SSL证书检测
 - 证书有效期
@@ -106,11 +108,14 @@ python3 app.py
 # 单个网站分析
 python3 analyzer.py https://example.com
 
-# 批量分析
+# 批量分析（文件）
 python3 analyzer.py --file urls.txt
 
 # 生成HTML报告
-python3 analyzer.py https://example.com --report
+python3 analyzer.py https://example.com --report -o my-report.html
+
+# 批量生成报告
+python3 analyzer.py --file urls.txt --report --workers 10
 ```
 
 ## 📊 输出示例
@@ -150,22 +155,25 @@ AI信任度得分: 85/100
 ## 📁 项目结构
 
 ```
-site-analyzer/
+site_analyzer/
 ├── analyzer.py          # 核心分析引擎
 ├── web/
-│   ├── app.py          # Flask Web应用
+│   ├── app.py           # Flask Web应用
+│   ├── ai_nav/          # AI导航文件（robots.txt, llms.txt, sitemap.xml）
+│   ├── static/
+│   │   └── images/      # 静态资源
 │   └── templates/
-│       └── index.html  # H5前端（响应式）
+│       ├── index.html   # H5前端（响应式）
+│       ├── about.html   # 关于页面
+│       └── api_docs.html # API文档页
 ├── README.md
 └── LICENSE
 ```
 
 ## 🔑 关键词
 
-SEO分析工具, AI信任度检测, AI SEO优化, 网站SEO检测, 
-JSON-LD检测, Open Graph检测, 移动端适配检测, SSL证书检测, 
-站长工具, 网站健康度检测, AI搜索引擎优化, ChatGPT SEO, 
-Perplexity优化, Google SGE, 结构化数据检测, 开源SEO工具
+SEO分析工具, AI信任度, 网站SEO检测, JSON-LD检测,
+Open Graph检测, 移动端适配, SSL证书检测, 站长工具
 
 ## 📄 许可证
 
