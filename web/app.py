@@ -18,7 +18,7 @@ from functools import wraps
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from analyzer import SiteAnalyzer
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
@@ -203,6 +203,20 @@ def index():
     return render_template('index.html', published_time=published_time, modified_time=modified_time)
 
 
+# ==================== AI/SEO 导航文件 ====================
+@app.route('/robots.txt')
+def robots_txt():
+    return send_from_directory(os.path.join(app.root_path, 'ai_nav'), 'robots.txt'), 200, {'Content-Type': 'text/plain'}
+
+@app.route('/llms.txt')
+def llms_txt():
+    return send_from_directory(os.path.join(app.root_path, 'ai_nav'), 'llms.txt'), 200, {'Content-Type': 'text/markdown'}
+
+@app.route('/sitemap.xml')
+def sitemap_xml():
+    return send_from_directory(os.path.join(app.root_path, 'ai_nav'), 'sitemap.xml'), 200, {'Content-Type': 'application/xml'}
+
+
 @app.route('/api', methods=['GET', 'OPTIONS'])
 def api_root():
     """API根路径 - 返回服务基本信息，方便AI智能体快速了解"""
@@ -270,6 +284,12 @@ def health():
             'window_seconds': limiter.window
         }
     })
+
+
+@app.route('/about')
+def about():
+    """关于页面"""
+    return render_template('about.html')
 
 
 @app.route('/api/docs.html')

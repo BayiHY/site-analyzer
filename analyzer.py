@@ -74,6 +74,7 @@ class SiteAnalyzer:
         
         # 执行各项检测
         self._check_accessibility()
+        self._check_ai_crawler_access()           # AI爬虫导航文件检测（robots.txt/llms.txt/sitemap.xml）
         self._check_ipv6()
         self._check_ssl()
         self._check_seo()                          # ← _raw_html 在这里设置
@@ -97,6 +98,88 @@ class SiteAnalyzer:
                     self.results['resolved_ip'] = ip
                     break
     
+    def _check_ai_crawler_access(self):
+        """检测AI爬虫导航文件：robots.txt、llms.txt、sitemap.xml 及各AI爬虫放行状态"""
+        import urllib.request
+        import urllib.error
+
+        base = 'https://' + self.domain
+        headers_req = {'User-Agent': 'Mozilla/5.0 (compatible; AI/1.0)'}
+
+        result = {
+            'robots_txt': {'exists': False, 'status': None, 'content': None, 'ai_bots': {}},
+            'llms_txt': {'exists': False, 'status': None},
+            'sitemap_xml': {'exists': False, 'status': None, 'url': None},
+        }
+
+        # ---- robots.txt ----
+        try:
+            req = urllib.request.Request(base + '/robots.txt', headers=headers_req)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                status = resp.status
+                content = resp.read().decode('utf-8', errors='ignore')
+                result['robots_txt']['exists'] = True
+                result['robots_txt']['status'] = status
+                result['robots_txt']['content'] = content
+
+                # 检测各AI爬虫 User-agent
+                bot_pattern = re.compile(r'^User-agent:\s*(.+)$', re.M | re.I)
+                allow_pattern = re.compile(r'^(Allow|Disallow):\s*(.+)$', re.M | re.I)
+                current_bot = None
+                bot_rules = {}
+                for line in content.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    bm = bot_pattern.match(line)
+                    if bm:
+                        current_bot = bm.group(1).strip()
+                        if current_bot not in bot_rules:
+                            bot_rules[current_bot] = []
+                    elif current_bot and allow_pattern.match(line):
+                        bot_rules[current_bot].append(line)
+                result['robots_txt']['ai_bots'] = bot_rules
+        except urllib.error.HTTPError as e:
+            result['robots_txt']['status'] = e.code
+        except Exception:
+            pass
+
+        # ---- llms.txt ----
+        try:
+            req = urllib.request.Request(base + '/llms.txt', headers=headers_req)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result['llms_txt']['exists'] = True
+                result['llms_txt']['status'] = resp.status
+        except urllib.error.HTTPError as e:
+            result['llms_txt']['status'] = e.code
+        except Exception:
+            pass
+
+        # ---- sitemap.xml ----
+        try:
+            # 尝试根目录
+            req = urllib.request.Request(base + '/sitemap.xml', headers=headers_req)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result['sitemap_xml']['exists'] = True
+                result['sitemap_xml']['status'] = resp.status
+                result['sitemap_xml']['url'] = base + '/sitemap.xml'
+        except urllib.error.HTTPError:
+            # 尝试 sitemap-index.xml
+            try:
+                req = urllib.request.Request(base + '/sitemap-index.xml', headers=headers_req)
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    result['sitemap_xml']['exists'] = True
+                    result['sitemap_xml']['status'] = resp.status
+                    result['sitemap_xml']['url'] = base + '/sitemap-index.xml'
+            except urllib.error.HTTPError as e:
+                result['sitemap_xml']['status'] = e.code
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        self.results['ai_crawler_access'] = result
+
     def _try_connect(self, url, host_header=None):
         """尝试连接URL"""
         try:
@@ -827,7 +910,7 @@ class SiteAnalyzer:
         
         # ==================== 1. 结构化数据 (20分) ====================
         struct_score = 0
-        
+
         # JSON-LD (8分)
         json_ld = self.results.get('seo', {}).get('ai_trust', {}).get('json_ld', {})
         if json_ld.get('exists'):
@@ -835,7 +918,7 @@ class SiteAnalyzer:
             details.append({'icon': '✅', 'text': 'JSON-LD结构化数据', 'score': 8})
         else:
             details.append({'icon': '❌', 'text': '缺少JSON-LD', 'score': 0, 'tip': '添加JSON-LD帮助AI理解内容'})
-        
+
         # Open Graph (12分) - 微信/头条/知乎通用
         og = self.results.get('seo', {}).get('open_graph', {})
         og_score = 0
@@ -850,8 +933,54 @@ class SiteAnalyzer:
             details.append({'icon': '⚠️', 'text': f'Open Graph部分缺失', 'score': og_score, 'tip': '补全og:title/description/image/url'})
         else:
             details.append({'icon': '❌', 'text': '缺少Open Graph', 'score': 0, 'tip': '微信/头条/知乎分享都需要OG标签'})
-        
-        discover['structured_data'] = {'score': struct_score, 'max': 20, 'items': details.copy()}
+
+        # AI爬虫导航文件 (10分)
+        # robots.txt (3分) + llms.txt (3分) + sitemap.xml (2分) + AI爬虫显式放行 (2分)
+        ai_nav_score = 0
+        ai_nav_details = []
+        ai_nav = self.results.get('ai_crawler_access', {})
+        robots = ai_nav.get('robots_txt', {})
+        llms = ai_nav.get('llms_txt', {})
+        sitemap = ai_nav.get('sitemap_xml', {})
+
+        if robots.get('exists'):
+            ai_nav_score += 3
+            ai_nav_details.append({'icon': '✅', 'text': 'robots.txt存在', 'score': 3})
+        else:
+            ai_nav_details.append({'icon': '❌', 'text': 'robots.txt缺失', 'score': 0, 'tip': '添加robots.txt显式声明允许AI爬虫抓取'})
+
+        if llms.get('exists'):
+            ai_nav_score += 3
+            ai_nav_details.append({'icon': '✅', 'text': 'llms.txt存在（AI导航文件）', 'score': 3})
+        else:
+            ai_nav_details.append({'icon': '❌', 'text': 'llms.txt缺失', 'score': 0, 'tip': '添加llms.txt为AI爬虫提供站点导航'})
+
+        if sitemap.get('exists'):
+            ai_nav_score += 2
+            ai_nav_details.append({'icon': '✅', 'text': 'sitemap.xml存在', 'score': 2})
+        else:
+            ai_nav_details.append({'icon': '❌', 'text': 'sitemap.xml缺失', 'score': 0, 'tip': '添加sitemap.xml加速搜索引擎收录'})
+
+        # AI爬虫显式放行（GPTBot/ClaudeBot/PerplexityBot/GeminiBot）
+        if robots.get('exists'):
+            bot_rules = robots.get('ai_bots', {})
+            major_bots = ['GPTBot', 'ClaudeBot', 'PerplexityBot', 'GeminiBot', 'GoogleExtended', 'Diffbot']
+            allowed = [b for b in major_bots if b in bot_rules]
+            if allowed:
+                ai_nav_score += 2
+                ai_nav_details.append({'icon': '✅', 'text': f'AI爬虫显式放行: {", ".join(allowed)}', 'score': 2})
+            else:
+                # 通配符 * Allow / 或完全没声明 = 默认允许（不算错，但没加分）
+                if '*' in bot_rules or (len(bot_rules) == 0 and robots.get('exists')):
+                    ai_nav_details.append({'icon': 'ℹ️', 'text': 'robots.txt无显式AI爬虫规则（默认允许）', 'score': 0})
+                else:
+                    ai_nav_details.append({'icon': '⚠️', 'text': 'robots.txt未声明AI爬虫放行', 'score': 0, 'tip': '建议显式声明 Allow: / 给 GPTBot/ClaudeBot 等'})
+
+        struct_score += ai_nav_score
+        for d in ai_nav_details:
+            details.append(d)
+
+        discover['structured_data'] = {'score': struct_score, 'max': 30, 'items': details.copy()}
         score += struct_score
         details.clear()
         
@@ -1404,7 +1533,7 @@ class SiteAnalyzer:
 
         # ==================== 总分 ====================
         discover['total_score'] = round(score, 1)
-        discover['max_score'] = 115
+        discover['max_score'] = 125
         discover['grade'] = 'A+' if score >= 100 else 'A' if score >= 90 else 'B' if score >= 75 else 'C' if score >= 60 else 'D'
 
         self.results['ai_discoverability'] = discover

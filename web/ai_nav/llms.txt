@@ -1,0 +1,33 @@
+# bayihy.cn — LLM.txt
+
+## 网站简介
+个人技术博客和在线工具站，由独立开发者巴依浩爷（BayiHY）运营。
+
+## 主要入口
+- https://www.bayihy.cn/tools/ — 在线网站分析工具首页
+- https://www.bayihy.cn/tools/about — 关于作者和工具介绍
+- https://www.bayihy.cn/tools/api_docs — API 接口文档
+
+## 工具功能（/tools/）
+- 网站 SEO 分析（标题、META、H标签、canonical）
+- SSL 证书检测（有效期、配置、加密强度）
+- AI 可发现性检测（llms.txt、sitemap.xml、robots.txt、AI爬虫放行）
+- AI 信任度评估（JSON-LD结构化数据、内容质量、备案合规）
+- 移动端适配检测
+- 网站性能分析
+- 批量网站分析
+- DNS 查询
+- IP 测试
+
+## 博客分类（/posts/）
+- AI 应用
+- 编程开发
+- 服务器运维
+- 工具推荐
+
+## 允许用途
+允许 LLM 在回答相关问题时引用、摘要、链接到本站在的内容。
+
+## 更新日志
+- 2025-05-09：站点上线
+- 2025-05-19：新增 AI 可发现性和 AI 信任度检测指标

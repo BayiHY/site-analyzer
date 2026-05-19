@@ -14,21 +14,21 @@
     <link rel="canonical" href="https://www.bayihy.cn/tools">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
     
-    <!-- Open Graph -->
+    
     <meta property="og:type" content="website">
     <meta property="og:title" content="站长工具 - 网站SEO分析">
     <meta property="og:description" content="免费在线网站分析工具，一键检测SEO优化、SSL证书、页面性能、移动端适配等指标，自动评分并提供优化建议。">
     <meta property="og:url" content="https://www.bayihy.cn/tools">
     <meta property="og:site_name" content="站长工具 by 巴依浩爷">
     <meta property="og:locale" content="zh_CN">
-    <meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630'><rect fill='%230f0c29' width='1200' height='630'/><text x='600' y='280' text-anchor='middle' fill='%2300d2ff' font-size='60' font-family='sans-serif'>🔍 站长工具</text><text x='600' y='360' text-anchor='middle' fill='white' font-size='30' font-family='sans-serif'>网站SEO分析 · AI信任度检测</text><text x='600' y='450' text-anchor='middle' fill='%23888' font-size='20' font-family='sans-serif'>by 巴依浩爷(BayiHY)</text></svg>">
+    <meta property="og:image" content="https://www.bayihy.cn/tools/static/images/og-image.png">
     
-    <!-- Twitter Card -->
+    
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="站长工具 - 网站SEO分析">
     <meta name="twitter:description" content="免费在线网站分析工具，一键检测SEO优化、SSL证书、页面性能、移动端适配等指标。">
     
-    <!-- JSON-LD 结构化数据 -->
+    
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
@@ -94,7 +94,9 @@
             backdrop-filter: blur(20px);
             border-bottom: 1px solid rgba(255,255,255,0.1);
             padding: 15px 20px;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             position: sticky;
             top: 0;
             z-index: 100;
@@ -105,6 +107,16 @@
             background: linear-gradient(90deg, #00d2ff, #928dab);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+        .nav-link {
+            color: #00d2ff;
+            text-decoration: none;
+            font-size: 14px;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        .nav-link:hover {
+            opacity: 1;
         }
 
         /* 主容器 */
@@ -465,9 +477,10 @@
 <body>
     <header class="header">
         <h1>🔍 站长工具 · 网站分析</h1>
+        <a href="/tools/about" class="nav-link">关于</a>
     </header>
 
-    <!-- AI API 入口横幅 -->
+    
     <div style="max-width:800px;margin:12px auto 0;padding:0 20px;">
         <a href="/tools/api/docs.html" style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:linear-gradient(135deg,rgba(0,210,255,0.08),rgba(138,43,226,0.08));border:1px solid rgba(0,210,255,0.2);border-radius:10px;text-decoration:none;color:#ccc;font-size:13px;transition:all 0.2s;" onmouseover="this.style.borderColor='rgba(0,210,255,0.5)';this.style.background='linear-gradient(135deg,rgba(0,210,255,0.15),rgba(138,43,226,0.15))'" onmouseout="this.style.borderColor='rgba(0,210,255,0.2)';this.style.background='linear-gradient(135deg,rgba(0,210,255,0.08),rgba(138,43,226,0.08))'">
             <span style="font-size:20px;">🤖</span>
@@ -477,7 +490,7 @@
     </div>
 
     <main class="container">
-        <!-- 搜索框 -->
+        
         <section class="search-box" aria-label="网站分析">
             <h2 class="sr-only">输入网址进行分析</h2>
             <div class="input-group">
@@ -495,10 +508,10 @@
             <div id="dnsResult" style="display:none;margin-top:10px;padding:12px;background:rgba(0,210,255,0.1);border-radius:8px;font-size:12px;line-height:1.8;"></div>
         </section>
 
-        <!-- 错误提示 -->
+        
         <div class="error-msg" id="errorMsg"></div>
 
-        <!-- 加载动画 -->
+        
         <div class="loading" id="loading">
             <div class="spinner"></div>
             <p id="loadingText">正在分析网站，请稍候...</p>
@@ -507,7 +520,7 @@
             </div>
         </div>
 
-        <!-- 结果区域 -->
+        
         <section class="result" id="result" aria-label="分析结果">
             <div id="defaultContent" style="text-align:center;padding:40px 20px;color:#888;">
                 <div style="font-size:48px;margin-bottom:16px;">🔍</div>
@@ -542,7 +555,7 @@
         </div>
     </footer>
 
-    <!-- 隐私政策弹窗 -->
+    
     <div id="privacyModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
         <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;border:1px solid #333;">
             <h3 style="color:#00d2ff;margin-bottom:15px;">🔒 隐私政策</h3>
@@ -557,7 +570,7 @@
         </div>
     </div>
 
-    <!-- 免责条款弹窗 -->
+    
     <div id="disclaimerModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
         <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;border:1px solid #333;">
             <h3 style="color:#ff9800;margin-bottom:15px;">📋 免责条款</h3>
@@ -571,7 +584,7 @@
         </div>
     </div>
 
-    <!-- 微信二维码弹窗 -->
+    
     <div id="wechatModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
         <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:min(420px,90vw);width:90%;text-align:center;border:1px solid #333;">
             <h3 style="color:#07c160;margin-bottom:15px;">💬 微信扫码添加</h3>
@@ -581,7 +594,7 @@
         </div>
     </div>
 
-    <!-- 抖音二维码弹窗 -->
+    
     <div id="douyinModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
         <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:min(420px,90vw);width:90%;text-align:center;border:1px solid #333;">
             <h3 style="color:#fe2c55;margin-bottom:15px;">🎵 抖音扫码关注</h3>
@@ -591,7 +604,7 @@
         </div>
     </div>
 
-    <!-- 小红书二维码弹窗 -->
+    
     <div id="xhsModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
         <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:min(420px,90vw);width:90%;text-align:center;border:1px solid #333;">
             <h3 style="color:#ff2442;margin-bottom:15px;">📕 小红书扫码关注</h3>
@@ -601,7 +614,7 @@
         </div>
     </div>
 
-    <!-- QQ二维码弹窗 -->
+    
     <div id="qqModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;justify-content:center;align-items:center;">
         <div style="background:#1a1a2e;border-radius:12px;padding:30px;max-width:min(420px,90vw);width:90%;text-align:center;border:1px solid #333;">
             <h3 style="color:#12b7f5;margin-bottom:15px;">🐧 QQ扫码添加</h3>
@@ -883,7 +896,7 @@
 
             let html = `
                 <div class="fade-in">
-                    <!-- 评分卡片 -->
+                    
                     <div class="score-card">
                         <div class="score-value" style="color: ${scoreColor}">${score}</div>
                         <div class="score-label">${scoreText} · 总分 100</div>
@@ -893,7 +906,7 @@
                         </div>
                     </div>
 
-                    <!-- 跳转提示 -->
+                    
                     ${data.redirect_count > 0 ? `
                     <div style="background:rgba(255,165,0,0.1);border:1px solid rgba(255,165,0,0.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;">
                         <span>🔀</span>
@@ -903,14 +916,14 @@
                     </div>
                     ` : ''}
 
-                    <!-- 分享按钮 -->
+                    
                     <div class="share-bar" id="shareBar">
                         <button onclick="shareScreenshot()" class="share-btn share-screenshot">📸 长图分享</button>
                         <button onclick="shareLink()" class="share-btn share-link">🔗 链接分享</button>
 
                     </div>
 
-                    <!-- 可用性 -->
+                    
                     <div class="info-card">
                         <h3><span class="icon" style="background:rgba(46,213,115,0.15)">🌐</span> 可用性</h3>
                         <div class="info-grid">
@@ -933,7 +946,7 @@
                         </div>
                     </div>
 
-                    <!-- IPv6 支持 -->
+                    
                     <div class="info-card">
                         <h3><span class="icon" style="background:rgba(156,39,176,0.15)">🌍</span> IPv6 支持</h3>
                         <div class="info-grid">
@@ -958,7 +971,7 @@
                         </div>
                     </div>
 
-                    <!-- SSL 证书 -->
+                    
                     <div class="info-card">
                         <h3><span class="icon" style="background:rgba(0,210,255,0.15)">🔒</span> SSL 证书</h3>
                         <div class="info-grid">
@@ -981,7 +994,7 @@
                         </div>
                     </div>
 
-                    <!-- IP 归属地 + 备案合规 -->
+                    
                     ${data.ip_intel && data.ip_intel.ip ? `
                     <div class="info-card">
                         <h3><span class="icon" style="background:rgba(0,230,118,0.15)">🌍</span> IP 归属地 & 备案合规</h3>
@@ -1016,7 +1029,7 @@
                     </div>
                     ` : ''}
 
-                    <!-- SEO 信息 -->
+                    
                     <div class="info-card">
                         <h3><span class="icon" style="background:rgba(123,104,238,0.15)">📈</span> SEO 信息</h3>
                         <div class="seo-detail">
@@ -1065,7 +1078,7 @@
                         </div>
                     </div>
 
-                    <!-- AI信任度指标 -->
+                    
                     ${seo.ai_trust ? `
                     <div class="info-card" style="border-left: 3px solid #00d2ff;">
                         <h3><span class="icon" style="background:rgba(0,210,255,0.15)">🤖</span> AI信任度 <span style="font-size:14px;color:${seo.ai_trust.score >= 70 ? '#00e676' : seo.ai_trust.score >= 40 ? '#ff9800' : '#ff5252'};margin-left:10px;">${seo.ai_trust.score}/${seo.ai_trust.max_score}分</span></h3>
@@ -1120,13 +1133,13 @@
                     </div>
                     ` : ''}
 
-                    <!-- AI可发现性指数 -->
+                    
                     ${data.ai_discoverability ? `
                     <div class="info-card" style="border-left: 3px solid #ff6b35;">
                         <h3><span class="icon" style="background:rgba(255,107,53,0.15)">🚀</span> AI可发现性指数 <span style="font-size:14px;color:${data.ai_discoverability.total_score >= 100 ? '#00e676' : data.ai_discoverability.total_score >= 70 ? '#ff9800' : '#ff5252'};margin-left:10px;">${data.ai_discoverability.total_score}/${data.ai_discoverability.max_score}分</span> <span style="font-size:16px;margin-left:8px;">${data.ai_discoverability.grade === 'A+' ? '🏆' : data.ai_discoverability.grade === 'A' ? '🥇' : data.ai_discoverability.grade === 'B' ? '🥈' : data.ai_discoverability.grade === 'C' ? '🥉' : '⚠️'} ${data.ai_discoverability.grade}级</span></h3>
                         <p style="font-size:12px;color:#888;margin-bottom:15px;">面向百度AI、豆包、通义千问、微信搜一搜等国内AI搜索引擎的综合可发现性评估</p>
                         
-                        <!-- 结构化数据 -->
+                        
                         ${data.ai_discoverability.structured_data ? `
                         <div style="margin-bottom:12px;">
                             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">📋 结构化数据 <span style="color:#ff6b35;">${data.ai_discoverability.structured_data.score}/${data.ai_discoverability.structured_data.max}分</span></div>
@@ -1136,7 +1149,7 @@
                         </div>
                         ` : ''}
                         
-                        <!-- 内容可引用性 -->
+                        
                         ${data.ai_discoverability.content_citation ? `
                         <div style="margin-bottom:12px;">
                             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">📝 内容可引用性 <span style="color:#ff6b35;">${data.ai_discoverability.content_citation.score}/${data.ai_discoverability.content_citation.max}分</span></div>
@@ -1146,7 +1159,7 @@
                         </div>
                         ` : ''}
                         
-                        <!-- 自媒体适配性 -->
+                        
                         ${data.ai_discoverability.media_adapt ? `
                         <div style="margin-bottom:12px;">
                             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🎬 自媒体适配性 <span style="color:#ff6b35;">${data.ai_discoverability.media_adapt.score}/${data.ai_discoverability.media_adapt.max}分</span></div>
@@ -1156,7 +1169,7 @@
                         </div>
                         ` : ''}
                         
-                        <!-- 权威性信号 -->
+                        
                         ${data.ai_discoverability.authority ? `
                         <div style="margin-bottom:12px;">
                             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🏆 权威性信号 <span style="color:#ff6b35;">${data.ai_discoverability.authority.score}/${data.ai_discoverability.authority.max}分</span></div>
@@ -1166,7 +1179,7 @@
                         </div>
                         ` : ''}
                         
-                        <!-- 可访问性 -->
+                        
                         ${data.ai_discoverability.accessibility ? `
                         <div style="margin-bottom:12px;">
                             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🔍 可访问性 <span style="color:#ff6b35;">${data.ai_discoverability.accessibility.score}/${data.ai_discoverability.accessibility.max}分</span></div>
@@ -1176,7 +1189,7 @@
                         </div>
                         ` : ''}
 
-                        <!-- API友好性 -->
+                        
                         ${data.ai_discoverability.api_friendly ? `
                         <div style="margin-bottom:12px;">
                             <div style="font-size:13px;font-weight:600;margin-bottom:8px;">🔌 API友好性 <span style="color:#ff6b35;">${data.ai_discoverability.api_friendly.score}/${data.ai_discoverability.api_friendly.max}分</span></div>
@@ -1212,7 +1225,7 @@
                     </div>
                     ` : ''}
 
-                    <!-- 性能 -->
+                    
                     <div class="info-card">
                         <h3><span class="icon" style="background:rgba(255,165,2,0.15)">⚡</span> 性能</h3>
                         <div class="info-grid">
