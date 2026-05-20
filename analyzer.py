@@ -65,6 +65,8 @@ class SiteAnalyzer:
     
     def analyze(self):
         """执行完整分析"""
+        import time
+        start_time = time.time()
         print(f"\n🔍 正在分析: {self.url}")
         
         # 基础检测
@@ -82,6 +84,13 @@ class SiteAnalyzer:
         self._check_ai_discoverability(getattr(self, '_soup', None))
         self._check_performance()
         self._calculate_score()
+        
+        # 记录总分析耗时
+        total_time = time.time() - start_time
+        self.results['analyze_time'] = round(total_time, 2)
+        
+        # 更新域名耗时统计
+        self._update_domain_timing(total_time)
         
         return self.results
     
@@ -465,37 +474,52 @@ class SiteAnalyzer:
         if page and icp_regex.search(page):
             return True
 
-        # 已知热门站点ICP/公网安备兜底（SPA站点或强制跳转页面无法抓取内容时使用）
-        # 格式：domain → (has_icp, gongan_number or None)
-        known_icp_domains = {
-            'baidu.com':           (True,  '京公网安备11000002000001号'),
-            'bilibili.com':        (True,  None),
-            'douyin.com':          (True,  None),
-            'toutiao.com':         (True,  None),
-            'zhihu.com':           (True,  '京公网安备11010802020088号'),
-            'weibo.com':           (True,  None),
-            'jd.com':              (True,  None),
-            'taobao.com':          (True,  None),
-            'tmall.com':           (True,  None),
-            'alipay.com':          (True,  None),
-            '163.com':             (True,  None),
-            'qq.com':              (True,  None),
-            'weixin.qq.com':       (True,  None),
-            'xiaohongshu.com':     (True,  None),
-            'kuaishou.com':        (True,  None),
-            'pinduoduo.com':       (True,  None),
-            'meituan.com':         (True,  None),
-            'douban.com':          (True,  None),
-            'juejin.cn':           (True,  None),
-            'miit.gov.cn':         (True,  None),
-            'beian.miit.gov.cn':   (True,  None),
+        # 已知热门站点兜底（SPA站点或强制跳转页面无法抓取内容时使用）
+        # 格式：domain → {"icp": bool, "gongan": str or None, "est_time": 秒}
+        known_domains = {
+            'baidu.com':           {"icp": True,  "gongan": "京公网安备11000002000001号", "est_time": 3},
+            'bilibili.com':        {"icp": True,  "gongan": "沪公网安备31011002002436号", "est_time": 15},
+            'douyin.com':          {"icp": True,  "gongan": None, "est_time": 12},
+            'toutiao.com':         {"icp": True,  "gongan": None, "est_time": 10},
+            'zhihu.com':           {"icp": True,  "gongan": "京公网安备11010802020088号", "est_time": 8},
+            'weibo.com':           {"icp": True,  "gongan": None, "est_time": 10},
+            'jd.com':              {"icp": True,  "gongan": None, "est_time": 8},
+            'taobao.com':          {"icp": True,  "gongan": None, "est_time": 12},
+            'tmall.com':           {"icp": True,  "gongan": None, "est_time": 10},
+            'alipay.com':          {"icp": True,  "gongan": None, "est_time": 6},
+            '163.com':             {"icp": True,  "gongan": None, "est_time": 5},
+            'qq.com':              {"icp": True,  "gongan": None, "est_time": 8},
+            'weixin.qq.com':       {"icp": True,  "gongan": None, "est_time": 10},
+            'xiaohongshu.com':     {"icp": True,  "gongan": None, "est_time": 12},
+            'kuaishou.com':        {"icp": True,  "gongan": None, "est_time": 12},
+            'pinduoduo.com':       {"icp": True,  "gongan": None, "est_time": 8},
+            'meituan.com':         {"icp": True,  "gongan": None, "est_time": 6},
+            'douban.com':          {"icp": True,  "gongan": None, "est_time": 5},
+            'juejin.cn':           {"icp": True,  "gongan": None, "est_time": 5},
+            'miit.gov.cn':         {"icp": True,  "gongan": None, "est_time": 8},
+            'beian.miit.gov.cn':   {"icp": True,  "gongan": None, "est_time": 8},
         }
-        for d, (has_icp, gongan_num) in known_icp_domains.items():
+        
+        # 从 timing_stats.json 读取实际平均耗时，替换 est_time
+        import json
+        import os
+        timing_file = os.path.join(os.path.dirname(__file__), 'timing_stats.json')
+        if os.path.exists(timing_file):
+            try:
+                with open(timing_file, 'r') as f:
+                    timing_stats = json.load(f)
+                for d in known_domains:
+                    if d in timing_stats:
+                        known_domains[d]['est_time'] = timing_stats[d].get('avg', known_domains[d]['est_time'])
+            except:
+                pass
+        
+        for d, info in known_domains.items():
             if d in self.domain:
-                if has_icp:
-                    if gongan_num:
+                if info["icp"]:
+                    if info["gongan"]:
                         self.results.setdefault('ip_intel', {})
-                        self.results['ip_intel']['gongan_number'] = gongan_num
+                        self.results['ip_intel']['gongan_number'] = info["gongan"]
                     return True
         return False
 
@@ -1758,6 +1782,46 @@ class SiteAnalyzer:
         self.results['score'] = max(0, score)
         self.results['issues'] = issues
         self.results['suggestions'] = suggestions
+
+    def _update_domain_timing(self, elapsed_seconds):
+        """更新域名分析耗时统计（按域名区分）"""
+        import json
+        import os
+        
+        # 限制最大耗时为 90 秒，超过的不计入统计（可能是超时）
+        MAX_TIME = 90
+        if elapsed_seconds > MAX_TIME:
+            return
+        
+        timing_file = os.path.join(os.path.dirname(__file__), 'timing_stats.json')
+        
+        try:
+            # 读取现有统计
+            if os.path.exists(timing_file):
+                with open(timing_file, 'r') as f:
+                    stats = json.load(f)
+            else:
+                stats = {}
+            
+            domain = self.domain
+            current = stats.get(domain, {'latest': 0, 'avg': 0, 'count': 0})
+            
+            # 更新统计：latest=最新耗时, avg=平均耗时, count=记录次数
+            count = current['count'] + 1
+            avg = ((current['avg'] * current['count']) + elapsed_seconds) / count
+            
+            stats[domain] = {
+                'latest': round(elapsed_seconds, 2),
+                'avg': round(avg, 2),
+                'count': count
+            }
+            
+            # 写回文件
+            with open(timing_file, 'w') as f:
+                json.dump(stats, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            # 统计更新失败不影响主流程
+            print(f"⚠️ 更新耗时统计失败: {e}")
 
 
 def generate_console_report(results):

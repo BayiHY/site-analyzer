@@ -9,6 +9,7 @@
     <meta name="author" content="巴依浩爷(BayiHY)">
     <meta name="publisher" content="巴依浩爷(BayiHY)">
     <meta name="robots" content="index, follow">
+    <meta name="baidu-site-verification" content="codeva-IKkeCFbXYn" />
     <meta property="article:published_time" content="{{ published_time }}">
     <meta property="article:modified_time" content="{{ modified_time }}">
     <link rel="canonical" href="https://www.bayihy.cn/tools">
@@ -542,6 +543,8 @@
         <div style="margin-bottom:8px;">
             站长工具 · © <a href="https://gitcode.com/BayiHY" target="_blank" style="color: inherit;">巴依浩爷(BayiHY)</a> · 免费开源 · 隐私优先 · 数据不存储<br>
             <a href="https://beian.miit.gov.cn/" target="_blank" style="color:#888;font-size:11px;" onclick="copyICP('新ICP备2026003879号-1', this);return false;">新ICP备2026003879号-1</a>
+            <span style="color:#555;font-size:11px;"> · </span>
+            <a href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=65010302001591" target="_blank" style="color:#888;font-size:11px;" onclick="copyGongan('新公网安备65010302001591号', this);return false;">新公网安备65010302001591号</a>
         </div>
         <div style="font-size:11px;color:#888;margin-bottom:6px;">
             <a href="#" onclick="copyText('95440881@qq.com', this);return false;" style="color:inherit;text-decoration:none;">📧 95440881@qq.com</a> · <a href="#" onclick="showWechatQR();return false;" style="color:inherit;text-decoration:none;">💬 微信: BayiHY</a> · <a href="#" onclick="showDouyinQR();return false;" style="color:inherit;text-decoration:none;">🎵 抖音: BayiHY</a> · <a href="#" onclick="showXhsQR();return false;" style="color:inherit;text-decoration:none;">📕 小红书: 26501111419</a> · <a href="#" onclick="showQQQR();return false;" style="color:inherit;text-decoration:none;">🐧 QQ: 95440881</a>
@@ -648,6 +651,14 @@
             setTimeout(function() {
                 if (confirm('备案号已复制，是否跳转到工信部备案查询网站？')) {
                     window.open('https://beian.miit.gov.cn/', '_blank');
+                }
+            }, 100);
+        }
+        function copyGongan(text, btn) {
+            copyText(text, btn);
+            setTimeout(function() {
+                if (confirm('公网安备号已复制，是否跳转到公安备案查询网站？')) {
+                    window.open('https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=65010302001591', '_blank');
                 }
             }, 100);
         }
@@ -805,13 +816,16 @@
                 dnsResult.style.display = 'none';
             }
             
-            // 根据域名调整倒计时
-            const domain = url.toLowerCase();
-            let initialSeconds = 5;  // 默认5秒
-            if (domain.includes('github')) {
-                initialSeconds = 30;  // GitHub较慢，给30秒
-            } else if (domain.includes('google') || domain.includes('youtube')) {
-                initialSeconds = 15;  // 国外站15秒
+            // 从 API 获取域名预计分析耗时
+            let initialSeconds = 10;  // 默认10秒
+            try {
+                const estResp = await fetch(`api/est-time?url=${encodeURIComponent(url)}`);
+                if (estResp.ok) {
+                    const estData = await estResp.json();
+                    initialSeconds = Math.ceil(estData.avg) || 10;
+                }
+            } catch (e) {
+                // 忽略错误，使用默认值
             }
             
             // 开始倒计时

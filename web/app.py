@@ -216,6 +216,10 @@ def llms_txt():
 def sitemap_xml():
     return send_from_directory(os.path.join(app.root_path, 'ai_nav'), 'sitemap.xml'), 200, {'Content-Type': 'application/xml'}
 
+@app.route('/baidu_verify_codeva-IKkeCFbXYn.html')
+def baidu_verify():
+    return send_from_directory(app.root_path, 'baidu_verify_codeva-IKkeCFbXYn.html'), 200, {'Content-Type': 'text/html'}
+
 
 @app.route('/api', methods=['GET', 'OPTIONS'])
 def api_root():
@@ -276,6 +280,7 @@ def health():
             'POST /api/batch': '批量分析（最多10个）',
             'POST /api/dns': 'DNS解析检测',
             'POST /api/test-ip': 'IP可达性测试',
+            'GET /api/est-time': '获取域名预计分析耗时',
             'GET /api/docs': 'API详细文档(JSON)',
             'GET /api/docs.html': 'API详细文档(HTML)'
         },
@@ -284,6 +289,62 @@ def health():
             'window_seconds': limiter.window
         }
     })
+
+
+@app.route('/api/est-time')
+def get_est_time():
+    """获取域名预计分析耗时 - 从历史统计中读取平均耗时"""
+    from urllib.parse import urlparse
+    import json
+    import os
+    
+    url = request.args.get('url', '')
+    if not url:
+        return jsonify({'avg': 15, 'count': 0})  # 默认15秒
+    
+    # 提取域名
+    if not url.startswith('http'):
+        url = 'https://' + url
+    domain = urlparse(url).netloc.lower()
+    domain = domain.replace('www.', '')  # 去掉www前缀
+    
+    # 已知慢站点兜底配置（无历史记录时使用）
+    slow_sites = {
+        'github.com': 60,
+        'github.io': 45,
+        'google.com': 20,
+        'youtube.com': 20,
+        'twitter.com': 25,
+        'x.com': 25,
+        'facebook.com': 25,
+        'instagram.com': 25,
+        'reddit.com': 30,
+        'medium.com': 30,
+        'stackoverflow.com': 20,
+        'npmjs.com': 25,
+        'pypi.org': 20,
+    }
+    
+    # 从 timing_stats.json 读取
+    timing_file = os.path.join(os.path.dirname(__file__), '..', 'timing_stats.json')
+    if os.path.exists(timing_file):
+        try:
+            with open(timing_file, 'r') as f:
+                stats = json.load(f)
+            if domain in stats:
+                return jsonify({
+                    'avg': round(stats[domain].get('avg', 15), 1),
+                    'count': stats[domain].get('count', 0)
+                })
+        except:
+            pass
+    
+    # 检查是否是已知慢站点
+    for slow_domain, est_time in slow_sites.items():
+        if slow_domain in domain:
+            return jsonify({'avg': est_time, 'count': 0})
+    
+    return jsonify({'avg': 15, 'count': 0})  # 默认15秒
 
 
 @app.route('/about')
