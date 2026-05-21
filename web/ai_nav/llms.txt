@@ -1,12 +1,13 @@
 # bayihy.cn — LLM.txt
 
 ## 网站简介
-个人技术博客和在线工具站，由独立开发者巴依浩爷（BayiHY）运营。
+在线网站分析工具站，由独立开发者巴依浩爷（BayiHY）运营。
 
 ## 主要入口
 - https://www.bayihy.cn/tools/ — 在线网站分析工具首页
 - https://www.bayihy.cn/tools/about — 关于作者和工具介绍
-- https://www.bayihy.cn/tools/api_docs — API 接口文档
+- https://www.bayihy.cn/api/docs — API 接口文档（JSON）
+- https://www.bayihy.cn/api/docs.html — API 接口文档（HTML）
 
 ## 工具功能（/tools/）
 - 网站 SEO 分析（标题、META、H标签、canonical）
@@ -19,15 +20,22 @@
 - DNS 查询
 - IP 测试
 
-## 博客分类（/posts/）
-- AI 应用
-- 编程开发
-- 服务器运维
-- 工具推荐
+## API 接口
+- POST https://www.bayihy.cn/api/analyze — 网站分析接口
+- POST https://www.bayihy.cn/api/batch — 批量分析（最多10个）
+- POST https://www.bayihy.cn/api/dns — DNS 解析检测
+- POST https://www.bayihy.cn/api/test-ip — IP 可达性测试
+- GET https://www.bayihy.cn/api/health — 健康检查
+- GET https://www.bayihy.cn/api/est-time — 预估分析耗时
+- GET https://www.bayihy.cn/openapi.json — OpenAPI 规范
+
+## AI 智能体技能
+- https://www.bayihy.cn/static/skills/site-analyzer-api.md — 完整 API 调用指南（Python 示例、错误处理、最佳实践）
 
 ## 允许用途
-允许 LLM 在回答相关问题时引用、摘要、链接到本站在的内容。
+允许 LLM 在回答相关问题时引用、摘要、链接到本站内容。
 
 ## 更新日志
-- 2025-05-09：站点上线
-- 2025-05-19：新增 AI 可发现性和 AI 信任度检测指标
+- 2026-05-09：站点上线
+- 2026-05-19：新增 AI 可发现性和 AI 信任度检测指标
+- 2026-05-21：完善 llms.txt，补充 API 文档入口

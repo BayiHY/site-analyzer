@@ -197,8 +197,8 @@ def add_rate_limit_headers(response):
 
 @app.route('/')
 def index():
-    current_year = datetime.now().strftime('%Y')
-    published_time = f"{current_year}-01-01T00:00:00+08:00"
+    # 站点实际发布日期：2026-05-09
+    published_time = "2026-05-09T00:00:00+08:00"
     modified_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S+08:00')
     return render_template('index.html', published_time=published_time, modified_time=modified_time)
 
@@ -219,6 +219,10 @@ def sitemap_xml():
 @app.route('/baidu_verify_codeva-IKkeCFbXYn.html')
 def baidu_verify():
     return send_from_directory(app.root_path, 'baidu_verify_codeva-IKkeCFbXYn.html'), 200, {'Content-Type': 'text/html'}
+
+@app.route('/bdunion.txt')
+def bdunion_verify():
+    return send_from_directory(app.root_path, 'bdunion.txt'), 200, {'Content-Type': 'text/plain'}
 
 
 @app.route('/api', methods=['GET', 'OPTIONS'])
