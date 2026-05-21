@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import sys
 import os
+from datetime import datetime
 
 app = Flask(__name__, 
             template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates'),
@@ -10,7 +11,9 @@ app.config['JSON_AS_ASCII'] = False
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    published_time = "2026-05-09T00:00:00+08:00"
+    modified_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S+08:00')
+    return render_template('index.html', published_time=published_time, modified_time=modified_time)
 
 @app.route('/about')
 def about():

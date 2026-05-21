@@ -23,6 +23,7 @@ from analyzer import SiteAnalyzer
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False
 
 # ==================== 日志配置 ====================
 
