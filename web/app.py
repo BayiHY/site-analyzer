@@ -221,7 +221,11 @@ def sitemap_xml():
 def baidu_verify():
     return send_from_directory(app.root_path, 'baidu_verify_codeva-IKkeCFbXYn.html'), 200, {'Content-Type': 'text/html'}
 
-@app.route('/bdunion.txt')
+@app.route('/releases/<filename>')
+def serve_release(filename):
+    return send_from_directory(os.path.join(app.root_path, 'static', 'releases'), filename)
+
+
 def bdunion_verify():
     return send_from_directory(app.root_path, 'bdunion.txt'), 200, {'Content-Type': 'text/plain'}
 
@@ -356,6 +360,18 @@ def get_est_time():
 def about():
     """关于页面"""
     return render_template('about.html')
+
+
+@app.route('/audio-cutter')
+def audio_cutter():
+    """音频裁剪工具"""
+    return render_template('audio-cutter.html')
+
+
+@app.route('/toolsbox')
+def toolsbox():
+    """工具箱"""
+    return render_template('toolsbox.html')
 
 
 @app.route('/api/docs.html')

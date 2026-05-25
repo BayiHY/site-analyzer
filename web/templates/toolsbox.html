@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工具箱 - 站长工具</title>
+    <meta name="description" content="站长工具箱 - 收录各类实用在线工具，包括音频裁剪、SEO分析等。">
+    <link rel="canonical" href="https://www.bayihy.cn/tools/toolsbox">
+    <style>
+        :root {
+            --primary: #4f8a8b;
+            --primary-dark: #3a6b6c;
+            --accent: #ffd700;
+            --bg: #0f1419;
+            --bg2: #1a2332;
+            --bg3: #243044;
+            --text: #e8eaed;
+            --text-dim: #9aa0a6;
+            --border: #2d3a4a;
+            --card-hover: rgba(79,138,139,0.12);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px 0;
+        }
+        .header h1 {
+            font-size: 1.8rem;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+        .header p {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+        .tool-card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            text-decoration: none;
+            color: var(--text);
+            transition: all 0.25s;
+            display: block;
+        }
+        .tool-card:hover {
+            background: var(--card-hover);
+            border-color: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .tool-icon {
+            font-size: 2.4rem;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .tool-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+        .tool-desc {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+        .tool-tag {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 3px 10px;
+            background: rgba(79,138,139,0.2);
+            color: var(--primary);
+            border-radius: 20px;
+            font-size: 0.72rem;
+        }
+        .section-title {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 30px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            padding: 16px;
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+        footer a { color: var(--primary); text-decoration: none; }
+        @media (max-width: 600px) {
+            .tools-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <a href="/tools/" class="back-link">← 返回首页</a>
+
+    <div class="header">
+        <h1>🧰 工具箱</h1>
+        <p>收录各类实用在线工具，持续更新中</p>
+    </div>
+
+    <!-- 音频处理 -->
+    <div class="section-title">音频处理</div>
+    <div class="tools-grid">
+        <a href="/tools/audio-cutter" class="tool-card">
+            <span class="tool-icon">🎵</span>
+            <div class="tool-name">音频裁剪工具</div>
+            <div class="tool-desc">纯浏览器端工作，无需上传服务器，保护隐私。支持多种音视频格式，波形可视化，手动选择裁剪区域，导出下载。</div>
+            <span class="tool-tag">浏览器端 · 无需上传</span>
+        </a>
+    </div>
+
+    <!-- 开发工具 -->
+    <div class="section-title">开发工具</div>
+    <div class="tools-grid">
+        <a href="/tools/" class="tool-card">
+            <span class="tool-icon">🔍</span>
+            <div class="tool-name">网站SEO分析</div>
+            <div class="tool-desc">多维度网站健康度检测：SEO评分、AI信任度、ICP备案、IP归属地、DNS解析、SSL证书等。</div>
+            <span class="tool-tag">免费 · AI智能体友好</span>
+        </a>
+    </div>
+
+    <footer>
+        <a href="/tools/">← 返回首页</a> ·
+        新ICP备2026003879号-1
+    </footer>
+</div>
+</body>
+</html>
