@@ -24,7 +24,7 @@ body {
 
 .container {
     display: flex;
-    height: calc(100vh - 20px);
+    height: 100vh;
     margin: 0 10px;
 }
 
