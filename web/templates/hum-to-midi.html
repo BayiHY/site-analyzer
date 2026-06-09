@@ -1319,25 +1319,28 @@ function initPiano() {
             }, {passive: true});  // 改为 passive，允许滚动
             
             key.addEventListener('touchmove', (e) => {
-                const touch = e.changedTouches[0];
-                const state = touchStartState.get(touch.identifier);
-                
-                if (state && !state.isDragging) {
-                    const dx = touch.clientX - state.x;
-                    const dy = touch.clientY - state.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+                // 处理所有移动的触摸点
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const state = touchStartState.get(touch.identifier);
                     
-                    // 如果移动超过阈值，标记为拖动，停止音符
-                    if (distance > DRAG_THRESHOLD) {
-                        state.isDragging = true;
-                        // 停止当前音符
-                        stopPianoKey(state.noteNumber);
-                        touchToNote.delete(touch.identifier);
-                        activeOscillators.delete(state.noteNumber);
-                        unhighlightKey(state.noteNumber);
+                    if (state && !state.isDragging) {
+                        const dx = touch.clientX - state.x;
+                        const dy = touch.clientY - state.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // 如果移动超过阈值，标记为拖动，停止音符
+                        if (distance > DRAG_THRESHOLD) {
+                            state.isDragging = true;
+                            // 停止当前音符
+                            stopPianoKey(state.noteNumber);
+                            touchToNote.delete(touch.identifier);
+                            activeOscillators.delete(state.noteNumber);
+                            unhighlightKey(state.noteNumber);
+                        }
                     }
                 }
-            }, {passive: true});  // 改为 passive，允许滚动
+            }, {passive: true});
             
             key.addEventListener('touchend', (e) => {
                 // 处理所有结束的触摸点
@@ -1421,20 +1424,23 @@ function initPiano() {
             
             key.addEventListener('touchmove', (e) => {
                 e.stopPropagation();
-                const touch = e.changedTouches[0];
-                const state = touchStartState.get(touch.identifier);
-                
-                if (state && !state.isDragging) {
-                    const dx = touch.clientX - state.x;
-                    const dy = touch.clientY - state.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+                // 处理所有移动的触摸点
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const state = touchStartState.get(touch.identifier);
                     
-                    if (distance > DRAG_THRESHOLD) {
-                        state.isDragging = true;
-                        stopPianoKey(state.noteNumber);
-                        touchToNote.delete(touch.identifier);
-                        activeOscillators.delete(state.noteNumber);
-                        unhighlightKey(state.noteNumber);
+                    if (state && !state.isDragging) {
+                        const dx = touch.clientX - state.x;
+                        const dy = touch.clientY - state.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance > DRAG_THRESHOLD) {
+                            state.isDragging = true;
+                            stopPianoKey(state.noteNumber);
+                            touchToNote.delete(touch.identifier);
+                            activeOscillators.delete(state.noteNumber);
+                            unhighlightKey(state.noteNumber);
+                        }
                     }
                 }
             }, {passive: true});
