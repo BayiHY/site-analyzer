@@ -59,12 +59,37 @@ function setExampleJson() {
         功能列表: ["图谱视图", "树视图", "代码编辑", "导入导出"],
         作者: {
             姓名: "开发者",
-            邮箱: "dev@example.com"
+            邮箱: "dev@example.com",
+            技能: ["JavaScript", "Python", "Vue"],
+            社交: {
+                博客: "https://example.com",
+                GitHub: "https://github.com"
+            }
         },
+        混合数组示例: [
+            "这是一个字符串",
+            12345,
+            true,
+            {
+                名称: "数组中的对象",
+                嵌套数组: ["嵌套数组项1", "嵌套数组项2"]
+            },
+            ["数组中的数组", "第二项"]
+        ],
         设置: {
             主题: "深色",
             自动布局: true,
-            动画效果: true
+            动画效果: true,
+            插件列表: [
+                {
+                    名称: "主题插件",
+                    启用: true
+                },
+                {
+                    名称: "导出插件",
+                    启用: false
+                }
+            ]
         }
     };
     ELEMENTS.jsonInput.value = JSON.stringify(exampleData, null, 2);
