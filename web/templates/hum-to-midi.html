@@ -821,9 +821,19 @@ async function startRecording() {
             
             // 检查是否选择虚拟键盘
             if (selectedDeviceId === 'virtual-keyboard') {
-                // 虚拟键盘模式：不需要连接物理设备
-                // 虚拟键盘的事件已经在 initPiano() 中绑定
-                // 这里只需要初始化录制状态
+                // 虚拟键盘模式：复用 pianoContext 作为 audioContext
+                // 确保 pianoContext 存在且处于运行状态
+                if (!pianoContext) {
+                    pianoContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (pianoContext.state === 'suspended') {
+                    await pianoContext.resume();
+                }
+                
+                // 复用 pianoContext
+                audioContext = pianoContext;
+                pitchDetector = new PitchDetector(audioContext.sampleRate);
+                
                 isRecording = true;
                 recordStartTime = audioContext.currentTime;
                 
@@ -1271,8 +1281,14 @@ function initPiano() {
     const piano = document.getElementById('piano');
     piano.innerHTML = '';
     
+    // 如果已有 pianoContext 则复用，否则创建
     if (!pianoContext) {
         pianoContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // 确保 AudioContext 处于运行状态
+    if (pianoContext.state === 'suspended') {
+        pianoContext.resume();
     }
     
     // 创建3个八度
