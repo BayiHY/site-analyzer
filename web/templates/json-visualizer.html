@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON 可视化图谱 - 站长工具</title>
+    <meta name="description" content="JSON 可视化图谱工具 - 将 JSON 数据转换为交互式树形图谱，支持编辑、导入导出、节点展开收起等功能。">
+    <link rel="canonical" href="https://www.bayihy.cn/tools/json-visualizer">
+    <link rel="stylesheet" href="/static/json-visualizer/styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <a href="/tools/toolsbox" class="back-link">← 返回工具箱</a>
+            <h1>JSON 可视化图谱</h1>
+            <div class="input-section">
+                <div class="view-toggle" id="viewToggle">
+                    <button class="vt-btn active" id="vtTree" onclick="switchView('tree')">树视图</button>
+                    <button class="vt-btn" id="vtCode" onclick="switchView('code')">代码编辑</button>
+                </div>
+                <textarea id="jsonInput"></textarea>
+                <div id="jsonEditor" class="json-editor"></div>
+                <div class="btn-row">
+                    <button class="btn" onclick="visualizeJson()">刷新</button>
+                    <button class="btn btn-secondary" onclick="clearCanvas()">清空</button>
+                    <button class="btn btn-secondary" onclick="importJson()">导入</button>
+                    <button class="btn btn-secondary" onclick="exportJson()">导出</button>
+                </div>
+                <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="handleFileImport(event)">
+                <div class="error-message" id="errorMsg"></div>
+            </div>
+        </div>
+        <button class="panel-toggle" id="panelToggle" onclick="toggleLeftPanel()" title="收起编辑区">收起编辑区 ◂</button>
+        <div class="right-panel">
+            <svg id="canvas"></svg>
+            <div class="tooltip" id="tooltip"></div>
+            <div class="info-panel" id="infoPanel">
+                <div>节点数: <span id="nodeCount">0</span></div>
+                <div>连接数: <span id="edgeCount">0</span></div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #00d4ff, #0099cc)"></div>
+                    <span>对象</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #667eea, #764ba2)"></div>
+                    <span>数组</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #11998e, #38ef7d)"></div>
+                    <span>字符串</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(135deg, #f093fb, #f5576c)"></div>
+                    <span>数字</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" id="menuEdit">
+            <span class="icon">✏️</span>
+            <span>修改属性</span>
+        </div>
+        <div class="context-menu-item" id="menuAdd">
+            <span class="icon">➕</span>
+            <span>新增属性</span>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="editModalOverlay">
+        <div class="modal" id="editModal">
+            <div class="modal-title" id="modalTitle">修改属性</div>
+            <div class="modal-form" id="modalForm">
+                <div id="simpleEdit" style="display: block;">
+                    <label>
+                        <span>属性名称</span>
+                        <input type="text" id="editKey" />
+                    </label>
+                    <label id="valueLabel">
+                        <span>属性值</span>
+                        <input type="text" id="editValue" />
+                        <select id="editBoolean" style="display: none;">
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                        <div id="valueHint" style="display: none; color: #94a3b8; font-size: 12px; margin-top: 5px;">值在子项图块中添加</div>
+                    </label>
+                    <label>
+                        <span>值类型</span>
+                        <select id="editType">
+                            <option value="string">字符串</option>
+                            <option value="number">数字</option>
+                            <option value="boolean">布尔值</option>
+                            <option value="null">空值</option>
+                            <option value="object">对象</option>
+                            <option value="array">数组</option>
+                        </select>
+                    </label>
+                </div>
+                <div id="listEdit" style="display: none;">
+                    <div class="list-header">
+                        <span>属性列表</span>
+                    </div>
+                    <div id="propertyList">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" id="btnCancel">取消</button>
+                <button class="modal-btn modal-btn-primary" id="btnConfirm">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deleteConfirmOverlay">
+        <div class="modal">
+            <div class="modal-title">确认删除</div>
+            <div style="color: #94a3b8; margin-bottom: 20px;">确定要删除该属性吗？</div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" id="btnDeleteCancel">取消</button>
+                <button class="modal-btn" id="btnDeleteConfirm" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS 文件按依赖顺序加载 -->
+    <script src="/static/json-visualizer/config.js"></script>
+    <script src="/static/json-visualizer/utils.js"></script>
+    <script src="/static/json-visualizer/tooltip.js"></script>
+    <script src="/static/json-visualizer/parser.js"></script>
+    <script src="/static/json-visualizer/layout.js"></script>
+    <script src="/static/json-visualizer/render.js"></script>
+    <script src="/static/json-visualizer/canvas.js"></script>
+    <script src="/static/json-visualizer/json-editor.js"></script>
+    <script src="/static/json-visualizer/app.js"></script>
+    <script src="/static/json-visualizer/editor.js"></script>
+</body>
+</html>

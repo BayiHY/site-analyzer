@@ -6,13 +6,16 @@
 
 import sys
 import os
+import re
+import json
 import time
 import signal
 import hashlib
 import logging
+import subprocess
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from collections import defaultdict
+from collections import defaultdict, Counter
 from threading import Lock
 from functools import wraps
 
@@ -368,10 +371,376 @@ def audio_cutter():
     return render_template('audio-cutter.html')
 
 
+@app.route('/hum-to-midi')
+def hum_to_midi():
+    """哼唱转MIDI工具"""
+    return render_template('hum-to-midi.html')
+
+
 @app.route('/toolsbox')
 def toolsbox():
-    """工具箱"""
     return render_template('toolsbox.html')
+
+
+@app.route('/json-visualizer')
+def json_visualizer():
+    """JSON 可视化图谱工具"""
+    return render_template('json-visualizer.html')
+
+
+# ==================== WQB 队列实时看板 ====================
+WQB_QUEUE_DIR = '/root/wbrain-project'
+WQB_LOG_PATH = '/root/wbrain-project/wqb_auto_v2.log'
+WQB_ENGINE_CMD = 'wqb_auto_submit_v3.py'
+
+# 终态集合（按 status 字段）— 必须与 wqb_auto_submit_v3.py 的 _TERMINAL_STATUSES 同步
+WQB_TERMINAL_STATUSES = {
+    'SUCCESS', 'ACTIVE', 'PARAM_FAIL', 'SC_DEAD', 'SC_FAIL',
+    'SUBMIT_FAIL', 'DUPLICATE', 'SCERR', 'SIM_ERR', 'SIM_FAIL',
+    'EXPR_ERR', 'CHECK_FAIL', 'FAILED', 'ERROR', 'success', 'sim_error',
+}
+
+def _list_queue_files():
+    """列出所有 queue_auto_*.json + queue_next.json"""
+    files = []
+    try:
+        for fn in os.listdir(WQB_QUEUE_DIR):
+            if fn.startswith('queue_auto_') and fn.endswith('.json'):
+                files.append(os.path.join(WQB_QUEUE_DIR, fn))
+            elif fn == 'queue_next.json':
+                files.append(os.path.join(WQB_QUEUE_DIR, fn))
+    except Exception as e:
+        app.logger.error(f'列出队列文件失败: {e}')
+    return sorted(files, key=lambda p: os.path.getmtime(p) if os.path.exists(p) else 0, reverse=True)
+
+def _parse_queue_file(path):
+    """读取单个 queue 文件，提取每条 item 关键信息"""
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            items = json.load(f)
+    except Exception as e:
+        return None, str(e)
+    if not isinstance(items, list):
+        return None, 'not a list'
+
+    # 提取队列名（去掉路径和扩展名）
+    name = os.path.basename(path).replace('.json', '')
+
+    # 统计 + 列表
+    status_counter = Counter()
+    started_at = None  # 该队列最早非空时间
+    items_out = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        st = (it.get('status') or 'PENDING').upper()
+        # 兼容新队列（无 status 字段）→ 视作 PENDING
+        if not it.get('status'):
+            st = 'PENDING'
+        status_counter[st] += 1
+
+        # 起始时间：看是否有 _sim_submitted_at 等时间字段，否则用文件 mtime
+        ts = it.get('_sim_submitted_at') or it.get('started_at')
+        if ts and (started_at is None or ts < started_at):
+            started_at = ts
+
+        # 处理 v3 引擎的 settings 嵌套结构 + dashboard 兼容字段名
+        settings = it.get('settings') or {}
+        items_out.append({
+            'id': it.get('id') or it.get('track') or '',
+            'status': st,
+            'sim_id': it.get('sim_id'),
+            'alpha_id': it.get('alpha_id'),
+            'sharpe': it.get('sharpe'),
+            'sc_max': it.get('sc_max'),
+            # 优先读 v3 回写的顶层字段，回退到 settings 嵌套，最后到旧 key
+            'universe': it.get('universe') or it.get('uni') or settings.get('universe'),
+            'neutralization': it.get('neutralization') or it.get('neut') or settings.get('neutralization'),
+            'decay': it.get('decay') if it.get('decay') is not None else settings.get('decay', 0),
+            'truncation': it.get('truncation') if it.get('truncation') is not None else settings.get('truncation', 0.08),
+            'language': settings.get('language', 'FASTEXPR'),
+            'region': settings.get('region', 'USA'),
+            'delay': settings.get('delay', 1),
+            'expr_preview': (it.get('expr') or '')[:80],
+            'notes': it.get('notes'),
+            'failed_checks': it.get('failed_checks', []),
+            'track': it.get('track'),
+            'template': it.get('template'),
+            'fields': it.get('fields', []),
+            '_queue_has_status': bool(it.get('status')),
+        })
+
+    # total = 实际 item 数（包含无 status 的）
+    total = len(items_out)
+    # 终态数
+    done = sum(c for s, c in status_counter.items() if s in WQB_TERMINAL_STATUSES)
+    # pending = 非终态
+    pending = total - done
+
+    # 文件 mtime 作为兜底起始时间
+    file_mtime = os.path.getmtime(path)
+
+    # 合并引擎日志的时间线
+    timeline = _get_log_timeline()
+    for item in items_out:
+        iid = item['id']
+        tl = timeline.get(iid, {})
+        # 时间字段
+        item['post_ts'] = tl.get('post_ts')              # POST sim 时间
+        item['push_ts'] = tl.get('push_ts')              # 推入 GET 池时间 (= 拿到 sim_id)
+        item['sim_id_obtained'] = bool(item.get('sim_id') or tl.get('push_ts'))
+        item['alpha_id_obtained'] = bool(item.get('alpha_id'))
+        item['checks_complete_ts'] = tl.get('checks_complete_ts')
+        item['sc_complete_ts'] = tl.get('sc_complete_ts')
+        item['done_ts'] = tl.get('done_ts')
+        # 耗时
+        item['sim_obtain_sec'] = None
+        if tl.get('post_ts') and tl.get('push_ts'):
+            item['sim_obtain_sec'] = round(tl['push_ts'] - tl['post_ts'], 1)
+        item['alpha_obtain_sec'] = None
+        if tl.get('post_ts') and tl.get('checks_complete_ts'):
+            # 从 POST 到 checks 完整的时间 ≈ 拿到 alpha_id
+            item['alpha_obtain_sec'] = round(tl['checks_complete_ts'] - tl['post_ts'], 1)
+        item['checks_obtain_sec'] = None
+        if tl.get('push_ts') and tl.get('checks_complete_ts'):
+            item['checks_obtain_sec'] = round(tl['checks_complete_ts'] - tl['push_ts'], 1)
+        item['sc_obtain_sec'] = None
+        if tl.get('checks_complete_ts') and tl.get('sc_complete_ts'):
+            item['sc_obtain_sec'] = round(tl['sc_complete_ts'] - tl['checks_complete_ts'], 1)
+        item['total_sec'] = None
+        if tl.get('post_ts') and tl.get('done_ts'):
+            item['total_sec'] = round(tl['done_ts'] - tl['post_ts'], 1)
+        item['sim_poll_fail_count'] = tl.get('sim_poll_fail_count', 0)
+        # 用日志得到的 done_status 覆盖（如果 queue 文件没存）
+        if not item.get('_queue_has_status') and tl.get('done_status'):
+            item['status'] = tl['done_status']
+
+    return {
+        'name': name,
+        'path': path,
+        'file_mtime': file_mtime,
+        'started_at': started_at,
+        'total': total,
+        'done': done,
+        'pending': pending,
+        'status_dist': dict(status_counter),
+        'items': items_out,
+    }, None
+
+def _engine_status():
+    """读引擎 PID + CPU + uptime"""
+    try:
+        out = subprocess.run(['pgrep', '-f', WQB_ENGINE_CMD], capture_output=True, text=True, timeout=5)
+        pids = [p for p in out.stdout.strip().split('\n') if p]
+        app.logger.info(f'[engine] pgrep -f {WQB_ENGINE_CMD} → rc={out.returncode} pids={pids} stderr={out.stderr[:100]!r}')
+    except Exception as e:
+        app.logger.error(f'[engine] pgrep 异常: {e}')
+        pids = []
+    if not pids:
+        return {'running': False, 'pids': [], 'cpu': 0.0, 'uptime_min': 0}
+
+    pid = int(pids[0])
+    try:
+        # /proc/<pid>/stat 拿 CPU 时间
+        with open(f'/proc/{pid}/stat') as f:
+            parts = f.read().split()
+        utime = int(parts[13]); stime = int(parts[14])
+        # starttime in clock ticks since boot
+        starttime = int(parts[21])
+        clk_tck = os.sysconf('SC_CLK_TCK')
+        with open('/proc/uptime') as f:
+            boot_age = float(f.read().split()[0])  # 系统已运行秒
+        uptime_sec = boot_age - (starttime / clk_tck)
+        cpu_sec = (utime + stime) / clk_tck
+        # 读 pcpu
+        with open(f'/proc/{pid}/stat') as f:
+            parts2 = f.read().split()
+        # 用 ps 命令拿 pcpu 更准
+        ps = subprocess.run(['ps', '-o', 'pcpu=', '-p', str(pid)], capture_output=True, text=True, timeout=5)
+        cpu = float(ps.stdout.strip() or 0)
+        return {
+            'running': True,
+            'pids': pids,
+            'cpu': cpu,
+            'uptime_min': int(uptime_sec / 60),
+        }
+    except Exception as e:
+        return {'running': True, 'pids': pids, 'cpu': 0.0, 'uptime_min': 0, 'error': str(e)}
+
+def _parse_engine_log():
+    """从引擎日志解析每个 item_id 的时间线。
+
+    返回 dict: {iid: {'post_ts': float, 'push_ts': float, 'done_ts': float, 'done_status': str,
+                          'sim_post_to_done_sec': float, ...}}
+    注意：sim_complete 关联复杂（GPW 池中不同 worker），暂只算 POST→DONE 总耗时。
+    """
+    try:
+        with open(WQB_LOG_PATH, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+    except Exception as e:
+        app.logger.error(f'读引擎日志失败: {e}')
+        return {}
+
+    lines = content.split('\n')
+
+    # 模式
+    POST_RE = re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?\[round \d+\] \[(\w+)\] POST sim')
+    PUSH_RE = re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?📡 \[(\w+)\] sim_id=')
+    DONE_RE = re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?✅ \[(\w+)\] -> (\w+)')
+    SIM_ERR_RE = re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?❌.*?\[(\w+)\] 标记 SIM_ERR')
+    CHECK_OK_RE = re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?✅ \[(\w+)\] 非SC checks全部通过')
+    SC_DONE_RE = re.compile(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}).*?📊 \[(\w+)\] SC max')
+    POLL_FAIL_RE = re.compile(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.*?⚠️.*?\[(\w+)\] poll 失败')
+
+    def parse_ts(s):
+        return time.mktime(time.strptime(s, '%Y-%m-%d %H:%M:%S'))
+
+    iid_data = defaultdict(lambda: {
+        'post_ts': None, 'push_ts': None,
+        'checks_complete_ts': None, 'sc_complete_ts': None,
+        'done_ts': None, 'done_status': None,
+        'sim_poll_fail_count': 0,
+    })
+
+    for line in lines:
+        m = POST_RE.search(line)
+        if m:
+            ts, iid = parse_ts(m.group(1)), m.group(2)
+            d = iid_data[iid]
+            if d['post_ts'] is None or ts < d['post_ts']:
+                d['post_ts'] = ts
+            continue
+        m = PUSH_RE.search(line)
+        if m:
+            ts, iid = parse_ts(m.group(1)), m.group(2)
+            d = iid_data[iid]
+            if d['push_ts'] is None or ts < d['push_ts']:
+                d['push_ts'] = ts
+            continue
+        m = CHECK_OK_RE.search(line)
+        if m:
+            ts, iid = parse_ts(m.group(1)), m.group(2)
+            d = iid_data[iid]
+            if d['checks_complete_ts'] is None or ts < d['checks_complete_ts']:
+                d['checks_complete_ts'] = ts
+            continue
+        m = SC_DONE_RE.search(line)
+        if m:
+            ts, iid = parse_ts(m.group(1)), m.group(2)
+            d = iid_data[iid]
+            if d['sc_complete_ts'] is None or ts < d['sc_complete_ts']:
+                d['sc_complete_ts'] = ts
+            continue
+        m = DONE_RE.search(line)
+        if m:
+            ts, iid, status = parse_ts(m.group(1)), m.group(2), m.group(3)
+            d = iid_data[iid]
+            if d['done_ts'] is None or ts > d['done_ts']:
+                d['done_ts'] = ts
+                d['done_status'] = status
+            continue
+        m = SIM_ERR_RE.search(line)
+        if m:
+            ts, iid = parse_ts(m.group(1)), m.group(2)
+            d = iid_data[iid]
+            if d['done_ts'] is None or ts > d['done_ts']:
+                d['done_ts'] = ts
+                d['done_status'] = 'SIM_ERR'
+            continue
+        m = POLL_FAIL_RE.search(line)
+        if m:
+            iid_data[m.group(1)]['sim_poll_fail_count'] += 1
+
+    return dict(iid_data)
+
+# 缓存（10 秒有效）
+_log_cache = {'data': None, 'ts': 0}
+def _get_log_timeline():
+    if _log_cache['data'] is None or time.time() - _log_cache['ts'] > 10:
+        _log_cache['data'] = _parse_engine_log()
+        _log_cache['ts'] = time.time()
+    return _log_cache['data']
+
+
+def _recent_engine_logs(n=20):
+    """最近 n 条引擎日志（去重 + 简化）"""
+    try:
+        with open(WQB_LOG_PATH, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+    except Exception as e:
+        return [f'(读日志失败: {e})']
+    # 去重：相同内容只留最新
+    seen = {}
+    for line in lines:
+        # 去掉时间戳前缀
+        m = re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}', line)
+        if m:
+            body = line[m.end():].strip()
+        else:
+            body = line.strip()
+        seen[body] = line.strip()  # 后写覆盖
+
+    out = list(seen.values())[-n:]
+    return out
+
+def wqb_dashboard():
+    return render_template('wqb_dashboard.html')
+
+app.add_url_rule('/wqb-dashboard', 'wqb_dashboard', wqb_dashboard)
+app.add_url_rule('/wqb-dashboard/', 'wqb_dashboard_slash', wqb_dashboard)
+
+def api_wqb_dashboard_view():
+    """实时看板数据接口"""
+    now = time.time()
+
+    # 队列文件
+    queue_files = _list_queue_files()
+    queues = []
+    for path in queue_files:
+        info, err = _parse_queue_file(path)
+        if err:
+            continue
+        if info is None or info['total'] == 0:
+            continue
+        # 全终态队列不显示（避免已完成队列污染 dashboard）
+        # 监控显示是因为监控关心历史；dashboard 关心当前活跃
+        if info['done'] >= info['total']:
+            continue
+        info['age_sec'] = int(now - info['file_mtime'])
+        # 进度条
+        info['progress_pct'] = round(info['done'] * 100 / info['total'], 1) if info['total'] else 0
+        # 运行时长（分钟）
+        start_ts = info['started_at'] or info['file_mtime']
+        info['run_min'] = int((now - start_ts) / 60)
+        queues.append(info)
+
+    # 引擎状态
+    engine = _engine_status()
+
+    # 最近日志
+    logs = _recent_engine_logs(15)
+
+    # 汇总
+    total_items = sum(q['total'] for q in queues)
+    total_done = sum(q['done'] for q in queues)
+    total_pending = sum(q['pending'] for q in queues)
+
+    return jsonify({
+        'ts': now,
+        'engine': engine,
+        'queues': queues,
+        'summary': {
+            'total_queues': len(queues),
+            'total_items': total_items,
+            'total_done': total_done,
+            'total_pending': total_pending,
+        },
+        'recent_logs': logs,
+    })
+
+
+app.add_url_rule('/api/wqb/dashboard', 'api_wqb_dashboard', api_wqb_dashboard_view)
+app.add_url_rule('/api/wqb/dashboard/', 'api_wqb_dashboard_slash', api_wqb_dashboard_view)
 
 
 @app.route('/api/docs.html')
