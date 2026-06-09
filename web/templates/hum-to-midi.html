@@ -1449,24 +1449,31 @@ function startPianoKey(noteNumber) {
     }
     
     const freq = 440 * Math.pow(2, (noteNumber - 69) / 12);
+    const now = pianoContext.currentTime;
     
-    // 等响度补偿：低频增益提升，高频增益降低
-    // 基准：MIDI 60 (中央 C4)，每低一个八度增益翻倍，每高一个八度增益减半
-    const loudnessCompensation = Math.pow(2, (60 - noteNumber) / 12);
-    
-    // 钢琴音色：加法合成（基频 + 泛音）
-    // 参考：https://en.wikipedia.org/wiki/Piano_tuning
+    // 钢琴音色：加法合成 + ADSR 包络
     const harmonics = [
-        { ratio: 1.0,   gain: 1.0,   type: 'triangle' },  // 基频
-        { ratio: 2.0,   gain: 0.5,   type: 'sine' },     // 2次谐波
-        { ratio: 3.0,   gain: 0.25,  type: 'sine' },     // 3次谐波
-        { ratio: 4.0,   gain: 0.125, type: 'sine' },     // 4次谐波
-        { ratio: 5.0,   gain: 0.0625, type: 'sine' },    // 5次谐波
+        { ratio: 1.0,  gain: 1.0,   type: 'triangle' },  // 基频
+        { ratio: 2.0,  gain: 0.6,   type: 'sine' },      // 2次谐波（较强）
+        { ratio: 3.0,  gain: 0.3,   type: 'sine' },      // 3次谐波
+        { ratio: 4.0,  gain: 0.15,  type: 'sine' },      // 4次谐波
+        { ratio: 5.0,  gain: 0.08,  type: 'sine' },      // 5次谐波
+        { ratio: 6.0,  gain: 0.05,  type: 'sine' },      // 6次谐波
     ];
+    
+    // ADSR 包络参数
+    const attack = 0.005;   // 音头（5ms）
+    const decay = 0.3;      // 衰减（300ms）
+    const sustain = 0.4;    // 保持电平
+    const peakGain = 0.5;   // 峰值音量
     
     const masterGain = pianoContext.createGain();
     masterGain.connect(pianoContext.destination);
-    masterGain.gain.value = 0.3 * loudnessCompensation; // 应用等响度补偿
+    masterGain.gain.setValueAtTime(0, now);
+    
+    // ADSR 包络
+    masterGain.gain.linearRampToValueAtTime(peakGain, now + attack);
+    masterGain.gain.exponentialRampToValueAtTime(peakGain * sustain, now + attack + decay);
     
     const oscillators = [];
     
@@ -1477,11 +1484,15 @@ function startPianoKey(noteNumber) {
         
         osc.type = h.type;
         osc.frequency.value = freq * h.ratio;
+        
+        // 添加轻微的频率抖动，模拟真实钢琴的不完美性
+        osc.detune.value = (Math.random() - 0.5) * 2; // ±1 cent
+        
         gain.gain.value = h.gain;
         
         osc.connect(gain);
         gain.connect(masterGain);
-        osc.start();
+        osc.start(now);
         
         oscillators.push({ osc, gain });
     });
