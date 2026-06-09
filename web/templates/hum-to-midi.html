@@ -1340,12 +1340,32 @@ function initPiano() {
             }, {passive: true});  // 改为 passive，允许滚动
             
             key.addEventListener('touchend', (e) => {
-                const touch = e.changedTouches[0];
-                const state = touchStartState.get(touch.identifier);
-                
-                if (state) {
-                    // 如果不是拖动（即正常点击），停止音符
-                    if (!state.isDragging && state.triggered) {
+                // 处理所有结束的触摸点
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const state = touchStartState.get(touch.identifier);
+                    
+                    if (state) {
+                        // 如果不是拖动（即正常点击），停止音符
+                        if (!state.isDragging && state.triggered) {
+                            const note = touchToNote.get(touch.identifier);
+                            if (note !== undefined) {
+                                stopPianoKey(note);
+                                touchToNote.delete(touch.identifier);
+                            }
+                        }
+                        touchStartState.delete(touch.identifier);
+                    }
+                }
+            }, {passive: true});
+            
+            // 触摸取消（例如手指滑出屏幕）
+            key.addEventListener('touchcancel', (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const state = touchStartState.get(touch.identifier);
+                    
+                    if (state && !state.isDragging) {
                         const note = touchToNote.get(touch.identifier);
                         if (note !== undefined) {
                             stopPianoKey(note);
@@ -1421,11 +1441,32 @@ function initPiano() {
             
             key.addEventListener('touchend', (e) => {
                 e.stopPropagation();
-                const touch = e.changedTouches[0];
-                const state = touchStartState.get(touch.identifier);
-                
-                if (state) {
-                    if (!state.isDragging && state.triggered) {
+                // 处理所有结束的触摸点
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const state = touchStartState.get(touch.identifier);
+                    
+                    if (state) {
+                        if (!state.isDragging && state.triggered) {
+                            const note = touchToNote.get(touch.identifier);
+                            if (note !== undefined) {
+                                stopPianoKey(note);
+                                touchToNote.delete(touch.identifier);
+                            }
+                        }
+                        touchStartState.delete(touch.identifier);
+                    }
+                }
+            }, {passive: true});
+            
+            // 触摸取消
+            key.addEventListener('touchcancel', (e) => {
+                e.stopPropagation();
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const state = touchStartState.get(touch.identifier);
+                    
+                    if (state && !state.isDragging) {
                         const note = touchToNote.get(touch.identifier);
                         if (note !== undefined) {
                             stopPianoKey(note);
