@@ -29,10 +29,10 @@
             min-height: 100vh;
             padding: 20px 0;
         }
-        .container { max-width: 100%; margin: 0; padding: 0 20px; }
+        .container { max-width: 100%; margin: 0; padding: 0; }
         .back-link {
             display: inline-block;
-            margin-bottom: 20px;
+            margin: 0 20px 20px 20px;
             color: var(--primary);
             text-decoration: none;
             font-size: 0.85rem;
@@ -40,7 +40,7 @@
         .back-link:hover { text-decoration: underline; }
         .header {
             text-align: center;
-            margin-bottom: 30px;
+            margin: 0 20px 30px 20px;
         }
         .header h1 {
             font-size: 1.6rem;
@@ -52,8 +52,10 @@
         .card {
             background: var(--bg2);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
+            border-left: none;
+            border-right: none;
+            border-radius: 0;
+            padding: 24px 20px;
             margin-bottom: 20px;
         }
         
@@ -171,7 +173,7 @@
         
         /* 虚拟钢琴键盘 */
         .piano-container {
-            margin: 24px -24px 0 -24px;  /* 抵消父卡片的 padding，撑满屏幕 */
+            margin: 24px -20px 0 -20px;  /* 抵消父卡片的左右 padding，撑满窗口 */
             padding: 0;
             background: var(--bg2);
             position: relative;
@@ -356,7 +358,7 @@
         
         footer {
             text-align: center;
-            margin-top: 40px;
+            margin: 40px 20px 0 20px;
             padding: 16px;
             color: var(--text-dim);
             font-size: 0.75rem;
