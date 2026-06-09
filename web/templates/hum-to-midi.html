@@ -1248,6 +1248,10 @@ let pianoContext = null;
 const activeOscillators = new Map(); // noteNumber -> {osc, gain, startTime}
 const touchToNote = new Map(); // touchId -> noteNumber
 
+// 触摸拖动相关
+const touchStartState = new Map(); // touchId -> {x, y, startTime, noteNumber, triggered}
+const DRAG_THRESHOLD = 20; // 拖动阈值（像素）
+
 function initPiano() {
     const piano = document.getElementById('piano');
     piano.innerHTML = '';
@@ -1295,20 +1299,66 @@ function initPiano() {
                 }
             });
             
-            // 触摸事件（支持多点触控）
+            // 触摸事件（支持多点触控和拖动）
             key.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 const touch = e.changedTouches[0];
-                touchToNote.set(touch.identifier, baseNote + offset);
-                startPianoKey(baseNote + offset);
+                const noteNumber = baseNote + offset;
+                
+                // 记录触摸起始状态
+                touchStartState.set(touch.identifier, {
+                    x: touch.clientX,
+                    y: touch.clientY,
+                    startTime: Date.now(),
+                    noteNumber: noteNumber,
+                    triggered: false  // 是否已触发音符
+                });
+                
+                // 延迟触发音符（等待判断是拖动还是点击）
+                setTimeout(() => {
+                    const state = touchStartState.get(touch.identifier);
+                    if (state && !state.triggered) {
+                        // 100ms 后仍未移动，触发音符
+                        state.triggered = true;
+                        touchToNote.set(touch.identifier, noteNumber);
+                        startPianoKey(noteNumber);
+                    }
+                }, 100);
             }, {passive: false});
+            
+            key.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.changedTouches[0];
+                const state = touchStartState.get(touch.identifier);
+                
+                if (state && !state.triggered) {
+                    // 计算移动距离
+                    const dx = touch.clientX - state.x;
+                    const dy = touch.clientY - state.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // 如果移动超过阈值，取消音符触发（认为是拖动）
+                    if (distance > DRAG_THRESHOLD) {
+                        touchStartState.delete(touch.identifier);
+                    }
+                }
+            }, {passive: false});
+            
             key.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 const touch = e.changedTouches[0];
-                const note = touchToNote.get(touch.identifier);
-                if (note !== undefined) {
-                    stopPianoKey(note);
-                    touchToNote.delete(touch.identifier);
+                const state = touchStartState.get(touch.identifier);
+                
+                if (state) {
+                    // 如果已经触发音符，停止它
+                    if (state.triggered) {
+                        const note = touchToNote.get(touch.identifier);
+                        if (note !== undefined) {
+                            stopPianoKey(note);
+                            touchToNote.delete(touch.identifier);
+                        }
+                    }
+                    touchStartState.delete(touch.identifier);
                 }
             }, {passive: false});
             
@@ -1335,24 +1385,67 @@ function initPiano() {
                 }
             });
             
-            // 触摸事件
+            // 触摸事件（支持多点触控和拖动）
             key.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 const touch = e.changedTouches[0];
-                touchToNote.set(touch.identifier, baseNote + offset);
-                startPianoKey(baseNote + offset);
+                const noteNumber = baseNote + offset;
+                
+                // 记录触摸起始状态
+                touchStartState.set(touch.identifier, {
+                    x: touch.clientX,
+                    y: touch.clientY,
+                    startTime: Date.now(),
+                    noteNumber: noteNumber,
+                    triggered: false
+                });
+                
+                // 延迟触发音符
+                setTimeout(() => {
+                    const state = touchStartState.get(touch.identifier);
+                    if (state && !state.triggered) {
+                        state.triggered = true;
+                        touchToNote.set(touch.identifier, noteNumber);
+                        startPianoKey(noteNumber);
+                    }
+                }, 100);
             }, {passive: false});
-            key.addEventListener('touchend', (e) => {
+            
+            key.addEventListener('touchmove', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 const touch = e.changedTouches[0];
-                const note = touchToNote.get(touch.identifier);
-                if (note !== undefined) {
-                    stopPianoKey(note);
-                    touchToNote.delete(touch.identifier);
+                const state = touchStartState.get(touch.identifier);
+                
+                if (state && !state.triggered) {
+                    const dx = touch.clientX - state.x;
+                    const dy = touch.clientY - state.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance > DRAG_THRESHOLD) {
+                        touchStartState.delete(touch.identifier);
+                    }
                 }
             }, {passive: false});
             
+            key.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const touch = e.changedTouches[0];
+                const state = touchStartState.get(touch.identifier);
+                
+                if (state) {
+                    if (state.triggered) {
+                        const note = touchToNote.get(touch.identifier);
+                        if (note !== undefined) {
+                            stopPianoKey(note);
+                            touchToNote.delete(touch.identifier);
+                        }
+                    }
+                    touchStartState.delete(touch.identifier);
+                }
+            }, {passive: false});
             octaveDiv.appendChild(key);
         });
         
