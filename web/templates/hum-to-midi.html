@@ -1249,8 +1249,9 @@ const activeOscillators = new Map(); // noteNumber -> {osc, gain, startTime}
 const touchToNote = new Map(); // touchId -> noteNumber
 
 // 触摸拖动相关
-const touchStartState = new Map(); // touchId -> {x, y, startTime, noteNumber, triggered}
-const DRAG_THRESHOLD = 20; // 拖动阈值（像素）
+const touchStartState = new Map(); // touchId -> {x, y, startTime, noteNumber, triggered, isDragging}
+const DRAG_THRESHOLD = 50; // 拖动阈值（像素）- 增大以避免多指触控误判
+const DRAG_TIME_THRESHOLD = 300; // 拖动时间阈值（毫秒）- 按下多久后才允许判定为拖动
 
 function initPiano() {
     const piano = document.getElementById('piano');
@@ -1325,6 +1326,12 @@ function initPiano() {
                     const state = touchStartState.get(touch.identifier);
                     
                     if (state && !state.isDragging) {
+                        // 检查是否超过时间阈值（按下 300ms 后才允许判定为拖动）
+                        const elapsed = Date.now() - state.startTime;
+                        if (elapsed < DRAG_TIME_THRESHOLD) {
+                            continue;  // 时间未到，不判定为拖动
+                        }
+                        
                         const dx = touch.clientX - state.x;
                         const dy = touch.clientY - state.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1430,6 +1437,12 @@ function initPiano() {
                     const state = touchStartState.get(touch.identifier);
                     
                     if (state && !state.isDragging) {
+                        // 检查是否超过时间阈值
+                        const elapsed = Date.now() - state.startTime;
+                        if (elapsed < DRAG_TIME_THRESHOLD) {
+                            continue;
+                        }
+                        
                         const dx = touch.clientX - state.x;
                         const dy = touch.clientY - state.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
