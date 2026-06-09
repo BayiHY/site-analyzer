@@ -274,7 +274,9 @@ function closeModal() {
 // 获取节点的原始值
 function getNodeRawValue(node) {
     if (node.type === '字符串') {
-        return node.value.replace(/^"|"$/g, '');
+        // 使用 fullValue 获取完整值，如果没有则使用 value
+        const fullVal = node.fullValue || node.value;
+        return fullVal.replace(/^"|"$/g, '');
     } else if (node.type === '布尔值') {
         return node.value === 'true' ? 'true' : 'false';
     } else if (node.type === '数字') {
