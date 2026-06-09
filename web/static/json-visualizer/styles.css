@@ -222,7 +222,7 @@ textarea::placeholder {
 
 .tooltip {
     position: absolute;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.35);
     color: #fff;
     padding: 10px 14px;
     border-radius: 8px;
@@ -233,7 +233,7 @@ textarea::placeholder {
     word-wrap: break-word;
     overflow-wrap: break-word;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     display: none;
     line-height: 1.5;
     backdrop-filter: blur(10px);
