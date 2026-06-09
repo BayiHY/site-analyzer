@@ -1454,6 +1454,10 @@ function startPianoKey(noteNumber) {
         
         // 显示录制状态
         statusDot.classList.add('midi');
+        
+        console.log('[虚拟键盘] 按下:', noteName, 'startTime:', startTime.toFixed(3), 'recordStartTime:', recordStartTime.toFixed(3));
+    } else {
+        console.log('[虚拟键盘] 未录制或无pitchDetector', {isRecording, pitchDetector: !!pitchDetector});
     }
     
     // 高亮按键
@@ -1527,6 +1531,8 @@ function stopPianoKey(noteNumber) {
     
     // 如果正在录制，加入待处理队列
     const keyNote = keyboardNotesOn.get(noteNumber);
+    console.log('[虚拟键盘] 松开:', noteNumber, {isRecording, pitchDetector: !!pitchDetector, keyNote: keyNote ? 'found' : 'not found'});
+    
     if (isRecording && pitchDetector && keyNote) {
         // 使用相同的时间基准
         const now = (audioContext && isRecording) 
@@ -1535,6 +1541,8 @@ function stopPianoKey(noteNumber) {
         const duration = now - keyNote.startTime;
         
         const minDur = parseFloat(document.getElementById('minDuration').value);
+        
+        console.log('[虚拟键盘] 时长:', duration.toFixed(3), '最小:', minDur, '通过:', duration >= minDur);
         
         if (duration >= minDur) {
             pendingNotes.push({
@@ -1546,6 +1554,8 @@ function stopPianoKey(noteNumber) {
             });
             
             keyboardNotesOn.delete(noteNumber);
+            
+            console.log('[虚拟键盘] 添加到 pendingNotes, 当前队列:', pendingNotes.length);
             
             // 如果没有其他按键正在播放，立即处理队列
             if (activeOscillators.size === 0) {
