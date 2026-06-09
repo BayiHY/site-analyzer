@@ -27,9 +27,9 @@
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
-            padding: 20px;
+            padding: 20px 0;
         }
-        .container { max-width: 800px; margin: 0 auto; }
+        .container { max-width: 100%; margin: 0; padding: 0 20px; }
         .back-link {
             display: inline-block;
             margin-bottom: 20px;
@@ -171,41 +171,26 @@
         
         /* 虚拟钢琴键盘 */
         .piano-container {
-            margin-top: 24px;
-            padding: 16px 8px;
-            background: var(--bg);
-            border-radius: 12px;
-            overflow-x: auto;
+            margin: 24px -24px 0 -24px;  /* 抵消父卡片的 padding，撑满屏幕 */
+            padding: 0;
+            background: var(--bg2);
             position: relative;
-        }
-        .piano-container::-webkit-scrollbar {
-            height: 8px;
-        }
-        .piano-container::-webkit-scrollbar-track {
-            background: var(--bg3);
-            border-radius: 4px;
-        }
-        .piano-container::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 4px;
         }
         .piano-wrapper {
-            display: flex;
-            align-items: center;
             position: relative;
+            width: 100%;
         }
         .piano-scroll-btn {
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
             z-index: 10;
-            width: 32px;
-            height: 80px;
-            background: rgba(0, 0, 0, 0.6);
+            width: 40px;
+            height: 100px;
+            background: rgba(0, 0, 0, 0.7);
             border: none;
-            border-radius: 8px;
             color: var(--text);
-            font-size: 1.2rem;
+            font-size: 1.5rem;
             cursor: pointer;
             transition: all 0.2s;
             display: flex;
@@ -214,38 +199,53 @@
             opacity: 0.8;
         }
         .piano-scroll-btn:hover {
-            background: rgba(79, 138, 139, 0.8);
+            background: rgba(79, 138, 139, 0.9);
             opacity: 1;
         }
         .piano-scroll-btn:disabled {
-            opacity: 0.3;
+            opacity: 0.2;
             cursor: not-allowed;
         }
         .piano-scroll-btn.left {
             left: 0;
-            border-radius: 0 8px 8px 0;
+            border-radius: 0 12px 12px 0;
         }
         .piano-scroll-btn.right {
             right: 0;
-            border-radius: 8px 0 0 8px;
+            border-radius: 12px 0 0 12px;
         }
         .piano-scroll-area {
             width: 100%;
             overflow-x: auto;
             overflow-y: hidden;
             scroll-behavior: smooth;
+            padding-bottom: 8px;
+        }
+        .piano-scroll-area::-webkit-scrollbar {
+            height: 12px;
+        }
+        .piano-scroll-area::-webkit-scrollbar-track {
+            background: var(--bg3);
+            border-radius: 6px;
+        }
+        .piano-scroll-area::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 6px;
+        }
+        .piano-scroll-area::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
         }
         .piano {
             display: flex;
             position: relative;
             height: 140px;
             min-width: fit-content;
-            margin: 0 auto;
         }
         .piano-octave {
             display: flex;
             position: relative;
             width: 252px; /* 7白键 * 36px */
+            flex-shrink: 0;
         }
         .white-key {
             width: 36px;
