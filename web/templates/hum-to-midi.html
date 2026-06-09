@@ -186,22 +186,15 @@
             width: 100%;
             overflow-x: auto;
             overflow-y: hidden;
-            scroll-behavior: smooth;
-            padding-bottom: 8px;
+            -webkit-overflow-scrolling: touch;  /* iOS 平滑滚动 */
         }
+        /* 隐藏滚动条 */
         .piano-scroll-area::-webkit-scrollbar {
-            height: 12px;
+            display: none;
         }
-        .piano-scroll-area::-webkit-scrollbar-track {
-            background: var(--bg3);
-            border-radius: 6px;
-        }
-        .piano-scroll-area::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 6px;
-        }
-        .piano-scroll-area::-webkit-scrollbar-thumb:hover {
-            background: var(--primary-dark);
+        .piano-scroll-area {
+            -ms-overflow-style: none;  /* IE/Edge */
+            scrollbar-width: none;  /* Firefox */
         }
         .piano {
             display: flex;
