@@ -172,7 +172,7 @@
         /* 虚拟钢琴键盘 */
         .piano-container {
             margin-top: 24px;
-            padding: 16px;
+            padding: 16px 8px;
             background: var(--bg);
             border-radius: 12px;
             overflow-x: auto;
@@ -192,14 +192,17 @@
         .piano-wrapper {
             display: flex;
             align-items: center;
-            gap: 8px;
+            position: relative;
         }
         .piano-scroll-btn {
-            flex-shrink: 0;
-            width: 36px;
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+            width: 32px;
             height: 80px;
-            background: var(--bg3);
-            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
             border-radius: 8px;
             color: var(--text);
             font-size: 1.2rem;
@@ -208,17 +211,26 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            opacity: 0.8;
         }
         .piano-scroll-btn:hover {
-            background: var(--primary);
-            color: white;
+            background: rgba(79, 138, 139, 0.8);
+            opacity: 1;
         }
         .piano-scroll-btn:disabled {
             opacity: 0.3;
             cursor: not-allowed;
         }
+        .piano-scroll-btn.left {
+            left: 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .piano-scroll-btn.right {
+            right: 0;
+            border-radius: 8px 0 0 8px;
+        }
         .piano-scroll-area {
-            flex: 1;
+            width: 100%;
             overflow-x: auto;
             overflow-y: hidden;
             scroll-behavior: smooth;
@@ -439,11 +451,11 @@
         <!-- 虚拟钢琴键盘 -->
         <div class="piano-container">
             <div class="piano-wrapper">
-                <button class="piano-scroll-btn" id="pianoScrollLeft" title="向左滚动">◀</button>
+                <button class="piano-scroll-btn left" id="pianoScrollLeft" title="向左滚动">◀</button>
                 <div class="piano-scroll-area" id="pianoScrollArea">
                     <div class="piano" id="piano"></div>
                 </div>
-                <button class="piano-scroll-btn" id="pianoScrollRight" title="向右滚动">▶</button>
+                <button class="piano-scroll-btn right" id="pianoScrollRight" title="向右滚动">▶</button>
             </div>
         </div>
     </div>
