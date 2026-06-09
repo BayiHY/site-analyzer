@@ -1,0 +1,1632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>哼唱转MIDI - 站长工具</title>
+    <meta name="description" content="纯浏览器端哼唱录音转MIDI，实时音高检测，支持系统内录和MIDI键盘。">
+    <link rel="canonical" href="https://www.bayihy.cn/tools/hum-to-midi">
+    <style>
+        :root {
+            --primary: #4f8a8b;
+            --primary-dark: #3a6b6c;
+            --accent: #ffd700;
+            --bg: #0f1419;
+            --bg2: #1a2332;
+            --bg3: #243044;
+            --text: #e8eaed;
+            --text-dim: #9aa0a6;
+            --border: #2d3a4a;
+            --success: #34a853;
+            --danger: #ea4335;
+            --warning: #fbbc04;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .back-link:hover { text-decoration: underline; }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 1.6rem;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+        .header p { color: var(--text-dim); font-size: 0.85rem; }
+        
+        .card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 4px;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary {
+            background: var(--bg3);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: var(--border); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-warning { background: var(--warning); color: #000; }
+        
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 16px;
+            background: var(--bg3);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--text-dim);
+        }
+        .status-dot.recording { background: var(--danger); animation: pulse 1s infinite; }
+        .status-dot.ready { background: var(--success); }
+        .status-dot.midi { background: var(--warning); animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .input-mode-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .mode-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 10px 16px;
+            background: var(--bg3);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .mode-btn:hover { border-color: var(--primary); }
+        .mode-btn.active {
+            border-color: var(--primary);
+            color: var(--text);
+            background: rgba(79,138,139,0.2);
+        }
+        .mode-btn .mode-icon { font-size: 1.5rem; display: block; margin-bottom: 4px; }
+        .mode-btn .mode-name { font-size: 0.85rem; }
+        .mode-btn .mode-status { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+        
+        .midi-device-select {
+            margin-top: 12px;
+            padding: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            width: 100%;
+            font-size: 0.9rem;
+        }
+        
+        .visualizer {
+            width: 100%;
+            height: 200px;
+            background: var(--bg3);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .pitch-display {
+            text-align: center;
+            padding: 20px;
+        }
+        .pitch-note {
+            font-size: 4rem;
+            font-weight: bold;
+            color: var(--accent);
+        }
+        .pitch-freq {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+        
+        /* 虚拟钢琴键盘 */
+        .piano-container {
+            margin-top: 24px;
+            padding: 16px;
+            background: var(--bg);
+            border-radius: 12px;
+            overflow-x: auto;
+            position: relative;
+        }
+        .piano-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .piano-container::-webkit-scrollbar-track {
+            background: var(--bg3);
+            border-radius: 4px;
+        }
+        .piano-container::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+        .piano-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .piano-scroll-btn {
+            flex-shrink: 0;
+            width: 36px;
+            height: 80px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .piano-scroll-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+        .piano-scroll-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        .piano-scroll-area {
+            flex: 1;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-behavior: smooth;
+        }
+        .piano {
+            display: flex;
+            position: relative;
+            height: 140px;
+            min-width: fit-content;
+            margin: 0 auto;
+        }
+        .piano-octave {
+            display: flex;
+            position: relative;
+            width: 252px; /* 7白键 * 36px */
+        }
+        .white-key {
+            width: 36px;
+            height: 100%;
+            background: linear-gradient(to bottom, #fff 0%, #e8e8e8 100%);
+            border: 1px solid #999;
+            border-radius: 0 0 6px 6px;
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+            transition: all 0.1s;
+        }
+        .white-key:hover { background: linear-gradient(to bottom, #fff 0%, #d0d0d0 100%); }
+        .white-key.active {
+            background: linear-gradient(to bottom, var(--accent) 0%, #e6c200 100%);
+            box-shadow: 0 0 12px var(--accent);
+        }
+        .white-key .key-label {
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: #666;
+            pointer-events: none;
+        }
+        .black-key {
+            width: 24px;
+            height: 60%;
+            background: linear-gradient(to bottom, #333 0%, #000 100%);
+            border-radius: 0 0 4px 4px;
+            position: absolute;
+            z-index: 2;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        .black-key:hover { background: linear-gradient(to bottom, #444 0%, #111 100%); }
+        .black-key.active {
+            background: linear-gradient(to bottom, var(--warning) 0%, #cc9900 100%);
+            box-shadow: 0 0 10px var(--warning);
+        }
+        /* 黑键位置（每八度5个黑键，白键宽36px） */
+        .black-key:nth-child(8) { left: 25px; }   /* C# */
+        .black-key:nth-child(9) { left: 61px; }   /* D# */
+        .black-key:nth-child(10) { left: 133px; }  /* F# */
+        .black-key:nth-child(11) { left: 169px; }  /* G# */
+        .black-key:nth-child(12) { left: 205px; }  /* A# */
+        
+        .midi-notes {
+            max-height: 300px;
+            overflow-y: auto;
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .midi-note {
+            display: inline-block;
+            padding: 4px 10px;
+            margin: 2px;
+            background: var(--primary);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+        .midi-note.from-keyboard { background: var(--warning); color: #000; }
+        .midi-note.chord {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 6px 12px;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .settings-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .setting-item {
+            flex: 1;
+            min-width: 150px;
+        }
+        .setting-item label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+        .setting-item select, .setting-item input {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+        
+        .info-box {
+            background: rgba(79,138,139,0.1);
+            border-left: 3px solid var(--primary);
+            padding: 12px 16px;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 20px;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 16px;
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+        footer a { color: var(--primary); text-decoration: none; }
+        
+        @media (max-width: 600px) {
+            .settings-row { flex-direction: column; }
+            .pitch-note { font-size: 3rem; }
+            .input-mode-selector { flex-direction: column; }
+            .mode-btn { min-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="/tools/toolsbox" class="back-link">← 返回工具箱</a>
+    
+    <div class="header">
+        <h1>🎵 哼唱转MIDI</h1>
+        <p>麦克风/系统内录/MIDI键盘 → 实时音高检测 → MIDI导出</p>
+    </div>
+    
+    <div class="info-box">
+        💡 使用说明：选择输入源后点击"开始录音"。支持麦克风哼唱、系统内录（浏览器标签页音频）、MIDI键盘输入。
+    </div>
+    
+    <div class="card">
+        <div class="input-mode-selector">
+            <div class="mode-btn active" id="modeMic" onclick="setInputMode('mic')">
+                <span class="mode-icon">🎤</span>
+                <span class="mode-name">麦克风</span>
+                <span class="mode-status" id="micStatus">点击启用</span>
+            </div>
+            <div class="mode-btn" id="modeSystem" onclick="setInputMode('system')">
+                <span class="mode-icon">🖥️</span>
+                <span class="mode-name">系统内录</span>
+                <span class="mode-status" id="systemStatus">捕获系统音频</span>
+            </div>
+            <div class="mode-btn" id="modeMidi" onclick="setInputMode('midi')">
+                <span class="mode-icon">🎹</span>
+                <span class="mode-name">MIDI键盘</span>
+                <span class="mode-status" id="midiStatus">检查中...</span>
+            </div>
+        </div>
+        
+        <div id="midiDevicePanel" style="display: none;">
+            <select class="midi-device-select" id="midiDeviceSelect">
+                <option value="">选择MIDI设备...</option>
+            </select>
+        </div>
+        
+        <div class="status-bar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">选择输入源后开始</span>
+        </div>
+        
+        <div class="settings-row">
+            <div class="setting-item">
+                <label>检测灵敏度</label>
+                <select id="sensitivity">
+                    <option value="high">高（适合安静环境）</option>
+                    <option value="medium" selected>中（推荐）</option>
+                    <option value="low">低（适合嘈杂环境）</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label>最低音符时值</label>
+                <select id="minDuration">
+                    <option value="0.1">100ms</option>
+                    <option value="0.2" selected>200ms</option>
+                    <option value="0.3">300ms</option>
+                    <option value="0.5">500ms</option>
+                </select>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button class="btn btn-primary" id="startBtn">🎤 开始录音</button>
+            <button class="btn btn-danger" id="stopBtn" disabled>⏹ 停止</button>
+            <button class="btn btn-secondary" id="clearBtn" disabled>🗑️ 清空</button>
+        </div>
+        
+        <canvas class="visualizer" id="visualizer"></canvas>
+        
+        <div class="pitch-display">
+            <div class="pitch-note" id="currentNote">--</div>
+            <div class="pitch-freq" id="currentFreq">等待输入...</div>
+        </div>
+        
+        <!-- 虚拟钢琴键盘 -->
+        <div class="piano-container">
+            <div class="piano-wrapper">
+                <button class="piano-scroll-btn" id="pianoScrollLeft" title="向左滚动">◀</button>
+                <div class="piano-scroll-area" id="pianoScrollArea">
+                    <div class="piano" id="piano"></div>
+                </div>
+                <button class="piano-scroll-btn" id="pianoScrollRight" title="向右滚动">▶</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card" id="notesCard" style="display: none;">
+        <h3 style="margin-bottom: 12px;">📝 检测到的音符</h3>
+        <div class="midi-notes" id="notesList"></div>
+        <div style="text-align: center;">
+            <button class="btn btn-success" id="exportBtn">📥 导出MIDI</button>
+            <button class="btn btn-secondary" id="playBtn">▶️ 试听</button>
+        </div>
+    </div>
+    
+    <footer>
+        <a href="/tools/toolsbox">← 返回工具箱</a> ·
+        新ICP备2026003879号-1
+    </footer>
+</div>
+
+<script>
+// ========== 音高检测核心 ==========
+class PitchDetector {
+    constructor(sampleRate) {
+        this.sampleRate = sampleRate;
+        this.MIN_FREQ = 60;   // 低音C2
+        this.MAX_FREQ = 1200; // 高音D6
+    }
+    
+    // 自相关算法检测音高
+    detect(float32Buffer) {
+        const SIZE = float32Buffer.length;
+        const MAX_PERIOD = Math.floor(this.sampleRate / this.MIN_FREQ);
+        const MIN_PERIOD = Math.floor(this.sampleRate / this.MAX_FREQ);
+        
+        // 计算自相关
+        const correlations = new Float32Array(MAX_PERIOD + 1);
+        for (let lag = MIN_PERIOD; lag <= MAX_PERIOD; lag++) {
+            let sum = 0;
+            for (let i = 0; i < SIZE - lag; i++) {
+                sum += float32Buffer[i] * float32Buffer[i + lag];
+            }
+            correlations[lag] = sum;
+        }
+        
+        // 找最大相关峰值
+        let maxCorr = -1;
+        let maxLag = -1;
+        for (let lag = MIN_PERIOD; lag <= MAX_PERIOD; lag++) {
+            if (correlations[lag] > maxCorr) {
+                maxCorr = correlations[lag];
+                maxLag = lag;
+            }
+        }
+        
+        if (maxLag < 0) return null;
+        
+        const freq = this.sampleRate / maxLag;
+        
+        // 验证相关性足够强
+        const threshold = 0.01;
+        if (maxCorr < threshold) return null;
+        
+        return freq;
+    }
+    
+    // 频率转MIDI音符编号
+    freqToMidi(freq) {
+        return Math.round(12 * Math.log2(freq / 440) + 69);
+    }
+    
+    // MIDI编号转音符名
+    midiToNote(midi) {
+        const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const octave = Math.floor(midi / 12) - 1;
+        const note = notes[midi % 12];
+        return `${note}${octave}`;
+    }
+}
+
+// ========== MIDI文件生成 ==========
+class MIDIWriter {
+    constructor() {
+        this.notes = [];
+        this.tempo = 120; // BPM
+    }
+    
+    addNote(midiNote, startTime, duration) {
+        this.notes.push({ midiNote, startTime, duration });
+    }
+    
+    generate() {
+        const ticksPerBeat = 480;
+        const ticksPerSecond = (ticksPerBeat * this.tempo) / 60;
+        
+        // MIDI文件头
+        const header = [
+            0x4D, 0x54, 0x68, 0x64, // "MThd"
+            0x00, 0x00, 0x00, 0x06, // 头长度
+            0x00, 0x00, // 格式0
+            0x00, 0x01, // 音轨数
+            (ticksPerBeat >> 8) & 0xFF, ticksPerBeat & 0xFF // ticks per beat
+        ];
+        
+        // 音轨事件
+        const events = [];
+        events.push([0, 0xC0, 0]); // 程序变更：钢琴
+        
+        for (const note of this.notes) {
+            const startTick = Math.floor(note.startTime * ticksPerSecond);
+            const durationTicks = Math.floor(note.duration * ticksPerSecond);
+            
+            events.push([startTick, 0x90, note.midiNote, 80]); // Note On
+            events.push([startTick + durationTicks, 0x80, note.midiNote, 0]); // Note Off
+        }
+        
+        // 排序事件
+        events.sort((a, b) => a[0] - b[0]);
+        
+        // 转换为Delta Time
+        const trackData = [];
+        let lastTick = 0;
+        for (const event of events) {
+            const delta = event[0] - lastTick;
+            trackData.push(...this.toVariableLength(delta));
+            trackData.push(event[1], event[2], event[3] || 0);
+            lastTick = event[0];
+        }
+        
+        // 结束事件
+        trackData.push(0x00, 0xFF, 0x2F, 0x00);
+        
+        // 音轨头
+        const trackHeader = [
+            0x4D, 0x54, 0x72, 0x6B, // "MTrk"
+            (trackData.length >> 24) & 0xFF,
+            (trackData.length >> 16) & 0xFF,
+            (trackData.length >> 8) & 0xFF,
+            trackData.length & 0xFF
+        ];
+        
+        return new Uint8Array([...header, ...trackHeader, ...trackData]);
+    }
+    
+    toVariableLength(value) {
+        const bytes = [];
+        bytes.push(value & 0x7F);
+        value >>= 7;
+        while (value > 0) {
+            bytes.unshift((value & 0x7F) | 0x80);
+            value >>= 7;
+        }
+        return bytes;
+    }
+}
+
+// ========== 主程序 ==========
+let audioContext, analyser, stream;
+let pitchDetector;
+let isRecording = false;
+let recordedNotes = [];
+let currentNoteStart = null;
+let lastDetectedNote = null;
+let lastDetectedMidi = null;
+let animationId = null;
+let inputMode = 'mic'; // 'mic' | 'system' | 'midi'
+
+// MIDI 相关
+let midiAccess = null;
+let midiInput = null;
+let midiNotesOn = new Map(); // noteNumber -> startTime
+let recordStartTime = null;
+
+// 和弦检测
+let pendingNotes = []; // 待处理的音符队列
+let chordDetectionTimer = null; // 和弦检测定时器
+let keyboardNotesOn = new Map(); // noteNumber -> {startTime, noteName} 虚拟键盘按下的音符
+
+const canvas = document.getElementById('visualizer');
+const ctx = canvas.getContext('2d');
+
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const clearBtn = document.getElementById('clearBtn');
+const exportBtn = document.getElementById('exportBtn');
+const playBtn = document.getElementById('playBtn');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const currentNoteEl = document.getElementById('currentNote');
+const currentFreqEl = document.getElementById('currentFreq');
+const notesList = document.getElementById('notesList');
+const notesCard = document.getElementById('notesCard');
+
+startBtn.onclick = startRecording;
+stopBtn.onclick = stopRecording;
+clearBtn.onclick = clearRecording;
+exportBtn.onclick = exportMIDI;
+playBtn.onclick = playNotes;
+
+// ========== 输入模式管理 ==========
+function setInputMode(mode) {
+    // 检查系统内录是否可用
+    if (mode === 'system') {
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+            alert('系统内录不可用\n\n可能原因：\n1. 浏览器不支持（需要 Chrome 94+/Edge 94+）\n2. 非 HTTPS 环境\n3. 某些企业安全策略限制\n\n建议：使用麦克风模式代替，或尝试更新浏览器。');
+            return;
+        }
+    }
+    
+    inputMode = mode;
+    
+    // 更新按钮状态
+    document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById('mode' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
+    
+    // 更新开始按钮文字
+    const btnTexts = {
+        mic: '🎤 开始录音',
+        system: '🖥️ 开始内录',
+        midi: '🎹 开始录制'
+    };
+    startBtn.textContent = btnTexts[mode];
+    
+    // 显示/隐藏MIDI设备选择
+    document.getElementById('midiDevicePanel').style.display = mode === 'midi' ? 'block' : 'none';
+    
+    // 如果切换到MIDI模式，初始化Web MIDI
+    if (mode === 'midi') {
+        initMIDI();
+    }
+}
+
+// ========== Web MIDI API ==========
+async function initMIDI() {
+    const select = document.getElementById('midiDeviceSelect');
+    select.innerHTML = '<option value="">选择MIDI设备...</option>';
+    
+    // 添加虚拟键盘选项（始终可用）
+    const virtualOption = document.createElement('option');
+    virtualOption.value = 'virtual-keyboard';
+    virtualOption.textContent = '🎹 虚拟键盘（页面内）';
+    select.appendChild(virtualOption);
+    
+    if (!navigator.requestMIDIAccess) {
+        document.getElementById('midiStatus').textContent = '仅虚拟键盘';
+        document.getElementById('midiStatus').style.color = 'var(--warning)';
+        return;
+    }
+    
+    try {
+        midiAccess = await navigator.requestMIDIAccess();
+        const inputs = Array.from(midiAccess.inputs.values());
+        
+        inputs.forEach((input, i) => {
+            const option = document.createElement('option');
+            option.value = input.id;
+            option.textContent = input.name || `MIDI Input ${i + 1}`;
+            select.appendChild(option);
+        });
+        
+        if (inputs.length === 0) {
+            document.getElementById('midiStatus').textContent = '仅虚拟键盘';
+            document.getElementById('midiStatus').style.color = 'var(--warning)';
+        } else {
+            document.getElementById('midiStatus').textContent = `${inputs.length} 设备 + 虚拟键盘`;
+            document.getElementById('midiStatus').style.color = 'var(--success)';
+        }
+        
+        // 监听设备连接/断开
+        midiAccess.onstatechange = (e) => {
+            const inputs = Array.from(midiAccess.inputs.values());
+            const select = document.getElementById('midiDeviceSelect');
+            select.innerHTML = '<option value="">选择MIDI设备...</option>';
+            
+            // 重新添加虚拟键盘选项
+            const virtualOption = document.createElement('option');
+            virtualOption.value = 'virtual-keyboard';
+            virtualOption.textContent = '🎹 虚拟键盘（页面内）';
+            select.appendChild(virtualOption);
+            
+            inputs.forEach((input, i) => {
+                const option = document.createElement('option');
+                option.value = input.id;
+                option.textContent = input.name || `MIDI Input ${i + 1}`;
+                select.appendChild(option);
+            });
+            
+            if (inputs.length === 0) {
+                document.getElementById('midiStatus').textContent = '仅虚拟键盘';
+            } else {
+                document.getElementById('midiStatus').textContent = `${inputs.length} 设备 + 虚拟键盘`;
+            }
+        };
+        
+    } catch (err) {
+        document.getElementById('midiStatus').textContent = '仅虚拟键盘';
+        document.getElementById('midiStatus').style.color = 'var(--warning)';
+    }
+}
+
+function handleMIDIMessage(event) {
+    if (!isRecording || inputMode !== 'midi') return;
+    
+    const [status, noteNumber, velocity] = event.data;
+    const command = status >> 4;
+    
+    // Note On (0x9) with velocity > 0
+    if (command === 9 && velocity > 0) {
+        const noteName = pitchDetector ? pitchDetector.midiToNote(noteNumber) : `Note ${noteNumber}`;
+        
+        // 显示当前音符
+        currentNoteEl.textContent = noteName;
+        currentFreqEl.textContent = `MIDI ${noteNumber} | Vel ${velocity}`;
+        
+        // 记录开始时间
+        midiNotesOn.set(noteNumber, {
+            startTime: audioContext.currentTime - recordStartTime,
+            noteName: noteName
+        });
+        
+        // 高亮状态和虚拟键盘
+        statusDot.classList.add('midi');
+        highlightKey(noteNumber);
+        
+    // Note Off (0x8) or Note On with velocity 0
+    } else if (command === 8 || (command === 9 && velocity === 0)) {
+        const noteInfo = midiNotesOn.get(noteNumber);
+        if (noteInfo) {
+            const duration = (audioContext.currentTime - recordStartTime) - noteInfo.startTime;
+            const minDur = parseFloat(document.getElementById('minDuration').value);
+            
+            if (duration >= minDur) {
+                recordedNotes.push({
+                    midiNote: noteNumber,
+                    noteName: noteInfo.noteName,
+                    startTime: noteInfo.startTime,
+                    duration: duration,
+                    fromKeyboard: true
+                });
+                displayNotes();
+            }
+            
+            midiNotesOn.delete(noteNumber);
+        }
+        
+        // 取消虚拟键盘高亮
+        unhighlightKey(noteNumber);
+        
+        // 如果没有按着的键，取消高亮
+        if (midiNotesOn.size === 0) {
+            statusDot.classList.remove('midi');
+            currentNoteEl.textContent = '--';
+            currentFreqEl.textContent = '等待按键...';
+        }
+    }
+}
+
+// ========== 录音控制 ==========
+async function startRecording() {
+    try {
+        recordStartTime = 0;
+        recordedNotes = [];
+        midiNotesOn.clear();
+        
+        if (inputMode === 'midi') {
+            // MIDI键盘模式
+            const selectedDeviceId = document.getElementById('midiDeviceSelect').value;
+            if (!selectedDeviceId) {
+                alert('请先选择MIDI设备或虚拟键盘');
+                return;
+            }
+            
+            // 初始化AudioContext（用于时间戳）
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            pitchDetector = new PitchDetector(audioContext.sampleRate);
+            
+            // 检查是否选择虚拟键盘
+            if (selectedDeviceId === 'virtual-keyboard') {
+                // 虚拟键盘模式：不需要连接物理设备
+                // 虚拟键盘的事件已经在 initPiano() 中绑定
+                // 这里只需要初始化录制状态
+                isRecording = true;
+                recordStartTime = audioContext.currentTime;
+                
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                clearBtn.disabled = true;
+                statusDot.classList.add('ready');
+                statusText.textContent = '虚拟键盘录制中（点击钢琴键）...';
+                
+            } else {
+                // 物理MIDI设备模式
+                if (!midiAccess) {
+                    alert('MIDI API 未初始化，请刷新页面重试');
+                    return;
+                }
+                
+                midiInput = midiAccess.inputs.get(selectedDeviceId);
+                if (!midiInput) {
+                    alert('无法连接MIDI设备');
+                    return;
+                }
+                
+                midiInput.onmidimessage = handleMIDIMessage;
+                
+                isRecording = true;
+                recordStartTime = audioContext.currentTime;
+                
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                clearBtn.disabled = true;
+                statusDot.classList.add('ready');
+                statusText.textContent = 'MIDI键盘录制中...';
+            }
+            
+        } else if (inputMode === 'system') {
+            // 系统内录模式
+            // 检查浏览器支持
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                alert('您的浏览器不支持系统内录功能。\n\n请使用 Chrome 94+、Edge 94+ 或 Firefox 52+ 浏览器。\n\n注意：需要 HTTPS 或 localhost 环境。');
+                return;
+            }
+            
+            let displayStream;
+            try {
+                displayStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: true
+                });
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    alert('用户取消了屏幕共享选择。');
+                } else if (err.name === 'NotSupportedError') {
+                    alert('您的浏览器不支持音频捕获。\n\n请尝试更新浏览器或使用 Chrome/Edge。');
+                } else {
+                    alert('启动系统内录失败：' + err.message + '\n\n提示：系统内录需要 HTTPS 环境。');
+                }
+                console.error('getDisplayMedia error:', err);
+                return;
+            }
+            
+            // 检查是否有音频轨道
+            const audioTracks = displayStream.getAudioTracks();
+            if (audioTracks.length === 0) {
+                displayStream.getTracks().forEach(t => t.stop());
+                alert('未检测到系统音频轨道。\n\n请在选择共享窗口时：\n1. 勾选"共享音频"或"Share audio"选项\n2. Chrome: 点击"标签页"选项卡，勾选底部"共享此标签页的音频"\n3. Edge: 选择"浏览器标签页"后勾选"包含标签页音频"');
+                return;
+            }
+            
+            console.log('✅ 系统内录已启动，音频轨道:', audioTracks.map(t => t.label));
+            
+            // 创建音频上下文
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(displayStream);
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048;
+            source.connect(analyser);
+            
+            stream = displayStream;
+            pitchDetector = new PitchDetector(audioContext.sampleRate);
+            
+            isRecording = true;
+            currentNoteStart = null;
+            lastDetectedMidi = null;
+            
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            clearBtn.disabled = true;
+            statusDot.classList.add('recording');
+            statusText.textContent = '系统内录中...';
+            
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            detect();
+            
+        } else {
+            // 麦克风模式（原有逻辑）
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            const source = audioContext.createMediaStreamSource(stream);
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048;
+            source.connect(analyser);
+            
+            pitchDetector = new PitchDetector(audioContext.sampleRate);
+            
+            isRecording = true;
+            currentNoteStart = null;
+            lastDetectedMidi = null;
+            
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            clearBtn.disabled = true;
+            statusDot.classList.add('recording');
+            statusText.textContent = '正在录音...';
+            
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            detect();
+        }
+        
+    } catch (err) {
+        alert('启动失败：' + err.message);
+        console.error(err);
+    }
+}
+
+function stopRecording() {
+    isRecording = false;
+    
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+    }
+    
+    if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+    }
+    
+    if (midiInput) {
+        midiInput.onmidimessage = null;
+    }
+    
+    // 处理还在按着的MIDI键
+    if (midiNotesOn.size > 0) {
+        const now = audioContext.currentTime - recordStartTime;
+        midiNotesOn.forEach((noteInfo, noteNumber) => {
+            const duration = now - noteInfo.startTime;
+            if (duration >= parseFloat(document.getElementById('minDuration').value)) {
+                recordedNotes.push({
+                    midiNote: noteNumber,
+                    noteName: noteInfo.noteName,
+                    startTime: noteInfo.startTime,
+                    duration: duration,
+                    fromKeyboard: true
+                });
+            }
+        });
+        midiNotesOn.clear();
+    }
+    
+    if (audioContext) {
+        // 麦克风/系统内录模式：保存最后一个音符
+        if (inputMode !== 'midi' && currentNoteStart !== null && lastDetectedMidi !== null) {
+            const duration = audioContext.currentTime - currentNoteStart;
+            if (duration >= parseFloat(document.getElementById('minDuration').value)) {
+                recordedNotes.push({
+                    midiNote: lastDetectedMidi,
+                    noteName: lastDetectedNote,
+                    startTime: currentNoteStart,
+                    duration: duration
+                });
+            }
+        }
+    }
+    
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    clearBtn.disabled = false;
+    statusDot.classList.remove('recording', 'midi');
+    statusDot.classList.add('ready');
+    statusText.textContent = `录制完成，检测到 ${recordedNotes.length} 个音符`;
+    
+    displayNotes();
+}
+
+function clearRecording() {
+    recordedNotes = [];
+    midiNotesOn.clear();
+    notesList.innerHTML = '';
+    notesCard.style.display = 'none';
+    currentNoteEl.textContent = '--';
+    currentFreqEl.textContent = '等待输入...';
+    statusDot.classList.remove('ready');
+    statusText.textContent = '选择输入源后开始';
+    clearBtn.disabled = true;
+}
+
+// ========== 音高检测循环 ==========
+function detect() {
+    if (!isRecording) return;
+    
+    const bufferLength = analyser.fftSize;
+    const buffer = new Float32Array(bufferLength);
+    analyser.getFloatTimeDomainData(buffer);
+    
+    // 绘制波形
+    drawWaveform(buffer);
+    
+    // 检测音高
+    const sensitivity = document.getElementById('sensitivity').value;
+    
+    // 计算RMS判断是否有声音
+    let rms = 0;
+    for (let i = 0; i < buffer.length; i++) {
+        rms += buffer[i] * buffer[i];
+    }
+    rms = Math.sqrt(rms / buffer.length);
+    
+    if (rms > 0.01) { // 有声音输入
+        const freq = pitchDetector.detect(buffer);
+        
+        if (freq && freq > pitchDetector.MIN_FREQ && freq < pitchDetector.MAX_FREQ) {
+            const midi = pitchDetector.freqToMidi(freq);
+            const noteName = pitchDetector.midiToNote(midi);
+            
+            currentNoteEl.textContent = noteName;
+            currentFreqEl.textContent = `${freq.toFixed(1)} Hz | MIDI ${midi}`;
+            
+            // 音符变化检测
+            if (lastDetectedMidi !== midi) {
+                // 取消上一个键的高亮
+                if (lastDetectedMidi !== null) {
+                    unhighlightKey(lastDetectedMidi);
+                }
+                
+                // 保存上一个音符
+                if (currentNoteStart !== null && lastDetectedMidi !== null) {
+                    const duration = audioContext.currentTime - currentNoteStart;
+                    if (duration >= parseFloat(document.getElementById('minDuration').value)) {
+                        recordedNotes.push({
+                            midiNote: lastDetectedMidi,
+                            noteName: lastDetectedNote,
+                            startTime: currentNoteStart,
+                            duration: duration
+                        });
+                    }
+                }
+                // 开始新音符
+                currentNoteStart = audioContext.currentTime;
+                lastDetectedMidi = midi;
+                lastDetectedNote = noteName;
+                
+                // 高亮虚拟键盘
+                highlightKey(midi);
+            }
+        }
+    } else {
+        currentNoteEl.textContent = '--';
+        currentFreqEl.textContent = '等待声音...';
+        
+        // 静音时结束当前音符
+        if (currentNoteStart !== null && lastDetectedMidi !== null) {
+            const duration = audioContext.currentTime - currentNoteStart;
+            if (duration >= parseFloat(document.getElementById('minDuration').value)) {
+                recordedNotes.push({
+                    midiNote: lastDetectedMidi,
+                    noteName: lastDetectedNote,
+                    startTime: currentNoteStart,
+                    duration: duration
+                });
+            }
+            // 取消高亮
+            unhighlightKey(lastDetectedMidi);
+            currentNoteStart = null;
+            lastDetectedMidi = null;
+        }
+    }
+    
+    animationId = requestAnimationFrame(detect);
+}
+
+function drawWaveform(buffer) {
+    ctx.fillStyle = '#1a2332';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#4f8a8b';
+    ctx.beginPath();
+    
+    const sliceWidth = canvas.width / buffer.length;
+    let x = 0;
+    
+    for (let i = 0; i < buffer.length; i++) {
+        const v = buffer[i];
+        const y = (v + 1) / 2 * canvas.height;
+        
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+        x += sliceWidth;
+    }
+    
+    ctx.stroke();
+}
+
+function displayNotes() {
+    if (recordedNotes.length === 0) {
+        notesCard.style.display = 'none';
+        return;
+    }
+    
+    notesCard.style.display = 'block';
+    
+    // 智能显示：和弦用方括号包裹
+    let html = '';
+    let i = 0;
+    while (i < recordedNotes.length) {
+        const note = recordedNotes[i];
+        if (note.isChord) {
+            // 找到这个和弦的所有音符（连续的 isChord=true）
+            const chordNotes = [];
+            while (i < recordedNotes.length && recordedNotes[i].isChord) {
+                chordNotes.push(recordedNotes[i]);
+                i++;
+            }
+            // 和弦显示：[C4·E4·G4]
+            html += `<span class="midi-note chord">${chordNotes.map(n => n.noteName).join('·')}</span>`;
+        } else {
+            // 单音显示
+            html += `<span class="midi-note ${note.fromKeyboard ? 'from-keyboard' : ''}">${note.noteName}</span>`;
+            i++;
+        }
+    }
+    notesList.innerHTML = html;
+}
+
+function exportMIDI() {
+    if (recordedNotes.length === 0) {
+        alert('没有可导出的音符');
+        return;
+    }
+    
+    const midi = new MIDIWriter();
+    for (const note of recordedNotes) {
+        midi.addNote(note.midiNote, note.startTime, note.duration);
+    }
+    
+    const data = midi.generate();
+    const blob = new Blob([data], { type: 'audio/midi' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hum_${new Date().toISOString().slice(0,10)}.mid`;
+    a.click();
+    
+    URL.revokeObjectURL(url);
+}
+
+function playNotes() {
+    if (recordedNotes.length === 0) return;
+    
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    let currentTime = ctx.currentTime + 0.1; // 稍微延迟开始
+    
+    // 遍历音符，和弦同时播放
+    let i = 0;
+    while (i < recordedNotes.length) {
+        const note = recordedNotes[i];
+        
+        if (note.isChord) {
+            // 收集和弦的所有音符
+            const chordNotes = [];
+            while (i < recordedNotes.length && recordedNotes[i].isChord) {
+                chordNotes.push(recordedNotes[i]);
+                i++;
+            }
+            
+            // 同时播放和弦音符
+            chordNotes.forEach(n => {
+                playNoteAt(ctx, n.midiNote, currentTime, n.duration);
+            });
+            
+            // 和弦时长取最长的音符
+            const maxDuration = Math.max(...chordNotes.map(n => n.duration));
+            currentTime += maxDuration;
+        } else {
+            // 播放单音
+            playNoteAt(ctx, note.midiNote, currentTime, note.duration);
+            currentTime += note.duration;
+            i++;
+        }
+    }
+}
+
+// 在指定时间播放单个音符（使用钢琴音色）
+function playNoteAt(ctx, midiNote, startTime, duration) {
+    const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+    
+    // 等响度补偿
+    const loudnessCompensation = Math.pow(2, (60 - midiNote) / 24);
+    
+    // 钢琴音色：加法合成
+    const harmonics = [
+        { ratio: 1.0,   gain: 1.0,   type: 'triangle' },
+        { ratio: 2.0,   gain: 0.5,   type: 'sine' },
+        { ratio: 3.0,   gain: 0.25,  type: 'sine' },
+        { ratio: 4.0,   gain: 0.125, type: 'sine' },
+        { ratio: 5.0,   gain: 0.0625, type: 'sine' },
+    ];
+    
+    const masterGain = ctx.createGain();
+    masterGain.connect(ctx.destination);
+    masterGain.gain.setValueAtTime(0.3 * loudnessCompensation, startTime);
+    masterGain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    
+    harmonics.forEach(h => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = h.type;
+        osc.frequency.value = freq * h.ratio;
+        gain.gain.value = h.gain;
+        
+        osc.connect(gain);
+        gain.connect(masterGain);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+    });
+}
+
+// ========== 虚拟钢琴键盘 ==========
+const PIANO_START_NOTE = 48; // C3
+const PIANO_END_NOTE = 84;   // C6 (3个八度)
+let pianoContext = null;
+const activeOscillators = new Map(); // noteNumber -> {osc, gain, startTime}
+const touchToNote = new Map(); // touchId -> noteNumber
+
+function initPiano() {
+    const piano = document.getElementById('piano');
+    piano.innerHTML = '';
+    
+    if (!pianoContext) {
+        pianoContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // 创建3个八度
+    for (let octave = 0; octave < 3; octave++) {
+        const octaveDiv = document.createElement('div');
+        octaveDiv.className = 'piano-octave';
+        
+        const baseNote = PIANO_START_NOTE + octave * 12;
+        
+        // 7个白键: C, D, E, F, G, A, B
+        const whiteNotes = [0, 2, 4, 5, 7, 9, 11];
+        whiteNotes.forEach((offset, i) => {
+            const key = document.createElement('div');
+            key.className = 'white-key';
+            key.dataset.note = baseNote + offset;
+            
+            // 添加音符标签
+            const label = document.createElement('span');
+            label.className = 'key-label';
+            const noteNames = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+            label.textContent = noteNames[i] + (3 + octave);
+            key.appendChild(label);
+            
+            // 鼠标事件
+            key.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                startPianoKey(baseNote + offset);
+            });
+            key.addEventListener('mouseup', () => stopPianoKey(baseNote + offset));
+            key.addEventListener('mouseleave', () => {
+                if (activeOscillators.has(baseNote + offset)) {
+                    stopPianoKey(baseNote + offset);
+                }
+            });
+            
+            // 触摸事件（支持多点触控）
+            key.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.changedTouches[0];
+                touchToNote.set(touch.identifier, baseNote + offset);
+                startPianoKey(baseNote + offset);
+            }, {passive: false});
+            key.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                const touch = e.changedTouches[0];
+                const note = touchToNote.get(touch.identifier);
+                if (note !== undefined) {
+                    stopPianoKey(note);
+                    touchToNote.delete(touch.identifier);
+                }
+            }, {passive: false});
+            
+            octaveDiv.appendChild(key);
+        });
+        
+        // 5个黑键: C#, D#, F#, G#, A#
+        const blackNotes = [1, 3, 6, 8, 10];
+        blackNotes.forEach(offset => {
+            const key = document.createElement('div');
+            key.className = 'black-key';
+            key.dataset.note = baseNote + offset;
+            
+            // 鼠标事件
+            key.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                startPianoKey(baseNote + offset);
+            });
+            key.addEventListener('mouseup', () => stopPianoKey(baseNote + offset));
+            key.addEventListener('mouseleave', () => {
+                if (activeOscillators.has(baseNote + offset)) {
+                    stopPianoKey(baseNote + offset);
+                }
+            });
+            
+            // 触摸事件
+            key.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const touch = e.changedTouches[0];
+                touchToNote.set(touch.identifier, baseNote + offset);
+                startPianoKey(baseNote + offset);
+            }, {passive: false});
+            key.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                const touch = e.changedTouches[0];
+                const note = touchToNote.get(touch.identifier);
+                if (note !== undefined) {
+                    stopPianoKey(note);
+                    touchToNote.delete(touch.identifier);
+                }
+            }, {passive: false});
+            
+            octaveDiv.appendChild(key);
+        });
+        
+        piano.appendChild(octaveDiv);
+    }
+}
+
+function startPianoKey(noteNumber) {
+    // 如果已经在发声，先停止
+    if (activeOscillators.has(noteNumber)) {
+        stopPianoKey(noteNumber);
+    }
+    
+    const freq = 440 * Math.pow(2, (noteNumber - 69) / 12);
+    
+    // 等响度补偿：低频增益提升，高频增益降低
+    // 基准：MIDI 60 (中央 C4)，每低一个八度增益翻倍，每高一个八度增益减半
+    const loudnessCompensation = Math.pow(2, (60 - noteNumber) / 12);
+    
+    // 钢琴音色：加法合成（基频 + 泛音）
+    // 参考：https://en.wikipedia.org/wiki/Piano_tuning
+    const harmonics = [
+        { ratio: 1.0,   gain: 1.0,   type: 'triangle' },  // 基频
+        { ratio: 2.0,   gain: 0.5,   type: 'sine' },     // 2次谐波
+        { ratio: 3.0,   gain: 0.25,  type: 'sine' },     // 3次谐波
+        { ratio: 4.0,   gain: 0.125, type: 'sine' },     // 4次谐波
+        { ratio: 5.0,   gain: 0.0625, type: 'sine' },    // 5次谐波
+    ];
+    
+    const masterGain = pianoContext.createGain();
+    masterGain.connect(pianoContext.destination);
+    masterGain.gain.value = 0.3 * loudnessCompensation; // 应用等响度补偿
+    
+    const oscillators = [];
+    
+    // 创建每个谐波
+    harmonics.forEach(h => {
+        const osc = pianoContext.createOscillator();
+        const gain = pianoContext.createGain();
+        
+        osc.type = h.type;
+        osc.frequency.value = freq * h.ratio;
+        gain.gain.value = h.gain;
+        
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        
+        oscillators.push({ osc, gain });
+    });
+    
+    // 记录活跃的振荡器（使用 audioContext 时间或 performance.now）
+    const startTime = (audioContext && isRecording) 
+        ? audioContext.currentTime - recordStartTime 
+        : performance.now() / 1000;
+    
+    activeOscillators.set(noteNumber, {
+        oscillators: oscillators,
+        masterGain: masterGain,
+        startTime: startTime
+    });
+    
+    // 如果正在录制，记录按下时间
+    if (isRecording && pitchDetector) {
+        const noteName = pitchDetector.midiToNote(noteNumber);
+        keyboardNotesOn.set(noteNumber, {
+            startTime: startTime,
+            noteName: noteName
+        });
+        
+        // 显示录制状态
+        statusDot.classList.add('midi');
+    }
+    
+    // 高亮按键
+    highlightKey(noteNumber);
+    
+    // 更新显示
+    if (pitchDetector) {
+        currentNoteEl.textContent = pitchDetector.midiToNote(noteNumber);
+    } else {
+        currentNoteEl.textContent = `Note ${noteNumber}`;
+    }
+    currentFreqEl.textContent = `MIDI ${noteNumber} | 虚拟键盘`;
+}
+
+// 处理待处理的音符队列（分组和弦）
+function processPendingNotes() {
+    if (pendingNotes.length === 0) return;
+    
+    // 按 startTime 排序
+    pendingNotes.sort((a, b) => a.startTime - b.startTime);
+    
+    // 分组和弦：startTime 相差 < 50ms 的音符为一组
+    const groups = [];
+    let currentGroup = [pendingNotes[0]];
+    
+    for (let i = 1; i < pendingNotes.length; i++) {
+        const note = pendingNotes[i];
+        const prevNote = currentGroup[0];
+        
+        // 如果 startTime 与组内第一个音符相差 < 50ms，加入当前组
+        if (note.startTime - prevNote.startTime < 0.05) {
+            currentGroup.push(note);
+        } else {
+            // 否则开始新组
+            groups.push(currentGroup);
+            currentGroup = [note];
+        }
+    }
+    groups.push(currentGroup);
+    
+    // 标记并添加到 recordedNotes
+    groups.forEach(group => {
+        const isChord = group.length > 1;
+        group.forEach(note => {
+            note.isChord = isChord;
+            recordedNotes.push(note);
+        });
+    });
+    
+    pendingNotes = [];
+    displayNotes();
+}
+
+function stopPianoKey(noteNumber) {
+    const active = activeOscillators.get(noteNumber);
+    if (!active) return;
+    
+    // 渐出效果（避免爆音）
+    const stopTime = pianoContext.currentTime + 0.15;
+    active.masterGain.gain.exponentialRampToValueAtTime(0.001, stopTime);
+    
+    // 停止所有振荡器
+    active.oscillators.forEach(({ osc }) => {
+        osc.stop(stopTime);
+    });
+    
+    activeOscillators.delete(noteNumber);
+    
+    // 取消高亮
+    unhighlightKey(noteNumber);
+    
+    // 如果正在录制，加入待处理队列
+    const keyNote = keyboardNotesOn.get(noteNumber);
+    if (isRecording && pitchDetector && keyNote) {
+        // 使用相同的时间基准
+        const now = (audioContext && isRecording) 
+            ? audioContext.currentTime - recordStartTime 
+            : performance.now() / 1000;
+        const duration = now - keyNote.startTime;
+        
+        const minDur = parseFloat(document.getElementById('minDuration').value);
+        
+        if (duration >= minDur) {
+            pendingNotes.push({
+                midiNote: noteNumber,
+                noteName: keyNote.noteName,
+                startTime: keyNote.startTime,
+                duration: duration,
+                fromKeyboard: true
+            });
+            
+            keyboardNotesOn.delete(noteNumber);
+            
+            // 如果没有其他按键正在播放，立即处理队列
+            if (activeOscillators.size === 0) {
+                processPendingNotes();
+            }
+        }
+    }
+    
+    // 更新显示
+    if (activeOscillators.size === 0) {
+        currentNoteEl.textContent = '--';
+        currentFreqEl.textContent = '等待输入...';
+        statusDot.classList.remove('midi');
+    } else {
+        // 显示最后一个按下的键
+        const lastKey = Array.from(activeOscillators.keys()).pop();
+        if (pitchDetector) {
+            currentNoteEl.textContent = pitchDetector.midiToNote(lastKey);
+        }
+        currentFreqEl.textContent = `MIDI ${lastKey} | ${activeOscillators.size} 键同时按`;
+    }
+}
+
+function highlightKey(noteNumber, duration = 0) {
+    const key = document.querySelector(`[data-note="${noteNumber}"]`);
+    if (key) {
+        key.classList.add('active');
+        if (duration > 0) {
+            setTimeout(() => key.classList.remove('active'), duration);
+        }
+    }
+}
+
+function unhighlightKey(noteNumber) {
+    const key = document.querySelector(`[data-note="${noteNumber}"]`);
+    if (key) {
+        key.classList.remove('active');
+    }
+}
+
+// ========== 虚拟钢琴滚动控制 ==========
+function initPianoScroll() {
+    const scrollArea = document.getElementById('pianoScrollArea');
+    const leftBtn = document.getElementById('pianoScrollLeft');
+    const rightBtn = document.getElementById('pianoScrollRight');
+    
+    // 滚动步长（一个八度的宽度）
+    const scrollStep = 252;
+    
+    leftBtn.onclick = () => {
+        scrollArea.scrollBy({ left: -scrollStep, behavior: 'smooth' });
+    };
+    
+    rightBtn.onclick = () => {
+        scrollArea.scrollBy({ left: scrollStep, behavior: 'smooth' });
+    };
+    
+    // 更新按钮状态
+    function updateButtons() {
+        leftBtn.disabled = scrollArea.scrollLeft <= 10;
+        rightBtn.disabled = scrollArea.scrollLeft >= scrollArea.scrollWidth - scrollArea.clientWidth - 10;
+    }
+    
+    scrollArea.addEventListener('scroll', updateButtons);
+    
+    // 初始化按钮状态
+    setTimeout(updateButtons, 100);
+    
+    // 键盘快捷键（可选）
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        if (e.key === 'ArrowLeft') leftBtn.click();
+        if (e.key === 'ArrowRight') rightBtn.click();
+    });
+}
+
+// ========== 初始化 ==========
+// 检查MIDI支持状态
+if (navigator.requestMIDIAccess) {
+    document.getElementById('midiStatus').textContent = '可用';
+    document.getElementById('midiStatus').style.color = 'var(--success)';
+} else {
+    document.getElementById('midiStatus').textContent = '仅虚拟键盘';
+    document.getElementById('midiStatus').style.color = 'var(--warning)';
+}
+
+// 检查系统内录支持
+if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+    document.getElementById('systemStatus').textContent = '不支持';
+    document.getElementById('systemStatus').style.color = 'var(--text-dim)';
+    document.getElementById('modeSystem').style.opacity = '0.5';
+    document.getElementById('modeSystem').style.cursor = 'not-allowed';
+}
+
+// 初始化虚拟钢琴
+initPiano();
+initPianoScroll();
+</script>
+</body>
+</html>

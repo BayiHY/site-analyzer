@@ -1,0 +1,3 @@
+[2026-05-25 09:40:06.412] [INFO ] [TEST] hello from curl | UA: curl/7.81.0
+[2026-05-25 09:41:46.194] [INFO ] [TEST] ping | UA: curl/7.81.0
+[2026-05-25 09:51:02.510] [INFO ] [TEST] beacon test | UA: curl/7.81.0

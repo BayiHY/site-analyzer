@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>WQB 队列实时看板</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #0a0e1a;
+    color: #d6dceb;
+    padding: 16px;
+    font-size: 13px;
+}
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #1a1f3a 0%, #0d1224 100%);
+    border-radius: 12px;
+    border: 1px solid #2a3158;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.header h1 {
+    font-size: 20px;
+    background: linear-gradient(90deg, #00d2ff, #7c4dff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.refresh-info {
+    color: #8a92b2;
+    font-size: 12px;
+}
+.refresh-info .pulse {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #00d2ff;
+    margin-right: 6px;
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.3); }
+}
+
+.summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+}
+.metric {
+    background: #131830;
+    border: 1px solid #2a3158;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+.metric .label { font-size: 11px; color: #8a92b2; margin-bottom: 4px; }
+.metric .value { font-size: 22px; font-weight: 600; color: #fff; }
+.metric .sub { font-size: 11px; color: #6a7298; margin-top: 3px; }
+.metric.green .value { color: #4ade80; }
+.metric.blue .value { color: #00d2ff; }
+.metric.orange .value { color: #fb923c; }
+.metric.red .value { color: #f87171; }
+
+.engine-bar {
+    background: #131830;
+    border: 1px solid #2a3158;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.engine-bar .dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    margin-right: 6px;
+    display: inline-block;
+}
+.engine-bar .dot.on { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+.engine-bar .dot.off { background: #f87171; box-shadow: 0 0 8px #f87171; }
+.engine-bar .item { display: flex; align-items: center; font-size: 12px; }
+.engine-bar .item .v { color: #fff; font-weight: 600; margin-left: 6px; }
+.engine-bar .sep { width: 1px; height: 18px; background: #2a3158; }
+
+.queue-card {
+    background: #131830;
+    border: 1px solid #2a3158;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: border 0.2s;
+}
+.queue-card.active { border-color: #00d2ff; box-shadow: 0 0 0 1px #00d2ff33; }
+.queue-card .qhead {
+    padding: 10px 16px;
+    background: #1a1f3a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.queue-card .qhead:hover { background: #1f2545; }
+.queue-card .qname {
+    font-size: 14px;
+    color: #fff;
+    font-weight: 600;
+}
+.queue-card .qname .badge {
+    display: inline-block;
+    background: #00d2ff;
+    color: #0a0e1a;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-weight: 700;
+}
+.queue-card .qstats {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: #8a92b2;
+    flex-wrap: wrap;
+}
+.queue-card .qstats .v { color: #fff; font-weight: 600; margin-left: 3px; }
+.queue-card .qbody { padding: 10px 16px; }
+.queue-card.collapsed .qbody { display: none; }
+
+.progress-bar {
+    height: 5px;
+    background: #0a0e1a;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 6px;
+}
+.progress-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00d2ff, #7c4dff);
+    transition: width 0.4s;
+}
+.progress-bar .fill.done { background: linear-gradient(90deg, #4ade80, #22c55e); }
+
+.status-pills {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+.pill {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 9px;
+    background: #2a3158;
+    color: #d6dceb;
+}
+.pill.SC_DEAD { background: #7c2d12; color: #fed7aa; }
+.pill.PARAM_FAIL { background: #7f1d1d; color: #fecaca; }
+.pill.SIM_ERR { background: #5b21b6; color: #ddd6fe; }
+.pill.SIM_SUBMITTED { background: #1e3a8a; color: #bfdbfe; }
+.pill.PENDING { background: #374151; color: #e5e7eb; }
+.pill.ACTIVE, .pill.SUCCESS { background: #14532d; color: #bbf7d0; }
+.pill.SC_POLLING, .pill.CHECKS_POLLING { background: #155e75; color: #a5f3fc; }
+
+/* 明细表格 */
+.detail-wrap {
+    overflow-x: auto;
+    margin-top: 8px;
+    border: 1px solid #2a3158;
+    border-radius: 6px;
+}
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    min-width: 1100px;
+}
+.detail-table th, .detail-table td {
+    text-align: left;
+    padding: 5px 7px;
+    border-bottom: 1px solid #1a1f3a;
+    white-space: nowrap;
+}
+.detail-table th {
+    color: #8a92b2;
+    font-weight: 600;
+    background: #0d1224;
+    position: sticky;
+    top: 0;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    z-index: 1;
+}
+.detail-table tr:hover td { background: #1a1f3a; }
+.detail-table .id { color: #00d2ff; font-family: ui-monospace, monospace; }
+.detail-table .alpha { color: #4ade80; font-family: ui-monospace, monospace; }
+.detail-table .sim { color: #c4b5fd; font-family: ui-monospace, monospace; }
+.detail-table .num { text-align: right; font-family: ui-monospace, monospace; color: #d6dceb; }
+.detail-table .ok { color: #4ade80; }
+.detail-table .fail { color: #f87171; }
+.detail-table .na { color: #4a5278; }
+.detail-table .expr {
+    color: #6a7298;
+    font-family: ui-monospace, monospace;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.detail-table .mono { font-family: ui-monospace, monospace; font-size: 10px; }
+
+.logs {
+    background: #0a0e1a;
+    border: 1px solid #2a3158;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-top: 16px;
+    max-height: 260px;
+    overflow-y: auto;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.6;
+}
+.logs .line {
+    color: #8a92b2;
+    padding: 2px 0;
+    border-bottom: 1px solid #13183022;
+    word-break: break-all;
+}
+.logs .line .ts { color: #4a5278; margin-right: 8px; }
+.logs .line.error { color: #fca5a5; }
+.logs .line.warn { color: #fcd34d; }
+.logs .line.success { color: #86efac; }
+.logs::-webkit-scrollbar { width: 6px; height: 6px; }
+.logs::-webkit-scrollbar-thumb { background: #2a3158; border-radius: 3px; }
+
+.section-title {
+    font-size: 12px;
+    color: #8a92b2;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 18px 0 8px 4px;
+}
+
+.error-banner {
+    background: #7f1d1d;
+    color: #fecaca;
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+
+/* 工具栏 */
+.toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.toolbar .filter {
+    background: #131830;
+    border: 1px solid #2a3158;
+    color: #d6dceb;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+.toolbar .filter:focus { outline: 1px solid #00d2ff; }
+
+@media (max-width: 720px) {
+    body { padding: 10px; }
+    .header { padding: 12px; }
+    .header h1 { font-size: 17px; }
+    .qstats { font-size: 10px !important; gap: 6px !important; }
+    .detail-table { font-size: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>⚡ WQB 队列实时看板</h1>
+    <div class="refresh-info">
+        <span class="pulse"></span>
+        <span id="lastRefresh">加载中...</span>
+        <span style="margin-left: 12px; opacity: 0.6">每 5 秒刷新</span>
+    </div>
+</div>
+
+<div id="errorBanner" class="error-banner" style="display:none"></div>
+
+<div class="summary" id="summary"></div>
+
+<div class="engine-bar" id="engineBar"></div>
+
+<div class="toolbar">
+    <input type="text" class="filter" id="filterId" placeholder="🔍 过滤 item ID / alpha_id" style="min-width:200px">
+    <select class="filter" id="filterStatus">
+        <option value="">全部状态</option>
+        <option value="PENDING">PENDING</option>
+        <option value="SIM_SUBMITTED">SIM_SUBMITTED</option>
+        <option value="SC_DEAD">SC_DEAD</option>
+        <option value="PARAM_FAIL">PARAM_FAIL</option>
+        <option value="SIM_ERR">SIM_ERR</option>
+        <option value="ACTIVE">ACTIVE</option>
+    </select>
+    <label style="color:#8a92b2;font-size:12px;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="onlyActive"> 仅看活跃队列
+    </label>
+    <span style="color:#6a7298;font-size:11px;" id="filterCount"></span>
+</div>
+
+<div class="section-title">📦 队列文件</div>
+<div id="queues"></div>
+
+<div class="section-title">📋 引擎最近日志</div>
+<div class="logs" id="logs"></div>
+
+<script>
+const STATUS_TERMINAL = new Set(['SC_DEAD', 'PARAM_FAIL', 'SIM_ERR', 'ACTIVE', 'SUCCESS']);
+
+function formatTime(ts) {
+    if (!ts) return '-';
+    const d = new Date(ts * 1000);
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function formatMin(min) {
+    if (min < 60) return `${min}m`;
+    return `${Math.floor(min/60)}h${min%60}m`;
+}
+function formatSec(s) {
+    if (s == null) return '<span class="na">-</span>';
+    if (s < 60) return s.toFixed(1) + 's';
+    if (s < 3600) return Math.floor(s/60) + 'm' + Math.round(s%60) + 's';
+    return Math.floor(s/3600) + 'h' + Math.floor((s%3600)/60) + 'm';
+}
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function cellOk(ok) {
+    return ok
+        ? '<span class="ok">✓</span>'
+        : '<span class="fail">✗</span>';
+}
+function cellNum(v, suffix='') {
+    if (v == null) return '<span class="na">-</span>';
+    return `<span class="num">${typeof v === 'number' ? v.toFixed(2) : v}${suffix}</span>`;
+}
+
+function renderSummary(summary) {
+    const pct = summary.total_items > 0
+        ? Math.round(summary.total_done * 100 / summary.total_items) : 0;
+    document.getElementById('summary').innerHTML = `
+        <div class="metric blue">
+            <div class="label">队列文件</div>
+            <div class="value">${summary.total_queues}</div>
+        </div>
+        <div class="metric">
+            <div class="label">总 item</div>
+            <div class="value">${summary.total_items}</div>
+        </div>
+        <div class="metric green">
+            <div class="label">已完成</div>
+            <div class="value">${summary.total_done}</div>
+            <div class="sub">${pct}%</div>
+        </div>
+        <div class="metric orange">
+            <div class="label">待处理</div>
+            <div class="value">${summary.total_pending}</div>
+        </div>
+    `;
+}
+
+function renderEngine(engine) {
+    const onOff = engine.running;
+    const items = [
+        `<div class="item"><span class="dot ${onOff ? 'on' : 'off'}"></span>引擎 <span class="v">${onOff ? '运行中' : '未运行'}</span></div>`,
+    ];
+    if (onOff) {
+        items.push(`<div class="sep"></div>`);
+        items.push(`<div class="item">PID <span class="v">${engine.pids.join(', ')}</span></div>`);
+        items.push(`<div class="sep"></div>`);
+        items.push(`<div class="item">CPU <span class="v">${engine.cpu.toFixed(1)}%</span></div>`);
+        items.push(`<div class="sep"></div>`);
+        items.push(`<div class="item">运行时长 <span class="v">${formatMin(engine.uptime_min)}</span></div>`);
+    }
+    document.getElementById('engineBar').innerHTML = items.join('');
+}
+
+let _allQueues = [];
+
+function renderItemRow(it) {
+    const simIdShort = it.sim_id ? (it.sim_id.length > 14 ? it.sim_id.slice(0, 14) + '…' : it.sim_id) : '-';
+    const alphaIdShort = it.alpha_id ? (it.alpha_id.length > 10 ? it.alpha_id.slice(0, 10) + '…' : it.alpha_id) : '-';
+
+    return `
+        <tr data-iid="${escapeHtml(it.id)}" data-status="${escapeHtml(it.status)}">
+            <td class="id mono" title="${escapeHtml(it.id)}">${escapeHtml(it.id)}</td>
+            <td><span class="pill ${escapeHtml(it.status)}">${escapeHtml(it.status)}</span></td>
+            <td class="sim mono" title="${escapeHtml(it.sim_id || '')}">${simIdShort}</td>
+            <td class="num">${cellOk(it.sim_id_obtained)}</td>
+            <td class="num">${formatSec(it.sim_obtain_sec)}</td>
+            <td class="alpha mono" title="${escapeHtml(it.alpha_id || '')}">${alphaIdShort}</td>
+            <td class="num">${cellOk(it.alpha_id_obtained)}</td>
+            <td class="num">${formatSec(it.alpha_obtain_sec)}</td>
+            <td class="num">${cellNum(it.sharpe)}</td>
+            <td class="num">${it.sharpe != null ? (it.sharpe >= 1.0 ? '<span class="ok">' + it.sharpe.toFixed(2) + '</span>' : (it.sharpe < 0 ? '<span class="fail">' + it.sharpe.toFixed(2) + '</span>' : it.sharpe.toFixed(2))) : '<span class="na">-</span>'}</td>
+            <td class="num">${formatSec(it.checks_obtain_sec)}</td>
+            <td class="num">${cellNum(it.sc_max)}</td>
+            <td class="num">${formatSec(it.sc_obtain_sec)}</td>
+            <td class="num">${formatSec(it.total_sec)}</td>
+            <td class="expr" title="${escapeHtml(it.expr_preview)}">${escapeHtml(it.expr_preview)}</td>
+        </tr>
+    `;
+}
+
+function filterItems(items) {
+    const idFilter = document.getElementById('filterId').value.toLowerCase();
+    const stFilter = document.getElementById('filterStatus').value;
+    if (!idFilter && !stFilter) return items;
+    return items.filter(it => {
+        if (idFilter) {
+            const hay = (it.id + ' ' + (it.alpha_id || '') + ' ' + (it.sim_id || '')).toLowerCase();
+            if (!hay.includes(idFilter)) return false;
+        }
+        if (stFilter && it.status !== stFilter) return false;
+        return true;
+    });
+}
+
+function renderQueues(queues) {
+    _allQueues = queues;
+    const onlyActive = document.getElementById('onlyActive').checked;
+    const idFilter = document.getElementById('filterId').value;
+    const stFilter = document.getElementById('filterStatus').value;
+    const hasFilter = idFilter || stFilter;
+
+    const visible = queues.filter(q => {
+        if (onlyActive && q.pending === 0) return false;
+        return true;
+    });
+
+    // 排序：活跃优先
+    visible.sort((a, b) => {
+        if (b.pending !== a.pending) return b.pending - a.pending;
+        return b.file_mtime - a.file_mtime;
+    });
+
+    let totalShown = 0;
+    const html = visible.map(q => {
+        const isActive = q.pending > 0;
+        const pct = q.progress_pct;
+        const statusDist = q.status_dist;
+        const pills = Object.entries(statusDist)
+            .sort((a,b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([s, c]) => `<span class="pill ${s}">${escapeHtml(s)}: ${c}</span>`)
+            .join('');
+
+        const filteredItems = filterItems(q.items);
+        totalShown += filteredItems.length;
+        const itemsHtml = filteredItems.map(renderItemRow).join('');
+
+        return `
+        <div class="queue-card ${isActive ? 'active' : ''}" data-qname="${escapeHtml(q.name)}">
+            <div class="qhead" onclick="toggleQueue('${escapeHtml(q.name)}')">
+                <div class="qname">
+                    ${escapeHtml(q.name)}
+                    ${isActive ? '<span class="badge">活跃</span>' : ''}
+                </div>
+                <div class="qstats">
+                    <span>进度 <span class="v">${q.done}/${q.total} (${pct}%)</span></span>
+                    <span>待处理 <span class="v">${q.pending}</span></span>
+                    <span>运行时长 <span class="v">${formatMin(q.run_min)}</span></span>
+                    <span>更新 <span class="v">${formatTime(q.file_mtime)}</span></span>
+                </div>
+            </div>
+            <div class="qbody">
+                <div class="progress-bar"><div class="fill ${q.done === q.total ? 'done' : ''}" style="width:${pct}%"></div></div>
+                <div class="status-pills">${pills}</div>
+                <div class="detail-wrap">
+                    <table class="detail-table">
+                        <thead>
+                            <tr>
+                                <th>item ID</th>
+                                <th>状态</th>
+                                <th>sim_id</th>
+                                <th>有 sim?</th>
+                                <th>sim 耗时</th>
+                                <th>alpha_id</th>
+                                <th>有 alpha?</th>
+                                <th>alpha 耗时</th>
+                                <th>Sharpe</th>
+                                <th>适应度</th>
+                                <th>checks 耗时</th>
+                                <th>SC max</th>
+                                <th>SC 耗时</th>
+                                <th>总耗时</th>
+                                <th>Expression</th>
+                            </tr>
+                        </thead>
+                        <tbody>${itemsHtml || `<tr><td colspan="15" style="text-align:center;color:#6a7298;padding:20px">无匹配项</td></tr>`}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('queues').innerHTML = html || '<div style="text-align:center;color:#6a7298;padding:40px">无队列文件</div>';
+
+    // 计数
+    if (hasFilter) {
+        document.getElementById('filterCount').textContent = `匹配 ${totalShown} 项`;
+    } else {
+        document.getElementById('filterCount').textContent = '';
+    }
+}
+
+function toggleQueue(name) {
+    const card = document.querySelector(`[data-qname="${CSS.escape(name)}"]`);
+    if (card) card.classList.toggle('collapsed');
+}
+
+function classifyLogLine(line) {
+    if (line.includes('[ERROR]')) return 'error';
+    if (line.includes('[WARNING]')) return 'warn';
+    if (line.includes('✅') || line.includes('COMPLETE') || line.includes('ACTIVE')) return 'success';
+    return '';
+}
+
+function renderLogs(logs) {
+    const html = logs.slice().reverse().map(l => {
+        const m = l.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),?\d*/);
+        const ts = m ? m[1].slice(11) : '';
+        const cls = classifyLogLine(l);
+        return `<div class="line ${cls}"><span class="ts">${ts}</span>${escapeHtml(l)}</div>`;
+    }).join('');
+    document.getElementById('logs').innerHTML = html;
+}
+
+async function fetchDashboard() {
+    try {
+        const resp = await fetch('api/wqb/dashboard', { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+
+        document.getElementById('errorBanner').style.display = 'none';
+        renderSummary(data.summary);
+        renderEngine(data.engine);
+        renderQueues(data.queues);
+        renderLogs(data.recent_logs || []);
+
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        document.getElementById('lastRefresh').textContent =
+            `最后刷新 ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    } catch (e) {
+        document.getElementById('errorBanner').textContent = '❌ 加载失败: ' + e.message;
+        document.getElementById('errorBanner').style.display = 'block';
+    }
+}
+
+let initialized = false;
+function initCollapse(queues) {
+    if (initialized) return;
+    initialized = true;
+    queues.forEach(q => {
+        if (q.pending === 0) {
+            const card = document.querySelector(`[data-qname="${CSS.escape(q.name)}"]`);
+            if (card) card.classList.add('collapsed');
+        }
+    });
+}
+
+// 过滤变化时重渲染（不重新拉数据）
+document.getElementById('filterId').addEventListener('input', () => renderQueues(_allQueues));
+document.getElementById('filterStatus').addEventListener('change', () => renderQueues(_allQueues));
+document.getElementById('onlyActive').addEventListener('change', () => renderQueues(_allQueues));
+
+(async () => {
+    await fetchDashboard();
+    setTimeout(() => {
+        // 默认折叠非活跃队列
+        const cards = document.querySelectorAll('.queue-card');
+        cards.forEach(c => {
+            if (!c.classList.contains('active')) c.classList.add('collapsed');
+        });
+    }, 100);
+    setInterval(fetchDashboard, 5000);
+})();
+</script>
+</body>
+</html>
