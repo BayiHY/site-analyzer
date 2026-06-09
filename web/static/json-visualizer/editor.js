@@ -346,7 +346,7 @@ function saveSimpleEdit() {
     currentEditingNode.type = getTypeName(newValue);
     
     if (typeof newValue === 'string') {
-        currentEditingNode.value = `"${newValue.substring(0, CONFIG.maxStringLength)}${newValue.length > CONFIG.maxStringLength ? '...' : ''}"`;
+        currentEditingNode.value = `"${newValue}"`;
         currentEditingNode.fullValue = `"${newValue}"`;
     } else if (typeof newValue === 'number' || typeof newValue === 'boolean') {
         currentEditingNode.value = String(newValue);
@@ -409,7 +409,7 @@ function saveListEdit() {
         child.type = getTypeName(newValue);
         
         if (typeof newValue === 'string') {
-            child.value = `"${newValue.substring(0, CONFIG.maxStringLength)}${newValue.length > CONFIG.maxStringLength ? '...' : ''}"`;
+            child.value = `"${newValue}"`;
             child.fullValue = `"${newValue}"`;
         } else if (typeof newValue === 'number' || typeof newValue === 'boolean') {
             child.value = String(newValue);
@@ -452,7 +452,7 @@ function saveAdd() {
     const nodeType = getTypeName(newValue);
     
     if (typeof newValue === 'string') {
-        nodeValue = `"${newValue.substring(0, CONFIG.maxStringLength)}${newValue.length > CONFIG.maxStringLength ? '...' : ''}"`;
+        nodeValue = `"${newValue}"`;
         nodeFullValue = `"${newValue}"`;
     } else if (typeof newValue === 'number' || typeof newValue === 'boolean') {
         nodeValue = String(newValue);
