@@ -182,40 +182,6 @@
             position: relative;
             width: 100%;
         }
-        .piano-scroll-btn {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 10;
-            width: 40px;
-            height: 100px;
-            background: rgba(0, 0, 0, 0.7);
-            border: none;
-            color: var(--text);
-            font-size: 1.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0.8;
-        }
-        .piano-scroll-btn:hover {
-            background: rgba(79, 138, 139, 0.9);
-            opacity: 1;
-        }
-        .piano-scroll-btn:disabled {
-            opacity: 0.2;
-            cursor: not-allowed;
-        }
-        .piano-scroll-btn.left {
-            left: 0;
-            border-radius: 0 12px 12px 0;
-        }
-        .piano-scroll-btn.right {
-            right: 0;
-            border-radius: 12px 0 0 12px;
-        }
         .piano-scroll-area {
             width: 100%;
             overflow-x: auto;
@@ -453,11 +419,9 @@
         <!-- 虚拟钢琴键盘 -->
         <div class="piano-container">
             <div class="piano-wrapper">
-                <button class="piano-scroll-btn left" id="pianoScrollLeft" title="向左滚动">◀</button>
                 <div class="piano-scroll-area" id="pianoScrollArea">
                     <div class="piano" id="piano"></div>
                 </div>
-                <button class="piano-scroll-btn right" id="pianoScrollRight" title="向右滚动">▶</button>
             </div>
         </div>
     </div>
@@ -1610,42 +1574,6 @@ function unhighlightKey(noteNumber) {
     }
 }
 
-// ========== 虚拟钢琴滚动控制 ==========
-function initPianoScroll() {
-    const scrollArea = document.getElementById('pianoScrollArea');
-    const leftBtn = document.getElementById('pianoScrollLeft');
-    const rightBtn = document.getElementById('pianoScrollRight');
-    
-    // 滚动步长（一个八度的宽度）
-    const scrollStep = 252;
-    
-    leftBtn.onclick = () => {
-        scrollArea.scrollBy({ left: -scrollStep, behavior: 'smooth' });
-    };
-    
-    rightBtn.onclick = () => {
-        scrollArea.scrollBy({ left: scrollStep, behavior: 'smooth' });
-    };
-    
-    // 更新按钮状态
-    function updateButtons() {
-        leftBtn.disabled = scrollArea.scrollLeft <= 10;
-        rightBtn.disabled = scrollArea.scrollLeft >= scrollArea.scrollWidth - scrollArea.clientWidth - 10;
-    }
-    
-    scrollArea.addEventListener('scroll', updateButtons);
-    
-    // 初始化按钮状态
-    setTimeout(updateButtons, 100);
-    
-    // 键盘快捷键（可选）
-    document.addEventListener('keydown', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-        if (e.key === 'ArrowLeft') leftBtn.click();
-        if (e.key === 'ArrowRight') rightBtn.click();
-    });
-}
-
 // ========== 初始化 ==========
 // 检查MIDI支持状态
 if (navigator.requestMIDIAccess) {
@@ -1666,7 +1594,6 @@ if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !==
 
 // 初始化虚拟钢琴
 initPiano();
-initPianoScroll();
 </script>
 </body>
 </html>
