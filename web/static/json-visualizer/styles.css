@@ -236,8 +236,6 @@ textarea::placeholder {
     border: 1px solid rgba(255, 255, 255, 0.25);
     display: none;
     line-height: 1.5;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
 }
 
 .tooltip-key {
