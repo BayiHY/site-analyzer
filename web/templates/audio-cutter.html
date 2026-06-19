@@ -6,6 +6,8 @@
     <title>音频裁剪工具 - 站长工具</title>
     <meta name="description" content="纯浏览器端音频裁剪工具，支持各类音视频格式，波形可视化，精确裁剪，导出下载。">
     <link rel="canonical" href="https://www.bayihy.cn/tools/audio-cutter">
+    <!-- lamejs MP3 编码器 (~200KB) -->
+    <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
     <style>
         :root {
             --primary: #4f8a8b;
@@ -146,6 +148,42 @@
         }
         .btn-accent:hover { background: #e6c200; }
         .btn-accent:disabled { opacity: 0.5; cursor: not-allowed; }
+        .format-select {
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            background: var(--bg3);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .format-select:hover { border-color: var(--primary); }
+        .format-select:focus { outline: none; border-color: var(--accent); }
+        .export-loading {
+            position: absolute;
+            inset: 0;
+            background: rgba(15,20,25,0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            z-index: 20;
+            border-radius: 8px;
+        }
+        .export-loading.active { display: flex; }
+        .export-loading .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(79,138,139,0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .export-loading .loading-text {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
         .btn-outline {
             background: transparent;
             border: 1px solid var(--border);
@@ -214,15 +252,16 @@
         }
         .time-info .time-value.start { color: var(--success); }
         .time-info .time-value.end { color: var(--danger); }
-        .time-info .time-value.duration { color: var(--warning); }
-        .player-row {
+        .preview-section.active { display: flex; }
+        .action-row {
+            position: relative;
             display: flex;
             gap: 12px;
-            align-items: center;
-            margin-bottom: 16px;
+            justify-content: center;
+            margin-top: 16px;
             display: none;
         }
-        .player-row.active { display: flex; width: 100%; }
+        .action-row.active { display: flex; }
         .player-row audio {
             flex: 1;
             width: 100%;
@@ -269,12 +308,10 @@
         }
         .preview-section.active { display: flex; }
         .action-row {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 16px;
+            position: relative;
             display: none;
+            flex-direction: column;
+            margin-top: 16px;
         }
         .action-row.active { display: flex; }
         .supported-formats {
@@ -430,9 +467,17 @@
 
     <!-- 预览区 -->
     <div class="card action-row" id="actionRow">
+        <div class="export-loading" id="exportLoading">
+            <div class="spinner"></div>
+            <div class="loading-text" id="exportLoadingText">正在编码...</div>
+        </div>
         <div class="preview-section active" id="previewSection">
             <button class="btn btn-primary" id="previewBtn">▶ 预览裁剪</button>
-            <button class="btn btn-accent" id="exportBtn">💾 导出音频</button>
+            <select id="exportFormat" class="format-select">
+                <option value="mp3">💾 MP3（压缩 ~1/10）</option>
+                <option value="wav">💾 WAV（无损 16-bit）</option>
+            </select>
+            <button class="btn btn-accent" id="exportBtn">导出</button>
         </div>
     </div>
 
@@ -866,12 +911,22 @@
     });
 
     // ===== 导出 =====
+    const exportFormatSel = document.getElementById('exportFormat');
+    const exportLoading = document.getElementById('exportLoading');
+    const exportLoadingText = document.getElementById('exportLoadingText');
+    let exporting = false;  // 防重复点击
     exportBtn.addEventListener('click', async () => {
-        setStatus('正在生成音频文件...', 'info');
+        if (exporting) return;  // 正在导出，忽略
+        exporting = true;
+
+        const format = exportFormatSel.value;
+        exportLoadingText.textContent = format === 'mp3' ? '正在编码 MP3...' : '正在生成 WAV...';
+        exportLoading.classList.add('active');
         exportBtn.disabled = true;
 
         try {
-            let blob;
+            let blob, ext;
+
             if (audioBuffer) {
                 const startSample = Math.floor(selection.start * audioBuffer.sampleRate);
                 const endSample   = Math.floor(selection.end   * audioBuffer.sampleRate);
@@ -883,29 +938,41 @@
                         audioBuffer.getChannelData(c).slice(startSample, endSample), c
                     );
                 }
-                blob = new Blob([audioBufferToWav(newBuffer)], { type: 'audio/wav' });
+
+                if (format === 'mp3') {
+                    if (typeof lamejs === 'undefined') {
+                        throw new Error('MP3 编码器未加载，请检查网络或切换到 WAV');
+                    }
+                    blob = new Blob([audioBufferToMp3(newBuffer)], { type: 'audio/mpeg' });
+                    ext = 'mp3';
+                } else {
+                    blob = new Blob([audioBufferToWav(newBuffer)], { type: 'audio/wav' });
+                    ext = 'wav';
+                }
             } else {
                 // fallback: 截取原媒体时间范围
-                // 浏览器无法精确裁剪媒体文件，提示用户
                 setStatus('此浏览器无法精确裁剪此格式，建议使用解码完整的音频文件（MP3/WAV/OGG等）', 'warn');
-                // 用原始 blob 代替（不裁剪）
                 const resp = await fetch(audioPlayer.src);
                 blob = await resp.blob();
+                ext = blob.type.includes('mpeg') ? 'mp3' : 'wav';
             }
 
             const baseName = fileName.replace(/\.[^.]+$/, '');
             const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            const dlName = `${baseName}_cut_${ts}.wav`;
+            const dlName = `${baseName}_cut_${ts}.${ext}`;
 
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = dlName;
             a.click();
-            setStatus('已导出: ' + dlName, '');
+            const sizeMB = (blob.size / 1024 / 1024).toFixed(2);
+            setStatus(`已导出: ${dlName} (${sizeMB} MB)`, '');
         } catch (e) {
             setStatus('导出失败: ' + e.message, 'err');
         } finally {
+            exportLoading.classList.remove('active');
             exportBtn.disabled = false;
+            exporting = false;
         }
     });
 
@@ -962,6 +1029,56 @@
     function writeU16LE(buf, offset, value) {
         buf[offset]     =  value        & 0xff;
         buf[offset + 1] = (value >> 8)  & 0xff;
+    }
+
+    // ===== MP3 编码 (lamejs) =====
+    function float32ToInt16(f32) {
+        const len = f32.length;
+        const i16 = new Int16Array(len);
+        for (let i = 0; i < len; i++) {
+            const s = Math.max(-1, Math.min(1, f32[i]));
+            i16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        return i16;
+    }
+
+    function audioBufferToMp3(buffer, kbps = 192) {
+        if (typeof lamejs === 'undefined') throw new Error('lamejs 未加载');
+
+        const numChannels = Math.min(buffer.numberOfChannels, 2);  // MP3 max 2 ch
+        const sampleRate  = buffer.sampleRate;
+        const numSamples  = buffer.length;
+
+        const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, kbps);
+
+        const leftF32  = buffer.getChannelData(0);
+        const rightF32 = numChannels === 2 ? buffer.getChannelData(1) : null;
+
+        // Float32 → Int16 (lamejs requires Int16Array)
+        const leftInt16  = float32ToInt16(leftF32);
+        const rightInt16 = rightF32 ? float32ToInt16(rightF32) : null;
+
+        // Encode in 1152-sample blocks (MPEG frame size)
+        const blockSize = 1152;
+        const mp3Data = [];
+        for (let i = 0; i < numSamples; i += blockSize) {
+            const l = leftInt16.subarray(i, Math.min(i + blockSize, numSamples));
+            const r = rightInt16 ? rightInt16.subarray(i, Math.min(i + blockSize, numSamples)) : null;
+            const buf = numChannels === 2
+                ? mp3encoder.encodeBuffer(l, r)
+                : mp3encoder.encodeBuffer(l);
+            if (buf.length > 0) mp3Data.push(buf);
+        }
+        const flush = mp3encoder.flush();
+        if (flush.length > 0) mp3Data.push(flush);
+
+        // Merge frames
+        let total = 0;
+        for (const b of mp3Data) total += b.length;
+        const out = new Uint8Array(total);
+        let off = 0;
+        for (const b of mp3Data) { out.set(b, off); off += b.length; }
+        return out;
     }
 
     function drawSelection(ctx, pw, ph) {

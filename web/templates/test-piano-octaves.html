@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>钢琴八度测试</title>
+    <style>
+        body { margin: 20px; font-family: sans-serif; }
+        .piano-container { border: 2px solid #333; padding: 10px; margin: 20px 0; }
+        .piano-scroll-area { 
+            width: 100%; 
+            overflow-x: auto; 
+            border: 1px solid #999;
+            padding: 10px 0;
+        }
+        .piano { display: flex; height: 120px; }
+        .piano-octave { 
+            display: flex; 
+            position: relative; 
+            width: 252px;
+            border: 1px dashed #ccc;
+            margin-right: 5px;
+        }
+        .white-key {
+            width: 36px;
+            height: 100%;
+            background: linear-gradient(to bottom, #fff, #e8e8e8);
+            border: 1px solid #999;
+            border-radius: 0 0 6px 6px;
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 5px;
+            font-size: 12px;
+        }
+        .octave-label {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            font-size: 12px;
+            font-weight: bold;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+<h1>钢琴八度渲染测试</h1>
+<div id="info"></div>
+<div class="piano-container">
+    <div class="piano-scroll-area" id="pianoScrollArea">
+        <div class="piano" id="piano"></div>
+    </div>
+</div>
+
+<script>
+const PIANO_START_NOTE = 36; // C2
+const PIANO_END_NOTE = 96;   // C7
+
+const numOctaves = Math.ceil((PIANO_END_NOTE - PIANO_START_NOTE) / 12);
+const info = document.getElementById('info');
+info.innerHTML = `
+    <p><strong>起始音:</strong> C2 (MIDI ${PIANO_START_NOTE})</p>
+    <p><strong>结束音:</strong> C7 (MIDI ${PIANO_END_NOTE})</p>
+    <p><strong>八度数量:</strong> ${numOctaves}</p>
+    <p><strong>总宽度:</strong> ${numOctaves * 252}px (${numOctaves} × 252px)</p>
+`;
+
+const piano = document.getElementById('piano');
+
+for (let octave = 0; octave < numOctaves; octave++) {
+    const octaveDiv = document.createElement('div');
+    octaveDiv.className = 'piano-octave';
+    
+    const baseNote = PIANO_START_NOTE + octave * 12;
+    const octaveNum = Math.floor(baseNote / 12) - 1;
+    
+    // 添加八度标签
+    const label = document.createElement('div');
+    label.className = 'octave-label';
+    label.textContent = `C${octaveNum}-B${octaveNum} (MIDI ${baseNote}-${baseNote+11})`;
+    octaveDiv.appendChild(label);
+    
+    // 7个白键: C, D, E, F, G, A, B
+    const whiteNotes = [0, 2, 4, 5, 7, 9, 11];
+    const noteNames = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+    
+    whiteNotes.forEach((offset, i) => {
+        const key = document.createElement('div');
+        key.className = 'white-key';
+        key.textContent = noteNames[i] + octaveNum;
+        key.dataset.note = baseNote + offset;
+        octaveDiv.appendChild(key);
+    });
+    
+    piano.appendChild(octaveDiv);
+    console.log(`八度 ${octave}: C${octaveNum}-B${octaveNum}, baseNote=${baseNote}`);
+}
+
+// 滚动到 C4 居中
+const scrollArea = document.getElementById('pianoScrollArea');
+const c4OctaveIndex = (60 - PIANO_START_NOTE) / 12;
+const octaveWidth = 252;
+const c4Position = c4OctaveIndex * octaveWidth;
+
+setTimeout(() => {
+    const containerWidth = scrollArea.clientWidth;
+    const scrollTo = c4Position + (octaveWidth / 2) - (containerWidth / 2);
+    scrollArea.scrollLeft = Math.max(0, scrollTo);
+    
+    info.innerHTML += `
+        <p><strong>C4 八度索引:</strong> ${c4OctaveIndex}</p>
+        <p><strong>C4 位置:</strong> ${c4Position}px</p>
+        <p><strong>容器宽度:</strong> ${containerWidth}px</p>
+        <p><strong>滚动位置:</strong> ${Math.max(0, scrollTo)}px</p>
+    `;
+}, 100);
+</script>
+</body>
+</html>

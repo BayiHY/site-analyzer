@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>JS 加载测试</title>
+</head>
+<body>
+<h1>JS 模块加载测试</h1>
+<div id="log"></div>
+
+<script>
+const log = document.getElementById('log');
+function addLog(msg, success = true) {
+    const p = document.createElement('p');
+    p.textContent = (success ? '✅ ' : '❌ ') + msg;
+    p.style.color = success ? 'green' : 'red';
+    log.appendChild(p);
+}
+
+window.onerror = function(msg, url, line) {
+    addLog(`错误: ${msg} (${url}:${line})`, false);
+    return false;
+};
+</script>
+
+<script src="/static/js/hum-to-midi/main.js" onload="addLog('main.js 加载成功')" onerror="addLog('main.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/core/pitch-detector.js" onload="addLog('pitch-detector.js 加载成功')" onerror="addLog('pitch-detector.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/core/midi-writer.js" onload="addLog('midi-writer.js 加载成功')" onerror="addLog('midi-writer.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/ui/input-mode.js" onload="addLog('input-mode.js 加载成功')" onerror="addLog('input-mode.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/midi/web-midi.js" onload="addLog('web-midi.js 加载成功')" onerror="addLog('web-midi.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/midi/midi-handler.js" onload="addLog('midi-handler.js 加载成功')" onerror="addLog('midi-handler.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/audio/recording.js" onload="addLog('recording.js 加载成功')" onerror="addLog('recording.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/audio/detection.js" onload="addLog('detection.js 加载成功')" onerror="addLog('detection.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/ui/visualization.js" onload="addLog('visualization.js 加载成功')" onerror="addLog('visualization.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/ui/display.js" onload="addLog('display.js 加载成功')" onerror="addLog('display.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/export/export-play.js" onload="addLog('export-play.js 加载成功')" onerror="addLog('export-play.js 加载失败', false)"></script>
+<script src="/static/js/hum-to-midi/piano/virtual-piano.js" onload="addLog('virtual-piano.js 加载成功')" onerror="addLog('virtual-piano.js 加载失败', false)"></script>
+
+<script>
+addLog('所有脚本加载完成');
+addLog('PitchDetector: ' + (typeof PitchDetector !== 'undefined' ? '已定义' : '未定义'));
+addLog('MIDIWriter: ' + (typeof MIDIWriter !== 'undefined' ? '已定义' : '未定义'));
+addLog('initPiano: ' + (typeof initPiano !== 'undefined' ? '已定义' : '未定义'));
+addLog('startRecording: ' + (typeof startRecording !== 'undefined' ? '已定义' : '未定义'));
+</script>
+</body>
+</html>

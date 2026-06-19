@@ -279,6 +279,14 @@
             font-weight: 600;
             border: 1px solid rgba(255,255,255,0.3);
         }
+        .note-duration {
+            display: inline-block;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-left: 4px;
+            margin-right: 12px;
+            vertical-align: middle;
+        }
         
         .settings-row {
             display: flex;
@@ -304,6 +312,12 @@
             border-radius: 6px;
             color: var(--text);
             font-size: 0.9rem;
+        }
+        .setting-hint {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            margin-top: 4px;
+            opacity: 0.7;
         }
         
         .info-box {
@@ -388,11 +402,14 @@
             <div class="setting-item">
                 <label>最低音符时值</label>
                 <select id="minDuration">
+                    <option value="0.02">20ms（极短）</option>
+                    <option value="0.05" selected>50ms（推荐）</option>
                     <option value="0.1">100ms</option>
-                    <option value="0.2" selected>200ms</option>
+                    <option value="0.2">200ms</option>
                     <option value="0.3">300ms</option>
                     <option value="0.5">500ms</option>
                 </select>
+                <div class="setting-hint">音符持续少于此时间将被忽略</div>
             </div>
         </div>
         
@@ -1122,7 +1139,7 @@ function displayNotes() {
     
     notesCard.style.display = 'block';
     
-    // 智能显示：和弦用方括号包裹
+    // 智能显示：和弦用方括号包裹，显示时长
     let html = '';
     let i = 0;
     while (i < recordedNotes.length) {
@@ -1134,11 +1151,14 @@ function displayNotes() {
                 chordNotes.push(recordedNotes[i]);
                 i++;
             }
-            // 和弦显示：[C4·E4·G4]
-            html += `<span class="midi-note chord">${chordNotes.map(n => n.noteName).join('·')}</span>`;
+            // 和弦显示：[C4·E4·G4] 0.3s（使用最长时长）
+            const maxDuration = Math.max(...chordNotes.map(n => n.duration));
+            html += `<span class="midi-note chord" title="时长: ${maxDuration.toFixed(2)}s">${chordNotes.map(n => n.noteName).join('·')}</span>`;
+            html += `<span class="note-duration">${maxDuration.toFixed(2)}s</span>`;
         } else {
-            // 单音显示
-            html += `<span class="midi-note ${note.fromKeyboard ? 'from-keyboard' : ''}">${note.noteName}</span>`;
+            // 单音显示：C4 0.25s
+            html += `<span class="midi-note ${note.fromKeyboard ? 'from-keyboard' : ''}" title="时长: ${note.duration.toFixed(2)}s">${note.noteName}</span>`;
+            html += `<span class="note-duration">${note.duration.toFixed(2)}s</span>`;
             i++;
         }
     }

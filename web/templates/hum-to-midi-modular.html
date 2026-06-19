@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>哼唱转MIDI - 站长工具</title>
+    <meta name="description" content="纯浏览器端哼唱录音转MIDI，实时音高检测，支持系统内录和MIDI键盘。">
+    <link rel="canonical" href="https://www.bayihy.cn/tools/hum-to-midi">
+    
+    <!-- 独立样式文件 -->
+    <link rel="stylesheet" href="/static/css/hum-to-midi.css">
+</head>
+<body>
+<div class="container">
+    <a href="/tools/toolsbox" class="back-link">← 返回工具箱</a>
+    
+    <div class="header">
+        <h1>🎵 哼唱转MIDI</h1>
+        <p>麦克风/系统内录/MIDI键盘 → 实时音高检测 → MIDI导出</p>
+    </div>
+    
+    <div class="info-box">
+        💡 使用说明：选择输入源后点击"开始录音"。支持麦克风哼唱、系统内录（浏览器标签页音频）、MIDI键盘输入。
+    </div>
+    
+    <div class="card">
+        <div class="input-mode-selector">
+            <div class="mode-btn active" id="modeMic" onclick="setInputMode('mic')">
+                <span class="mode-icon">🎤</span>
+                <span class="mode-name">麦克风</span>
+                <span class="mode-status" id="micStatus">点击启用</span>
+            </div>
+            <div class="mode-btn" id="modeSystem" onclick="setInputMode('system')">
+                <span class="mode-icon">🖥️</span>
+                <span class="mode-name">系统内录</span>
+                <span class="mode-status" id="systemStatus">捕获系统音频</span>
+            </div>
+            <div class="mode-btn" id="modeMidi" onclick="setInputMode('midi')">
+                <span class="mode-icon">🎹</span>
+                <span class="mode-name">MIDI键盘</span>
+                <span class="mode-status" id="midiStatus">检查中...</span>
+            </div>
+        </div>
+        
+        <div id="midiDevicePanel" style="display: none;">
+            <select class="midi-device-select" id="midiDeviceSelect">
+                <option value="">选择MIDI设备...</option>
+            </select>
+        </div>
+        
+        <div class="status-bar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">选择输入源后开始</span>
+        </div>
+        
+        <div class="settings-row">
+            <div class="setting-item">
+                <label>检测灵敏度</label>
+                <select id="sensitivity">
+                    <option value="high">高（适合安静环境）</option>
+                    <option value="medium" selected>中（推荐）</option>
+                    <option value="low">低（适合嘈杂环境）</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label>最低音符时值</label>
+                <select id="minDuration">
+                    <option value="0.02">20ms（极短）</option>
+                    <option value="0.05" selected>50ms（推荐）</option>
+                    <option value="0.1">100ms</option>
+                    <option value="0.2">200ms</option>
+                    <option value="0.3">300ms</option>
+                    <option value="0.5">500ms</option>
+                </select>
+                <div class="setting-hint">音符持续少于此时间将被忽略</div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button class="btn btn-primary" id="startBtn">🎤 开始录音</button>
+            <button class="btn btn-danger" id="stopBtn" disabled>⏹ 停止</button>
+            <button class="btn btn-secondary" id="clearBtn" disabled>🗑️ 清空</button>
+        </div>
+        
+        <canvas class="visualizer" id="visualizer"></canvas>
+        
+        <div class="pitch-display">
+            <div class="pitch-note" id="currentNote">--</div>
+            <div class="pitch-freq" id="currentFreq">等待输入...</div>
+        </div>
+        
+        <!-- 虚拟钢琴键盘 -->
+        <div class="piano-container">
+            <div class="piano-wrapper">
+                <div class="piano-scroll-area" id="pianoScrollArea">
+                    <div class="piano" id="piano"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card" id="notesCard" style="display: none;">
+        <h3 style="margin-bottom: 12px;">📝 检测到的音符</h3>
+        <div class="midi-notes" id="notesList"></div>
+        <div style="text-align: center;">
+            <button class="btn btn-success" id="exportBtn">📥 导出MIDI</button>
+            <button class="btn btn-secondary" id="playBtn">▶️ 试听</button>
+        </div>
+    </div>
+    
+    <footer>
+        <a href="/tools/toolsbox">← 返回工具箱</a> ·
+        新ICP备2026003879号-1
+    </footer>
+</div>
+
+<!-- JS 模块加载（按依赖顺序） -->
+<script src="/static/js/hum-to-midi/main.js"></script>
+<script src="/static/js/hum-to-midi/core/pitch-detector.js"></script>
+<script src="/static/js/hum-to-midi/core/midi-writer.js"></script>
+<script src="/static/js/hum-to-midi/ui/input-mode.js"></script>
+<script src="/static/js/hum-to-midi/midi/web-midi.js"></script>
+<script src="/static/js/hum-to-midi/midi/midi-handler.js"></script>
+<script src="/static/js/hum-to-midi/audio/recording.js"></script>
+<script src="/static/js/hum-to-midi/audio/detection.js"></script>
+<script src="/static/js/hum-to-midi/ui/visualization.js"></script>
+<script src="/static/js/hum-to-midi/ui/display.js"></script>
+<script src="/static/js/hum-to-midi/export/export-play.js"></script>
+<script src="/static/js/hum-to-midi/piano/virtual-piano.js"></script>
+<!-- 初始化（必须在所有模块加载后） -->
+<script src="/static/js/hum-to-midi/init.js"></script>
+</body>
+</html>

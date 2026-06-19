@@ -373,9 +373,25 @@ def audio_cutter():
 
 @app.route('/hum-to-midi')
 def hum_to_midi():
-    """哼唱转MIDI工具"""
+    """哼唱转MIDI工具 - 模块化版本"""
+    return render_template('hum-to-midi-modular.html')
+
+
+@app.route('/hum-to-midi-old')
+def hum_to_midi_old():
+    """哼唱转MIDI工具 - 原始单文件版本（备份）"""
     return render_template('hum-to-midi.html')
 
+
+@app.route('/test-js-load')
+def test_js_load():
+    """JS模块加载测试"""
+    return render_template('test-js-load.html')
+
+@app.route('/test-piano-octaves')
+def test_piano_octaves():
+    """钢琴八度渲染测试"""
+    return render_template('test-piano-octaves.html')
 
 @app.route('/toolsbox')
 def toolsbox():
