@@ -22,6 +22,7 @@
 | 语义化HTML分析 | ✅ | ❌ |
 | AI引用优化建议 | ✅ | ❌ |
 | 免费开源 | ✅ | ❌ |
+| 角色扮演游戏 | ✅ | - |
 
 ## ✨ 核心功能
 
@@ -69,6 +70,14 @@
 - 缓存控制
 - Keep-Alive
 - ETag
+
+### 🎭 角色扮演游戏
+- 沉浸式 AI 角色对话体验
+- 多角色支持，情感指标系统（隐性，影响角色行为）
+- 渐进式信息披露，角色秘密与背景逐步解锁
+- 纯前端实现，数据保存在浏览器 IndexedDB
+- 支持 API Key 记忆，重置故事自动回填
+- 默认中文对话，角色形象 AI 生成
 
 ## 🚀 快速开始
 
@@ -139,6 +148,7 @@ AI信任度得分: 85/100
 | 自部署 | ✅ | ❌ | ❌ | ❌ |
 | 移动端支持 | ✅ | ❌ | ✅ | ✅ |
 | 批量分析 | ✅ | ✅ | ✅ | ✅ |
+| 角色扮演游戏 | ✅ | - | - | - |
 
 ## 🛠️ 技术栈
 
@@ -155,7 +165,8 @@ site-analyzer/
 ├── web/
 │   ├── app.py          # Flask Web应用
 │   └── templates/
-│       └── index.html  # H5前端（响应式）
+│       ├── index.html  # H5前端（响应式）
+│       └── roleplay.html  # 角色扮演游戏（纯前端）
 ├── README.md
 └── LICENSE
 ```
@@ -165,7 +176,8 @@ site-analyzer/
 SEO分析工具, AI信任度检测, AI SEO优化, 网站SEO检测, 
 JSON-LD检测, Open Graph检测, 移动端适配检测, SSL证书检测, 
 站长工具, 网站健康度检测, AI搜索引擎优化, ChatGPT SEO, 
-Perplexity优化, Google SGE, 结构化数据检测, 开源SEO工具
+Perplexity优化, Google SGE, 结构化数据检测, 开源SEO工具,
+角色扮演游戏, AI角色对话, 沉浸式角色扮演
 
 ## 📄 许可证
 
@@ -180,7 +192,7 @@ MIT License - 免费使用，商业友好
 - GitCode: [https://gitcode.com/BayiHY/site-analyzer](https://gitcode.com/BayiHY/site-analyzer)
 - GitHub: [https://github.com/BayiHY/site-analyzer](https://github.com/BayiHY/site-analyzer)
 
-🔗 **在线体验：** [https://www.bayihy.cn/tools](https://www.bayihy.cn/tools)
+🔗 **在线体验：** [https://www.bayihy.cn/tools](https://www.bayihy.cn/tools) ｜ [角色扮演](https://www.bayihy.cn/tools/roleplay)
 
 ## 🤝 贡献
 

@@ -21,11 +21,11 @@ from functools import wraps
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, make_response
 from analyzer import SiteAnalyzer
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config['JSON_AS_ASCII'] = False
 
 # ==================== 日志配置 ====================
@@ -180,6 +180,12 @@ def handle_exception(e):
 @app.after_request
 def add_rate_limit_headers(response):
     """给所有 /api/ 响应加上标准速率限制头和CORS头"""
+    # 静态资源不缓存
+    if '/static/' in request.path:
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    
     if request.path.startswith('/api') or request.path in ['/openapi.json', '/swagger.json']:
         fp = limiter._get_fingerprint()
         now = time.time()
@@ -402,6 +408,18 @@ def toolsbox():
 def json_visualizer():
     """JSON 可视化图谱工具"""
     return render_template('json-visualizer.html')
+
+
+@app.route('/roleplay')
+def roleplay():
+    """角色扮演 Web 应用（静态资源带时间戳防缓存）"""
+    import time
+    ts = str(int(time.time()))
+    resp = make_response(render_template('roleplay.html', cb=ts))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 
 # ==================== WQB 队列实时看板 ====================

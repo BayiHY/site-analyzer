@@ -1,13 +1,13 @@
 {
   "bayihy.cn": {
-    "latest": 1.62,
-    "avg": 1.77,
-    "count": 33
+    "latest": 1.81,
+    "avg": 1.85,
+    "count": 39
   },
   "baidu.com": {
-    "latest": 12.59,
-    "avg": 11.55,
-    "count": 14
+    "latest": 19.81,
+    "avg": 12.1,
+    "count": 15
   },
   "www.bayihy.cn": {
     "latest": 4.18,
@@ -25,9 +25,9 @@
     "count": 4
   },
   "juejin.cn": {
-    "latest": 7.41,
-    "avg": 7.99,
-    "count": 5
+    "latest": 8.8,
+    "avg": 8.12,
+    "count": 6
   },
   "test": {
     "latest": 0.29,
