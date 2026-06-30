@@ -1,0 +1,139 @@
+/* ===== 共享组件：按钮、表单控件、滚动条 ===== */
+
+/* --- 按钮 --- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    min-height: 36px;
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary {
+    background: var(--primary);
+    color: #fff;
+    width: 100%;
+}
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    min-height: 28px;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+}
+.btn-outline:hover { border-color: var(--primary); color: var(--text); }
+
+/* --- 表单控件 --- */
+.form-group { margin-bottom: 0; }
+.form-group label {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(139,92,246,0.15);
+}
+.form-group textarea { resize: none; }
+
+/* --- API Key 输入框带清除按钮 --- */
+.api-key-group { position: relative; }
+.api-key-group input { padding-right: 36px; }
+.api-key-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.75rem;
+    width: 50px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+    padding: 0 4px;
+}
+.api-key-clear:hover {
+    opacity: 1 !important;
+    color: var(--danger);
+    background: rgba(239,68,68,0.1);
+    border-color: rgba(239,68,68,0.3);
+}
+.api-key-group input:not(:placeholder-shown) ~ .api-key-clear {
+    opacity: 0.6 !important;
+}
+.api-key-group input:focus:not(:placeholder-shown) ~ .api-key-clear {
+    opacity: 0.6 !important;
+}
+
+/* --- 性别单选 --- */
+.gender-radio-group { display: flex; gap: 16px; }
+.gender-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+}
+.gender-option:hover { border-color: var(--primary); }
+.gender-option input[type="radio"] {
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+}
+.gender-option:has(input:checked) {
+    border-color: var(--primary);
+    background: rgba(124, 58, 237, 0.15);
+}
+
+/* --- 通用滚动条 --- */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }

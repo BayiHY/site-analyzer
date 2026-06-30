@@ -24,9 +24,9 @@ App.appendArtStyle = function(prompt) {
 
 // 构建模块化生图 prompt（按降级级别组合）
 // 注意：imageStyle 字段由 LLM 填充但经常出错，统一使用 state.story.imageStyle 作为全局风格
-// level 0: 全身 (face+hair+body+clothes+environment)
-// level 1: 半身 (face+hair+body+clothes)
-// level 2: 特写 (face+hair)
+// level 0: 全身 (face+hair+body+clothes+environment) → 从头到脚全身
+// level 1: 半身 (face+hair+body+clothes) → 腰部以上半身
+// level 2: 特写 (face+hair) → 面部特写到锁骨
 App.buildModularPrompt = function(character, level) {
     const parts = [];
     const mods = character.__modules__ || {};
@@ -49,8 +49,15 @@ App.buildModularPrompt = function(character, level) {
     let base = parts.join(', ');
     if (!base) base = 'character portrait';
 
-    // 追加角色信息
-    base += `, portrait of ${character.name || 'character'}, ${character.age || 20} years old, clean background, professional character design`;
+    // 追加角色信息 + 分级 framing 提示词
+    base += `, ${character.name || 'character'}, ${character.age || 20} years old`;
+    if (level === 0) {
+        base += ', full body shot from head to toe, standing pose, complete figure';
+    } else if (level === 1) {
+        base += ', medium shot from waist up, upper body portrait';
+    } else {
+        base += ', close-up portrait from upper chest to collarbone, face detail shot';
+    }
 
     return App.appendArtStyle(base.trim());
 };
@@ -90,7 +97,7 @@ App.sanitizeImagePrompt = function(prompt, character) {
         .replace(/\blingerie\b/gi, 'casual wear');
 
     if (character && character.appearance) {
-        cleaned += `, portrait of ${character.name}, ${character.age} years old, wearing ${character.appearance}, clean background, professional character design`;
+        cleaned += `, ${character.name}, ${character.age} years old, wearing ${character.appearance}`;
     }
 
     return App.appendArtStyle(cleaned.trim());
@@ -105,7 +112,7 @@ App.buildBackupPrompt = function(character) {
         if (/男|男人|男子|先生|他/.test(character.appearance)) gender = 'young man';
         else if (/女|女人|女子|女士|她/.test(character.appearance)) gender = 'young woman';
     }
-    return `Character portrait, ${gender}, ${character.age || 20} years old, friendly expression, clean simple background, soft lighting, detailed character design, professional concept art` + App.getArtStyleSuffix();
+    return `Character portrait, ${gender}, ${character.age || 20} years old, friendly expression, soft lighting, detailed character design, professional concept art` + App.getArtStyleSuffix();
 };
 
 // 三级降级生图：完整 → 半身 → 特写 → 备用
@@ -124,7 +131,9 @@ App.generateCharacterImage = async function(character) {
 
     if (hasModules) {
         // 模块化流程：三级降级
-        // level 0 = 全身(face+hair+body+clothes+env)，level 1 = 半身(face+hair+body+clothes)，level 2 = 特写(face+hair)
+        // level 0 = 全身(face+hair+body+clothes+env) → full body from head to toe
+        // level 1 = 半身(face+hair+body+clothes) → waist-up medium shot
+        // level 2 = 特写(face+hair) → close-up from upper chest to collarbone
         const levels = [
             { name: '全身', level: 0 },
             { name: '半身', level: 1 },
@@ -247,7 +256,7 @@ App.generatePlayerAvatar = async function() {
     const appearance = gender === '男' ? 'handsome, sharp features' : 'beautiful, delicate features';
     const artStyle = state.story?.imageStyle || 'anime';
     const styleSuffix = App.artStyleSuffixes[artStyle] || App.artStyleSuffixes['anime'];
-    const prompt = `Portrait of ${pw}, ${appearance}, modern casual clothing, clean background, professional character concept art, detailed facial features${styleSuffix}`;
+    const prompt = `Portrait of ${pw}, ${appearance}, modern casual clothing, professional character concept art, detailed facial features${styleSuffix}`;
 
     console.log(`[主角] 开始生成头像 (性别: ${gender})`);
 

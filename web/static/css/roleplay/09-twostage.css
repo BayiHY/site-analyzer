@@ -1,0 +1,91 @@
+/* ===== 两阶段生成控制栏 ===== */
+/* （原 06-twostage.css，重命名为 09） */
+
+#gen-controls {
+    display: none;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding: 8px 12px;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+}
+#gen-controls.visible { display: flex; }
+
+.gen-phase {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+.phase-badge {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+.phase-badge.active {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(79, 195, 247, 0.1);
+}
+.phase-status {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+}
+
+.gen-actions { display: flex; gap: 6px; }
+.gen-actions .btn-sm {
+    white-space: nowrap;
+    font-size: 0.78rem;
+    padding: 4px 10px;
+}
+.gen-actions .btn-primary {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+}
+.gen-actions .btn-primary:hover { background: var(--primary-dark); }
+.gen-actions .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- 世界观预览卡片 --- */
+.worldview-preview {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0 12px 8px;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+    animation: previewFadeIn 0.3s ease;
+}
+@keyframes previewFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.worldview-preview .wp-title {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+}
+.worldview-preview .wp-tags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+.worldview-preview .wp-tag {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
