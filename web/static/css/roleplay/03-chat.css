@@ -12,7 +12,6 @@
 .chat-header,
 .chat-messages,
 .chat-input-area,
-.reply-options,
 .generation-controls {
     position: relative;
     z-index: 1;
@@ -66,6 +65,8 @@
 .msg { display: flex; gap: 10px; max-width: 85%; }
 .msg.char { align-self: flex-start; }
 .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+.msg.system { align-self: stretch; }
+.msg.system .bubble { opacity: 0.65; }
 .msg .avatar {
     width: 32px; height: 32px; border-radius: 50%; background: rgba(26, 35, 50, 0.65);
     display: flex; align-items: center; justify-content: center;
@@ -152,7 +153,26 @@
     font-size: 0.82rem;
 }
 
-/* 内联建议回复 */
+/* 快捷回复选项 - 在消息滚动区域内，粘在底部 */
+.reply-options {
+    padding: 4px 16px 12px 16px;
+    display: flex; flex-wrap: wrap;
+    gap: 8px;
+    min-height: 0;
+    margin-top: auto; /* 确保滚到底部时显示在输入区上方 */
+}
+.reply-option-btn {
+    padding: 5px 14px; 
+    background: transparent; 
+    border: 1px solid rgba(124, 58, 237, 0.4);
+    border-radius: 16px; color: var(--text); font-size: 0.82rem; cursor: pointer;
+    transition: all 0.2s; white-space: nowrap;
+}
+.reply-option-btn:hover { background: var(--primary); border-color: var(--primary); color: #fff; }
+.reply-option-btn:active { transform: scale(0.95); }
+.reply-option-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 气泡内旧的 inline-replies（兼容遗留代码） */
 .msg .bubble .inline-replies {
     display: flex;
     flex-wrap: wrap;
@@ -208,27 +228,3 @@
 }
 .chat-input-area .send-btn:hover { background: var(--primary-dark); }
 .chat-input-area .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-/* 快捷回复选项 - 固定锁定在输入框上方 */
-.reply-options {
-    padding: 8px 16px; 
-    background: rgba(26, 35, 50, 0.65);
-    display: flex; flex-wrap: wrap;
-    gap: 8px; 
-    border-top: 1px solid rgba(45, 58, 74, 0.5); 
-    min-height: 44px;
-    position: fixed;
-    bottom: 64px;
-    left: 0;
-    right: 0;
-    z-index: 19;
-}
-.reply-option-btn {
-    padding: 6px 14px; 
-    background: transparent; 
-    border: 1px solid rgba(45, 58, 74, 0.5);
-    border-radius: 16px; color: var(--text); font-size: 0.82rem; cursor: pointer;
-    transition: all 0.2s; white-space: nowrap;
-}
-.reply-option-btn:hover { background: var(--primary); border-color: var(--primary); color: #fff; }
-.reply-option-btn:active { transform: scale(0.95); }
