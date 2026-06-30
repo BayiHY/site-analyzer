@@ -99,8 +99,8 @@ App.generateCharactersAndStart = async function() {
         rpLog('info', 'CHARS', `generateCharactersAndStart chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
         if (state.apiKeys.image && chars.length > 0) {
-            rpLog('info', 'IMG', `开始并行生成 ${chars.length} 个角色头像 + 主角头像 + 初始场景图`);
-            addSystemMessage('🎨 正在生成角色头像和场景...');
+            rpLog('info', 'IMG', `开始生成 ${chars.length} 个角色头像 + 主角头像`);
+            addSystemMessage('🎨 正在生成角色头像...');
             try {
                 const imgTasks = chars.map(async (char, i) => {
                     if (!char || !char.name) { rpLog('warn', 'IMG', '角色 #' + i + ' 无效，跳过'); return null; }
@@ -118,18 +118,19 @@ App.generateCharactersAndStart = async function() {
                     return null;
                 });
 
-                const sceneTask = state.story.openingScene
-                    ? App.generateInitialSceneImage(state.story.openingScene).then(url => {
-                        rpLog('info', 'SCENE', '初始场景图生成完成');
-                        return url;
-                    })
-                    : Promise.resolve(null);
+                // 先完成角色头像
+                await Promise.all(imgTasks);
+                const playerOk = await playerAvatarTask;
+                addSystemMessage(`✅ 角色头像生成完成 (${chars.length}/${chars.length} 角色 + ${playerOk ? '1' : '0'} 主角)`);
+                rpLog('info', 'IMG', `角色头像生成完成: ${chars.length}/${chars.length} 角色, 主角:${playerOk}`);
 
-                const results = await Promise.all([...imgTasks, playerAvatarTask, sceneTask]);
-                const charSuccessCount = results.filter((r, i) => r !== null && i < chars.length).length;
-                const playerOk = results[chars.length] !== null;
-                addSystemMessage(`✅ 头像生成完成 (${charSuccessCount}/${chars.length} 角色 + ${playerOk ? '1' : '0'} 主角)，初始场景已设置`);
-                rpLog('info', 'IMG', `头像+场景图生成完成: ${charSuccessCount}/${chars.length} 角色, 主角:${playerOk}`);
+                // 角色头像全部完成后，再生成初始场景图
+                if (state.story.openingScene) {
+                    rpLog('info', 'SCENE', '角色头像全部完成，开始生成初始场景图');
+                    addSystemMessage('🖼️ 正在生成场景图...');
+                    await App.generateInitialSceneImage(state.story.openingScene);
+                    rpLog('info', 'SCENE', '初始场景图生成完成');
+                }
             } catch (imgErr) {
                 rpLog('error', 'IMG', '头像/场景图生成失败: ' + imgErr.message);
                 addSystemMessage(`⚠️ 头像/场景图生成失败: ${imgErr.message}`);
@@ -212,8 +213,8 @@ App.regenerateCharacters = async function() {
         rpLog('info', 'CHARS', `regenerateCharacters 返回 chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
         if (state.apiKeys.image && chars.length > 0) {
-            rpLog('info', 'IMG', `开始并行重新生成 ${chars.length} 个角色头像 + 主角头像 + 初始场景图`);
-            addSystemMessage('🎨 正在重新生成角色头像和场景...');
+            rpLog('info', 'IMG', `开始重新生成 ${chars.length} 个角色头像 + 主角头像`);
+            addSystemMessage('🎨 正在重新生成角色头像...');
             try {
                 rpLog('info', 'IMG', `构建 imgTasks: chars.length=${chars.length}, 角色列表: ${chars.map(c => c.name).join(', ')}`);
                 const imgTasks = chars.map(async (char, i) => {
@@ -232,18 +233,19 @@ App.regenerateCharacters = async function() {
                     return null;
                 });
 
-                const sceneTask = state.story.openingScene
-                    ? App.generateInitialSceneImage(state.story.openingScene).then(url => {
-                        rpLog('info', 'SCENE', '初始场景图重新生成完成');
-                        return url;
-                    })
-                    : Promise.resolve(null);
+                // 先完成角色头像
+                await Promise.all(imgTasks);
+                const playerOk = await playerAvatarTask;
+                addSystemMessage(`✅ 角色头像重新生成完成 (${chars.length}/${chars.length} 角色 + ${playerOk ? '1' : '0'} 主角)`);
+                rpLog('info', 'IMG', `角色头像重新生成完成: ${chars.length}/${chars.length} 角色, 主角:${playerOk}`);
 
-                const results = await Promise.all([...imgTasks, playerAvatarTask, sceneTask]);
-                const charSuccessCount = results.filter((r, i) => r !== null && i < chars.length).length;
-                const playerOk = results[chars.length] !== null;
-                addSystemMessage(`✅ 头像重新生成完成 (${charSuccessCount}/${chars.length} 角色 + ${playerOk ? '1' : '0'} 主角)，初始场景已设置`);
-                rpLog('info', 'IMG', `头像+场景图重新生成完成: ${charSuccessCount}/${chars.length} 角色, 主角:${playerOk}`);
+                // 角色头像全部完成后，再生成初始场景图
+                if (state.story.openingScene) {
+                    rpLog('info', 'SCENE', '角色头像全部完成，开始重新生成初始场景图');
+                    addSystemMessage('🖼️ 正在重新生成场景图...');
+                    await App.generateInitialSceneImage(state.story.openingScene);
+                    rpLog('info', 'SCENE', '初始场景图重新生成完成');
+                }
             } catch (imgErr) {
                 rpLog('error', 'IMG', '头像生成失败: ' + imgErr.message);
                 addSystemMessage(`头像生成失败: ${imgErr.message}`);

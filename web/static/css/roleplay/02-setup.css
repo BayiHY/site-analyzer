@@ -1,12 +1,18 @@
 /* ===== 角色聊天 - 创建界面 ===== */
 #char-setup-screen {
     display: flex; align-items: center; justify-content: center;
-    padding: 20px; height: 100vh;
+    padding: 20px;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100dvh;
 }
 .setup-card {
     background: var(--bg2); border: 1px solid var(--border);
     border-radius: 16px; padding: 24px;
-    max-width: 520px; width: 100%; height: 90vh; max-height: 90vh;
+    max-width: 520px; width: 100%;
+    height: 90vh;
+    height: 90dvh;
+    max-height: 90dvh;
     overflow: hidden; display: flex; flex-direction: column; gap: 0;
 }
 .setup-card > *:first-child { flex-shrink: 0; }

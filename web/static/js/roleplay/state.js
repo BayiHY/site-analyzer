@@ -192,7 +192,17 @@ App.loadMessages = async function() {
     if (!_dbReady) {
         const saved = localStorage.getItem('rp_messages_fallback');
         if (saved) {
-            try { state.messages = JSON.parse(saved); } catch(e) {}
+            try {
+                state.messages = JSON.parse(saved);
+                // localStorage 回退：也按时间排序确保时序正确
+                state.messages.sort((a, b) => {
+                    if (a.timestamp && b.timestamp) {
+                        const t = a.timestamp.localeCompare(b.timestamp);
+                        if (t !== 0) return t;
+                    }
+                    return (a.id || '').localeCompare(b.id || '');
+                });
+            } catch(e) {}
         }
         return;
     }
@@ -201,7 +211,14 @@ App.loadMessages = async function() {
         const tx = db.transaction('messages', 'readonly');
         const req = tx.objectStore('messages').getAll();
         req.onsuccess = () => {
-            state.messages = req.result || [];
+            state.messages = (req.result || []).slice().sort((a, b) => {
+                // 按时间戳排序，时间相同则按 id 排序（msg_ 前缀保证字典序即时序）
+                if (a.timestamp && b.timestamp) {
+                    const t = a.timestamp.localeCompare(b.timestamp);
+                    if (t !== 0) return t;
+                }
+                return (a.id || '').localeCompare(b.id || '');
+            });
             resolve();
         };
     });

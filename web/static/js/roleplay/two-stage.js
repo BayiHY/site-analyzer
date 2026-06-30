@@ -54,10 +54,10 @@ App.initializeStory = async function(userInspiration, playerGender) {
         throw err;
     }
 
-    // 角色生成完成后，并行生成头像 + 初始场景图
+    // 角色生成完成后，并行生成头像
     if (state.apiKeys.image) {
-        rpLog('info', 'IMG', `开始并行生成 ${state.characters.length} 个角色头像 + 主角头像 + 初始场景图`);
-        addSystemMessage('🎨 正在生成角色头像和场景...');
+        rpLog('info', 'IMG', `开始生成 ${state.characters.length} 个角色头像 + 主角头像`);
+        addSystemMessage('🎨 正在生成角色头像...');
 
         try {
             // 角色头像生成任务
@@ -77,20 +77,19 @@ App.initializeStory = async function(userInspiration, playerGender) {
                 return null;
             });
 
-            // 初始场景图生成任务
-            const sceneTask = state.story.openingScene
-                ? App.generateInitialSceneImage(state.story.openingScene).then(url => {
-                    rpLog('info', 'SCENE', '初始场景图生成完成');
-                    return url;
-                })
-                : Promise.resolve(null);
+            // 等待所有角色头像完成
+            await Promise.all(imgTasks);
+            const playerOk = await playerAvatarTask;
+            addSystemMessage(`✅ 角色头像生成完成 (${state.characters.length}/${state.characters.length} 角色 + ${playerOk ? '1' : '0'} 主角)`);
+            rpLog('info', 'IMG', `角色头像生成完成: ${state.characters.length}/${state.characters.length} 角色, 主角:${playerOk}`);
 
-            // 全部并行执行
-            const results = await Promise.all([...imgTasks, playerAvatarTask, sceneTask]);
-            const charSuccessCount = results.filter((r, i) => r !== null && i < state.characters.length).length;
-            const playerAvatarOk = results[state.characters.length] !== null;
-            addSystemMessage(`✅ 头像生成完成 (${charSuccessCount}/${state.characters.length} 角色 + ${playerAvatarOk ? '1' : '0'} 主角)，初始场景已设置`);
-            rpLog('info', 'IMG', `头像+场景图生成完成: ${charSuccessCount}/${state.characters.length} 角色, 主角:${playerAvatarOk}`);
+            // 角色头像全部完成后，再生成初始场景图
+            if (state.story.openingScene) {
+                rpLog('info', 'SCENE', '角色头像全部完成，开始生成初始场景图');
+                addSystemMessage('🖼️ 正在生成场景图...');
+                await App.generateInitialSceneImage(state.story.openingScene);
+                rpLog('info', 'SCENE', '初始场景图生成完成');
+            }
         } catch (imgErr) {
             rpLog('error', 'IMG', '头像/场景图生成失败: ' + imgErr.message);
             addSystemMessage(`⚠️ 头像/场景图生成失败: ${imgErr.message}`);

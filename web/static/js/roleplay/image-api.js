@@ -132,6 +132,7 @@ App.buildBackupPrompt = function(character) {
 };
 
 // 三级降级生图：完整 → 半身 → 特写 → 备用
+// 新流程：先生成面部特写（level 2），再用 img2img 从特写生成全身/半身
 App.generateCharacterImage = async function(character) {
     if (!character || !character.name) {
         throw new Error('无效的角色对象，无法生成图片');
@@ -146,10 +147,22 @@ App.generateCharacterImage = async function(character) {
     let imageUrl;
 
     if (hasModules) {
-        // 模块化流程：三级降级
-        // level 0 = 全身(face+hair+body+clothes+env) → full body from head to toe
-        // level 1 = 半身(face+hair+body+clothes) → waist-up medium shot
-        // level 2 = 特写(face+hair) → close-up from upper chest to collarbone
+        // === 第一步：生成面部特写（高精度） ===
+        rpLog('info', 'IMG', `📷 第一步：生成面部特写: ${character.name}`);
+        const facePrompt = App.buildModularPrompt(character, 2); // level 2 = 特写
+        rpLog('debug', 'IMG', `面部特写 Prompt: ${facePrompt.slice(0, 150)}...`);
+        
+        let faceImageUrl;
+        try {
+            faceImageUrl = await App.agnesImageGen(facePrompt, '512x512');
+            rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
+            character.faceImageUrl = faceImageUrl;
+            await saveState();
+        } catch (e) {
+            rpLog('warn', 'IMG', `面部特写生成失败: ${e.message}`);
+        }
+
+        // === 第二步：从面部特写出发，三级降级生成全身/半身 ===
         const levels = [
             { name: '全身', level: 0 },
             { name: '半身', level: 1 },
@@ -158,16 +171,24 @@ App.generateCharacterImage = async function(character) {
 
         for (const tier of levels) {
             try {
-                rpLog('info', 'IMG', `尝试 ${tier.name} 生图: ${character.name}`);
+                rpLog('info', 'IMG', `第二步: 尝试 ${tier.name} 生图（基于面部特写）: ${character.name}`);
                 const prompt = App.buildModularPrompt(character, tier.level);
-                rpLog('debug', 'IMG', `Prompt (${tier.name}): ${prompt.slice(0, 120)}...`);
-                imageUrl = await App.agnesImageGen(prompt);
+                
+                // 如果有面部特写，用 img2img 确保面部一致性
+                if (faceImageUrl) {
+                    imageUrl = await App.agnesImageGenWithRefImg(prompt, faceImageUrl);
+                } else {
+                    imageUrl = await App.agnesImageGen(prompt);
+                }
+                
                 if (imageUrl) {
                     rpLog('info', 'IMG', `${tier.name} 生成成功: ${character.name}`);
+                    character.faceImageUrl = imageUrl;
+                    await saveState();
                     return imageUrl;
                 }
             } catch (e) {
-                rpLog('warn', 'IMG', `${tier.name} 失败 (${e.message}), 降级到 ${levels[levels.indexOf(tier) + 1]?.name || '备用'}`);
+                rpLog('warn', 'IMG', `${tier.name} 失败 (${e.message})`);
             }
         }
 
@@ -333,6 +354,56 @@ App.agnesImageGen = async function(prompt, size = '768x1024') {
     if (!imgUrl) {
         console.error('生图返回数据异常:', JSON.stringify(data).slice(0, 500));
         throw new Error('未获取到图片 URL，API 返回格式异常');
+    }
+    return imgUrl;
+};
+
+// === img2img 变体：传入面部参考图，确保面部一致性 ===
+App.agnesImageGenWithRefImg = async function(prompt, faceImageUrl, size = '768x1024') {
+    const apiKey = state.apiKeys.image;
+    if (!apiKey) {
+        throw new Error('未配置生图 API Key');
+    }
+    if (!faceImageUrl) {
+        throw new Error('缺少面部参考图 URL');
+    }
+
+    rpLog('info', 'IMG', `img2img: 使用面部参考图生图`);
+
+    const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: 'agnes-image-2.1-flash',
+            prompt: prompt,
+            image: [faceImageUrl],
+            size: size,
+            n: 1,
+            extra_body: { response_format: 'url' }
+        }),
+        signal: AbortSignal.timeout(120000)
+    });
+
+    if (!resp.ok) {
+        let errMsg = `img2img 生图错误 (${resp.status})`;
+        try {
+            const errData = await resp.json();
+            errMsg = errData.error?.message || errData.message || errMsg;
+        } catch(e) {
+            errMsg = `生图错误 (${resp.status}): ${await resp.text()}`;
+        }
+        console.error('img2img API 响应:', errMsg);
+        throw new Error(errMsg);
+    }
+
+    const data = await resp.json();
+    const imgUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
+    if (!imgUrl) {
+        console.error('img2img 返回数据异常:', JSON.stringify(data).slice(0, 500));
+        throw new Error('未获取到图片 URL');
     }
     return imgUrl;
 };
