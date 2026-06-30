@@ -40,6 +40,19 @@
                 <label>故事灵感 <span style="color:#666;font-weight:normal;">（选填）</span></label>
                 <textarea id="story-prompt" placeholder="例如：我想和一个温柔的外科医生青梅竹马的故事。&#10;&#10;留空则完全随机生成世界观和角色。" rows="4"></textarea>
             </div>
+            <div class="form-group">
+                <label>玩家性别 <span style="color:var(--danger);">*</span></label>
+                <div class="gender-radio-group">
+                    <label class="gender-option">
+                        <input type="radio" name="player-gender" value="男" checked>
+                        <span>♂ 男</span>
+                    </label>
+                    <label class="gender-option">
+                        <input type="radio" name="player-gender" value="女">
+                        <span>♀ 女</span>
+                    </label>
+                </div>
+            </div>
         </div>
         <button class="btn btn-primary" id="btn-create" type="button" onclick="App.createCharacter()">
             开始冒险
@@ -49,6 +62,9 @@
 
 <!-- ===== 聊天界面 ===== -->
 <div id="chat-screen">
+    <!-- 场景背景层 -->
+    <div class="scene-bg" id="scene-bg"></div>
+
     <div class="chat-header">
         <div class="header-left">
             <div class="story-title" id="header-story-title">故事标题</div>
@@ -73,25 +89,6 @@
 
     <!-- 快捷回复选项 -->
     <div class="reply-options" id="reply-options"></div>
-
-    <!-- 两阶段生成控制栏 -->
-    <div class="generation-controls" id="gen-controls">
-        <div class="gen-phase" id="gen-phase-indicator">
-            <span class="phase-badge">📖 世界观</span>
-            <span class="phase-status">生成中...</span>
-        </div>
-        <div class="gen-actions">
-            <button class="btn btn-sm btn-outline" id="btn-regen-worldview" onclick="App.regenerateWorldview()" style="display:none;">
-                🔄 刷新世界观
-            </button>
-            <button class="btn btn-sm btn-primary" id="btn-generate-chars" onclick="App.generateCharactersAndStart()" style="display:none;">
-                ✨ 生成角色
-            </button>
-            <button class="btn btn-sm btn-outline" id="btn-regen-chars" onclick="App.regenerateCharacters()" style="display:none;">
-                🔄 刷新角色
-            </button>
-        </div>
-    </div>
 </div>
 
 <!-- ===== 侧边面板 ===== -->
@@ -109,17 +106,8 @@
     <img id="img-overlay-img" src="" alt="">
 </div>
 
-<!-- ===== 页内日志面板 ===== -->
-<div id="rp-log-panel" style="display:none;">
-    <div id="rp-log-header" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:2px 4px;border-bottom:1px solid #333;background:#111;user-select:none;">
-        <span style="font-size:10px;color:#888;">📋 日志</span>
-        <div style="display:flex;gap:4px;">
-            <button id="rp-log-copy" title="复制日志" style="background:none;color:#4fc3f7;border:none;font-size:11px;cursor:pointer;line-height:1;">📋</button>
-            <button id="rp-log-close" title="收起日志" style="background:none;color:#ef5350;border:none;font-size:14px;cursor:pointer;line-height:1;">×</button>
-        </div>
-    </div>
-    <div id="rp-log-body" style="overflow-y:auto;max-height:160px;"></div>
-</div>
+<!-- 页内日志面板 — 内容由 logger.js renderLogPanel() 动态渲染 -->
+<div id="rp-log-panel" style="display:none;"></div>
 
 
 
@@ -127,6 +115,7 @@
 <script src="/static/js/roleplay/worldview-factors.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/logger.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/llm-client.js?v={{ cb }}"></script>
+<script src="/static/js/roleplay/delimited-parser.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/emotion-update.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/image-api.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/face-images.js?v={{ cb }}"></script>
@@ -135,6 +124,7 @@
 <script src="/static/js/roleplay/char-gen.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/two-stage.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/chat-sender.js?v={{ cb }}"></script>
+<script src="/static/js/roleplay/reply-options.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/message-renderer.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/ui-switcher.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/side-panel.js?v={{ cb }}"></script>
@@ -148,12 +138,6 @@
 <!-- Initialize App after all modules load -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 打印当前加载的资源版本
-    const cssLink = document.querySelector('link[href*="roleplay.css"]');
-    const jsLinks = document.querySelectorAll('script[src*="roleplay/"]');
-    if (cssLink) rpLog('info', 'VERSION', 'CSS: ' + cssLink.href.split('?')[1]);
-    jsLinks.forEach(s => rpLog('info', 'VERSION', 'JS: ' + s.src.split('?')[1]));
-    
     if (typeof App !== 'undefined' && typeof App.init === 'function') {
         App.init();
     }

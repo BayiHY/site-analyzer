@@ -18,6 +18,7 @@ App.createCharacter = async function() {
     const chatKey = document.getElementById('setup-chat-key').value.trim();
     const imageKey = document.getElementById('setup-image-key').value.trim();
     const storyPrompt = document.getElementById('story-prompt').value.trim();
+    const playerGender = document.querySelector('input[name="player-gender"]:checked')?.value || '男';
 
     if (!chatKey) {
         alert('请先填写对话 API Key');
@@ -28,10 +29,18 @@ App.createCharacter = async function() {
     state.apiKeys.image = imageKey;
     localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
 
+    state.player = { gender: playerGender, faceImageUrl: '' };
     state.characters = [];
     state.activeCharIndex = 0;
     state.emotions = {};
     state.revealed = {};
+
+    // 从用户灵感中自动检测画面风格
+    const detectedStyle = App.detectVisualStyleFromInspiration(storyPrompt);
+    const imageStyle = detectedStyle || 'anime';
+    if (detectedStyle) {
+        rpLog('info', 'STYLE', `从灵感中检测到画面风格: ${detectedStyle}`);
+    }
 
     state.story = {
         title: '',
@@ -41,7 +50,9 @@ App.createCharacter = async function() {
         toneKeywords: [],
         worldviewNotes: '',
         factors: null,
-        phase: 'idle'
+        userInspiration: '',
+        phase: 'idle',
+        imageStyle: imageStyle
     };
 
     state.messages = [];
@@ -59,8 +70,8 @@ App.createCharacter = async function() {
     addSystemMessage('正在初始化故事世界...');
 
     try {
-        rpLog('info', 'CREATE', '开始两阶段初始化');
-        await App.initializeStory(storyPrompt);
+        rpLog('info', 'CREATE', `开始两阶段初始化，玩家性别: ${playerGender}`);
+        await App.initializeStory(storyPrompt, playerGender);
         rpLog('info', 'CREATE', '初始化完成，进入聊天阶段');
     } catch (err) {
         rpLog('error', 'CREATE', '初始化失败: ' + (err.message || String(err)));
@@ -77,39 +88,66 @@ App.generateCharactersAndStart = async function() {
     await saveState();
 
     try {
-        const chars = await App.generateCharacters(3);
+        const chars = await App.generateCharacters(3, state.player?.gender, state.story.userInspiration || '', '');
         addSystemMessage(`✅ 角色生成完成！共 ${chars.length} 个角色。`);
+        rpLog('info', 'CHARS', `generateCharactersAndStart chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
         if (state.apiKeys.image && chars.length > 0) {
-            rpLog('info', 'IMG', `开始并行生成 ${chars.length} 个角色头像`);
-            addSystemMessage('正在生成角色头像...');
+            rpLog('info', 'IMG', `开始并行生成 ${chars.length} 个角色头像 + 主角头像 + 初始场景图`);
+            addSystemMessage('🎨 正在生成角色头像和场景...');
             try {
                 const imgTasks = chars.map(async (char, i) => {
                     if (!char || !char.name) { rpLog('warn', 'IMG', '角色 #' + i + ' 无效，跳过'); return null; }
-                    const prompt = char.imagePrompt || '';
-                    if (!prompt) { rpLog('warn', 'IMG', '角色 ' + char.name + ' 缺少 imagePrompt，跳过'); return null; }
                     rpLog('info', 'IMG', '生成 ' + char.name + ' 的头像');
-                    const result = await App.generateCharacterFaceSilent(char, prompt);
+                    const result = await App.generateCharacterFaceSilent(char);
                     return result;
                 });
-                const results = await Promise.all(imgTasks);
-                const successCount = results.filter(r => r !== null).length;
-                addSystemMessage(`角色头像生成完成 (${successCount}/${chars.length})`);
-                rpLog('info', 'IMG', `头像生成完成: ${successCount}/${chars.length}`);
+
+                // 主角头像
+                const playerAvatarTask = App.generatePlayerAvatar().then(url => {
+                    rpLog('info', 'IMG', '主角头像生成完成');
+                    return url;
+                }).catch(err => {
+                    rpLog('warn', 'IMG', '主角头像生成失败: ' + err.message);
+                    return null;
+                });
+
+                const sceneTask = state.story.openingScene
+                    ? App.generateInitialSceneImage(state.story.openingScene).then(url => {
+                        rpLog('info', 'SCENE', '初始场景图生成完成');
+                        return url;
+                    })
+                    : Promise.resolve(null);
+
+                const results = await Promise.all([...imgTasks, playerAvatarTask, sceneTask]);
+                const charSuccessCount = results.filter((r, i) => r !== null && i < chars.length).length;
+                const playerOk = results[chars.length] !== null;
+                addSystemMessage(`✅ 头像生成完成 (${charSuccessCount}/${chars.length} 角色 + ${playerOk ? '1' : '0'} 主角)，初始场景已设置`);
+                rpLog('info', 'IMG', `头像+场景图生成完成: ${charSuccessCount}/${chars.length} 角色, 主角:${playerOk}`);
             } catch (imgErr) {
-                rpLog('error', 'IMG', '头像生成失败: ' + imgErr.message);
-                addSystemMessage(`头像生成失败: ${imgErr.message}`);
+                rpLog('error', 'IMG', '头像/场景图生成失败: ' + imgErr.message);
+                addSystemMessage(`⚠️ 头像/场景图生成失败: ${imgErr.message}`);
             }
         }
 
-        const openingMsg = `【${state.story.openingScene}】`;
+        const openingRaw = state.story.openingScene || '';
+        let openingText = openingRaw;
+        let openingReplies = [];
+        const replyMatch = openingRaw.match(/<(.+)>$/);
+        if (replyMatch) {
+            openingText = openingRaw.slice(0, openingRaw.length - replyMatch[0].length).trim();
+            openingReplies = replyMatch[1].split('|').map(s => s.trim()).filter(Boolean);
+        }
+        
+        const openingMsg = `【${openingText}】`;
         state.messages.push({
             id: 'msg_' + Date.now(),
             role: 'char',
             type: 'text',
             content: openingMsg,
             timestamp: new Date().toISOString(),
-            charIndex: 0
+            charIndex: 0,
+            suggestedReplies: openingReplies
         });
         renderMessage(state.messages[state.messages.length - 1]);
         saveMessages().catch(() => {});
@@ -121,6 +159,7 @@ App.generateCharactersAndStart = async function() {
     } finally {
         state.story.phase = 'chat';
         await saveState();
+
         document.getElementById('send-btn').disabled = false;
     }
 };
@@ -162,39 +201,67 @@ App.regenerateCharacters = async function() {
     await saveState();
 
     try {
-        const chars = await App.generateCharacters(3);
+        const chars = await App.generateCharacters(3, state.player?.gender, state.story.userInspiration || '', '');
         addSystemMessage(`✅ 角色重新生成完成！共 ${chars.length} 个角色。`);
+        rpLog('info', 'CHARS', `regenerateCharacters 返回 chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
         if (state.apiKeys.image && chars.length > 0) {
-            rpLog('info', 'IMG', `开始并行重新生成 ${chars.length} 个角色头像`);
-            addSystemMessage('正在重新生成角色头像...');
+            rpLog('info', 'IMG', `开始并行重新生成 ${chars.length} 个角色头像 + 主角头像 + 初始场景图`);
+            addSystemMessage('🎨 正在重新生成角色头像和场景...');
             try {
+                rpLog('info', 'IMG', `构建 imgTasks: chars.length=${chars.length}, 角色列表: ${chars.map(c => c.name).join(', ')}`);
                 const imgTasks = chars.map(async (char, i) => {
                     if (!char || !char.name) { rpLog('warn', 'IMG', '角色 #' + i + ' 无效，跳过'); return null; }
-                    const prompt = char.imagePrompt || '';
-                    if (!prompt) { rpLog('warn', 'IMG', '角色 ' + char.name + ' 缺少 imagePrompt，跳过'); return null; }
                     rpLog('info', 'IMG', '重新生成 ' + char.name + ' 的头像');
-                    const result = await App.generateCharacterFaceSilent(char, prompt);
+                    const result = await App.generateCharacterFaceSilent(char);
                     return result;
                 });
-                const results = await Promise.all(imgTasks);
-                const successCount = results.filter(r => r !== null).length;
-                addSystemMessage(`角色头像重新生成完成 (${successCount}/${chars.length})`);
-                rpLog('info', 'IMG', `头像重新生成完成: ${successCount}/${chars.length}`);
+
+                // 主角头像
+                const playerAvatarTask = App.generatePlayerAvatar().then(url => {
+                    rpLog('info', 'IMG', '主角头像重新生成完成');
+                    return url;
+                }).catch(err => {
+                    rpLog('warn', 'IMG', '主角头像重新生成失败: ' + err.message);
+                    return null;
+                });
+
+                const sceneTask = state.story.openingScene
+                    ? App.generateInitialSceneImage(state.story.openingScene).then(url => {
+                        rpLog('info', 'SCENE', '初始场景图重新生成完成');
+                        return url;
+                    })
+                    : Promise.resolve(null);
+
+                const results = await Promise.all([...imgTasks, playerAvatarTask, sceneTask]);
+                const charSuccessCount = results.filter((r, i) => r !== null && i < chars.length).length;
+                const playerOk = results[chars.length] !== null;
+                addSystemMessage(`✅ 头像重新生成完成 (${charSuccessCount}/${chars.length} 角色 + ${playerOk ? '1' : '0'} 主角)，初始场景已设置`);
+                rpLog('info', 'IMG', `头像+场景图重新生成完成: ${charSuccessCount}/${chars.length} 角色, 主角:${playerOk}`);
             } catch (imgErr) {
                 rpLog('error', 'IMG', '头像生成失败: ' + imgErr.message);
                 addSystemMessage(`头像生成失败: ${imgErr.message}`);
             }
         }
 
-        const openingMsg = `【${state.story.openingScene}】`;
+        const openingRaw = state.story.openingScene || '';
+        let openingText = openingRaw;
+        let openingReplies = [];
+        const replyMatch = openingRaw.match(/<(.+)>$/);
+        if (replyMatch) {
+            openingText = openingRaw.slice(0, openingRaw.length - replyMatch[0].length).trim();
+            openingReplies = replyMatch[1].split('|').map(s => s.trim()).filter(Boolean);
+        }
+        
+        const openingMsg = `【${openingText}】`;
         state.messages.push({
             id: 'msg_' + Date.now(),
             role: 'char',
             type: 'text',
             content: openingMsg,
             timestamp: new Date().toISOString(),
-            charIndex: 0
+            charIndex: 0,
+            suggestedReplies: openingReplies
         });
         renderMessage(state.messages[state.messages.length - 1]);
         saveMessages().catch(() => {});
@@ -206,6 +273,7 @@ App.regenerateCharacters = async function() {
     } finally {
         state.story.phase = 'chat';
         await saveState();
+
         if (btn) btn.disabled = false;
     }
 };

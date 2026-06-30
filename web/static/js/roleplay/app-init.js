@@ -1,22 +1,67 @@
 // === Section: 应用初始化 ===
 // 加载设置、恢复 API Key、初始化 IndexedDB、恢复上次状态
 
-App.resetStory = function() {
+// === 从用户灵感中检测画面风格 ===
+App.detectVisualStyleFromInspiration = function(inspiration) {
+    if (!inspiration || inspiration.trim().length === 0) return null;
+    const text = inspiration.toLowerCase();
+    const styleMap = {
+        '油画': 'oil painting',
+        '油畫': 'oil painting',
+        '水彩': 'watercolor',
+        '动漫': 'anime',
+        '动画': 'anime',
+        '日漫': 'anime',
+        '二次元': 'anime',
+        'anime': 'anime',
+        '卡通': 'anime',
+        '漫画': 'comic book',
+        '美漫': 'comic book',
+        '绘本': 'comic book',
+        '铅笔画': 'pencil sketch',
+        '素描': 'pencil sketch',
+        '速写': 'pencil sketch',
+        '写实': 'digital realism',
+        '现实': 'digital realism',
+        '逼真': 'digital realism',
+        'photorealistic': 'digital realism',
+    };
+    for (const [keyword, style] of Object.entries(styleMap)) {
+        if (text.includes(keyword)) return style;
+    }
+    return null;
+};
+
+App.resetStory = async function() {
     if (!confirm('确定要重新生成随机故事吗？当前故事将被替换为全新的随机故事。')) return;
     
+    state.player = { gender: state.player?.gender || '男', faceImageUrl: '' };
     state.characters = [];
     state.activeCharIndex = 0;
     state.emotions = {};
     state.messages = [];
     state.story = null;
     state.revealed = {};
+    state.currentSceneBg = '';
+    state.lastReplyOptions = null;
+    state.sceneHistory = [];
     
-    localStorage.setItem('rp_state', JSON.stringify(state));
+    // 持久化清空后的状态到 IndexedDB / localStorage
+    await saveState();
+    await saveMessages();
+    
+    // 同时清除 localStorage 回退键，防止 IndexedDB 不可用时残留旧数据
+    localStorage.removeItem('rp_state_fallback');
+    localStorage.removeItem('rp_messages_fallback');
     
     document.getElementById('char-setup-screen').style.display = 'flex';
     document.getElementById('chat-screen').style.display = 'none';
     
     document.getElementById('story-prompt').value = '';
+
+    // 清除场景背景
+    const bgLayer = document.getElementById('scene-bg-layer');
+    if (bgLayer) bgLayer.style.backgroundImage = '';
     
     showNewDiscovery('故事已重置，请点击"开始冒险"生成新的随机故事');
 }
@@ -39,7 +84,29 @@ App.saveSettings = function() {
     state.apiKeys.chat = document.getElementById('setting-chat-key').value.trim();
     state.apiKeys.image = document.getElementById('setting-image-key').value.trim();
     localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
-    alert('设置已保存');
+
+    // 保存画面风格
+    const artStyleEl = document.getElementById('setting-art-style');
+    if (artStyleEl) {
+        state.story.imageStyle = artStyleEl.value;
+        rpLog('info', 'SETTINGS', `画面风格已保存: ${artStyleEl.value}`);
+    }
+
+    // 保存故事标题
+    const titleEl = document.getElementById('setting-story-title');
+    if (titleEl) {
+        state.story.title = titleEl.value.trim();
+    }
+
+    saveState().then(() => {
+        // 重新渲染场景背景（风格变化后可能需要更新）
+        if (state.story.openingScene) {
+            App.generateInitialSceneImage(state.story.openingScene).catch(() => {});
+        }
+        alert('设置已保存');
+    }).catch(() => {
+        alert('设置已保存（本地存储）');
+    });
 }
 
 App.showNewDiscovery = function(msg) {
@@ -57,6 +124,11 @@ App.init = async function() {
         await loadMessages();
         showChatScreen();
         renderMessages();
+
+        // 恢复场景背景图
+        if (state.currentSceneBg) {
+            App.applySceneBackground(state.currentSceneBg);
+        }
     }
 }
 

@@ -74,3 +74,24 @@
     background: transparent; border: 1px solid var(--border); color: var(--text-dim);
 }
 .btn-outline:hover { border-color: var(--primary); color: var(--text); }
+
+/* 玩家性别单选框 */
+.gender-radio-group {
+    display: flex; gap: 16px;
+}
+.gender-option {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; font-size: 0.9rem; color: var(--text);
+    padding: 8px 16px; border-radius: 8px;
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+}
+.gender-option:hover { border-color: var(--primary); }
+.gender-option input[type="radio"] {
+    accent-color: var(--primary);
+    width: 16px; height: 16px;
+}
+.gender-option:has(input:checked) {
+    border-color: var(--primary);
+    background: rgba(124, 58, 237, 0.15);
+}

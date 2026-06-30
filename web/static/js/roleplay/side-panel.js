@@ -125,6 +125,12 @@ App.renderCharactersPanel = function() {
 }
 
 App.renderSettingsPanel = function() {
+    const phase = state.story?.phase || 'idle';
+    const showWorldviewBtn = phase === 'worldview' || phase === 'idle';
+    const showCharsBtn = phase === 'chat';
+    const regenCharsDisabled = phase === 'regenerating_chars' || phase === 'regenerating_worldview';
+    const regenWwDisabled = phase === 'regenerating_worldview';
+
     return `
         <div class="setting-item">
             <label>对话 API Key</label>
@@ -141,6 +147,25 @@ App.renderSettingsPanel = function() {
         <div class="setting-item">
             <label>故事标题</label>
             <input type="text" id="setting-story-title" value="${state.story ? state.story.title : ''}" placeholder="输入故事标题">
+        </div>
+        ${showWorldviewBtn ? `\n        <button class="btn btn-outline btn-sm" onclick="App.regenerateWorldview()" style="margin-top:8px;width:100%;" ${regenWwDisabled ? 'disabled' : ''}>
+            🔄 刷新世界观
+        </button>` : ''}
+        ${showCharsBtn ? `\n        <button class="btn btn-outline btn-sm" onclick="App.regenerateCharacters()" style="margin-top:8px;width:100%;" ${regenCharsDisabled ? 'disabled' : ''}>
+            🔄 刷新角色
+        </button>` : ''}
+        <hr style="border-color:var(--border);margin:20px 0;">
+        <div class="setting-item">
+            <label>🎨 画面风格</label>
+            <select id="setting-art-style" style="width:100%;padding:6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px;">
+                <option value="anime" ${(state.story?.imageStyle || state.story?.artStyle || 'anime') === 'anime' ? 'selected' : ''}>动漫风 (anime)</option>
+                <option value="watercolor" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'watercolor' ? 'selected' : ''}>水彩风 (watercolor)</option>
+                <option value="oil painting" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'oil painting' ? 'selected' : ''}>油画风 (oil painting)</option>
+                <option value="digital realism" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'digital realism' ? 'selected' : ''}>数字写实 (digital realism)</option>
+                <option value="pencil sketch" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'pencil sketch' ? 'selected' : ''}>铅笔素描 (pencil sketch)</option>
+                <option value="comic book" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'comic book' ? 'selected' : ''}>漫画风 (comic book)</option>
+            </select>
+            <div class="setting-hint">所有角色头像和场景图将使用此统一风格</div>
         </div>
         <button class="btn btn-outline btn-sm" onclick="App.exportData()" style="margin-top:8px;width:100%;">导出数据 (JSON)</button>
         <button class="btn btn-outline btn-sm" onclick="App.importData()" style="margin-top:8px;width:100%;">导入数据</button>

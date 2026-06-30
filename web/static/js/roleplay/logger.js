@@ -60,3 +60,7 @@ function renderLogPanel() {
 }
 
 rpLog('info', 'INIT', '日志工具已就绪');
+
+// 日志面板默认收起
+_rpLogCollapsed = true;
+renderLogPanel();

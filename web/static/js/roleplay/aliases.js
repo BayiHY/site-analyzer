@@ -12,14 +12,16 @@ window.buildBackupPrompt = App.buildBackupPrompt;
 // 头像生成
 window.generateCharacterFace = App.generateCharacterFace;
 window.generateCharacterFaceSilent = App.generateCharacterFaceSilent;
+window.generatePlayerAvatar = App.generatePlayerAvatar;
 
 // 场景图
 window.generateSceneImage = App.generateSceneImage;
+window.generateInitialSceneImage = App.generateInitialSceneImage;
 window.parseSceneFromReply = App.parseSceneFromReply;
 window.isSceneChanged = App.isSceneChanged;
 window.sceneToImagePrompt = App.sceneToImagePrompt;
 window.getActiveCharacterFaceUrl = App.getActiveCharacterFaceUrl;
-window.addSceneGenStatus = App.addSceneGenStatus;
+window.applySceneBackground = App.applySceneBackground;
 
 // 情感与信息披露
 window.updateEmotions = App.updateEmotions;

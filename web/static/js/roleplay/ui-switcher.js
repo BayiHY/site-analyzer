@@ -15,45 +15,8 @@ App.updateStoryHeader = function() {
 }
 
 App.updateGenerationControls = function() {
-    const container = document.getElementById('gen-controls');
-    if (!container) return;
-
-    const phase = state.story?.phase || 'idle';
-    const badge = container.querySelector('.phase-badge');
-    const status = container.querySelector('.phase-status');
-    const btnRegenWw = document.getElementById('btn-regen-worldview');
-    const btnGenChars = document.getElementById('btn-generate-chars');
-    const btnRegenChars = document.getElementById('btn-regen-chars');
-
-    if (phase === 'idle' || phase === 'worldview') {
-        container.classList.add('visible');
-        if (badge) { badge.textContent = '📖 世界观'; badge.classList.add('active'); }
-        if (status) status.textContent = '准备生成...';
-        if (btnRegenWw) btnRegenWw.style.display = 'inline-flex';
-        if (btnGenChars) btnGenChars.style.display = 'none';
-        if (btnRegenChars) btnRegenChars.style.display = 'none';
-    } else if (phase === 'regenerating_worldview') {
-        container.classList.add('visible');
-        if (badge) { badge.textContent = '📖 世界观'; badge.classList.add('active'); }
-        if (status) status.textContent = '生成中...';
-        if (btnRegenWw) btnRegenWw.style.display = 'none';
-        if (btnGenChars) btnGenChars.style.display = 'none';
-        if (btnRegenChars) btnRegenChars.style.display = 'none';
-    } else if (phase === 'chat') {
-        container.classList.add('visible');
-        if (badge) { badge.textContent = '✨ 角色已就绪'; badge.classList.remove('active'); }
-        if (status) status.textContent = '可以开始冒险了';
-        if (btnRegenWw) btnRegenWw.style.display = 'inline-flex';
-        if (btnGenChars) btnGenChars.style.display = 'none';
-        if (btnRegenChars) btnRegenChars.style.display = 'inline-flex';
-    } else if (phase === 'regenerating_chars') {
-        container.classList.add('visible');
-        if (badge) { badge.textContent = '✨ 角色'; badge.classList.add('active'); }
-        if (status) status.textContent = '生成中...';
-        if (btnRegenWw) btnRegenWw.style.display = 'none';
-        if (btnGenChars) btnGenChars.style.display = 'none';
-        if (btnRegenChars) btnRegenChars.style.display = 'none';
-    }
+    // 控制栏已移至设置面板，此处不再需要操作 DOM
+    // 保留此函数供现有调用点（story-gen.js / char-gen.js / two-stage.js）调用
 }
 
 App.truncate = function(str, len) {

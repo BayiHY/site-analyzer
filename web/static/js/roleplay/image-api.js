@@ -1,19 +1,76 @@
 // === Section: 图片 API 封装 ===
-// 生图 API 调用 + prompt 清洗 + 风格后缀 + 备用 prompt
+// 生图 API 调用 + prompt 清洗 + 风格后缀 + 模块化三级降级
 
+// 艺术风格后缀映射
+App.artStyleSuffixes = {
+    'anime': ', high quality anime style, cel shading, vibrant colors',
+    'watercolor': ', watercolor painting style, soft washes, transparent layers, artistic',
+    'oil painting': ', oil painting style, rich textures, impasto brushstrokes, classical',
+    'digital realism': ', digital painting, photorealistic, highly detailed, cinematic lighting',
+    'pencil sketch': ', pencil sketch style, graphite drawing, crosshatching, monochrome',
+    'comic book': ', comic book style, bold outlines, halftone dots, graphic novel art'
+};
+
+// 获取当前艺术风格后缀
+App.getArtStyleSuffix = function() {
+    const style = state.story?.imageStyle || state.story?.artStyle || 'anime';
+    return App.artStyleSuffixes[style] || App.artStyleSuffixes['anime'];
+};
+
+// 拼接风格后缀到 prompt
 App.appendArtStyle = function(prompt) {
-    const style = state.story?.artStyle || 'anime';
-    const styleSuffixes = {
-        'anime': ', high quality anime style, cel shading, vibrant colors',
-        'watercolor': ', watercolor painting style, soft washes, transparent layers, artistic',
-        'oil painting': ', oil painting style, rich textures, impasto brushstrokes, classical',
-        'digital realism': ', digital painting, photorealistic, highly detailed, cinematic lighting',
-        'pencil sketch': ', pencil sketch style, graphite drawing, crosshatching, monochrome',
-        'comic book': ', comic book style, bold outlines, halftone dots, graphic novel art'
-    };
-    return prompt + (styleSuffixes[style] || styleSuffixes['anime']);
-}
+    return prompt + App.getArtStyleSuffix();
+};
 
+// 构建模块化生图 prompt（按降级级别组合）
+// 注意：imageStyle 字段由 LLM 填充但经常出错，统一使用 state.story.imageStyle 作为全局风格
+// level 0: 全身 (face+hair+body+clothes+environment)
+// level 1: 半身 (face+hair+body+clothes)
+// level 2: 特写 (face+hair)
+App.buildModularPrompt = function(character, level) {
+    const parts = [];
+    const mods = character.__modules__ || {};
+
+    const include = {
+        imageFace: level >= 0,
+        imageHair: level >= 0,
+        imageBody: level >= 1,
+        imageClothes: level >= 1,
+        imageEnvironment: level >= 0
+    };
+
+    // 不再使用 LLM 填的 mods.imageStyle（经常填错），直接用全局风格
+    if (include.imageFace && mods.imageFace) parts.push(mods.imageFace);
+    if (include.imageHair && mods.imageHair) parts.push(mods.imageHair);
+    if (include.imageBody && mods.imageBody) parts.push(mods.imageBody);
+    if (include.imageClothes && mods.imageClothes) parts.push(mods.imageClothes);
+    if (include.imageEnvironment && mods.imageEnvironment) parts.push(mods.imageEnvironment);
+
+    let base = parts.join(', ');
+    if (!base) base = 'character portrait';
+
+    // 追加角色信息
+    base += `, portrait of ${character.name || 'character'}, ${character.age || 20} years old, clean background, professional character design`;
+
+    return App.appendArtStyle(base.trim());
+};
+
+// 从角色对象中提取模块化字段
+App.extractModules = function(character) {
+    if (character.__modules__) return character.__modules__;
+    const mods = {};
+    // 新格式：直接字段
+    if (character.imageStyle) mods.imageStyle = character.imageStyle;
+    if (character.imageFace) mods.imageFace = character.imageFace;
+    if (character.imageHair) mods.imageHair = character.imageHair;
+    if (character.imageBody) mods.imageBody = character.imageBody;
+    if (character.imageClothes) mods.imageClothes = character.imageClothes;
+    if (character.imageEnvironment) mods.imageEnvironment = character.imageEnvironment;
+    character.__modules__ = mods;
+    return mods;
+};
+
+// 旧版：清洗 prompt → 追加角色信息 → 追加风格
 App.sanitizeImagePrompt = function(prompt, character) {
     let cleaned = prompt
         .replace(/\bbusty\b/gi, 'well-proportioned')
@@ -37,8 +94,9 @@ App.sanitizeImagePrompt = function(prompt, character) {
     }
 
     return App.appendArtStyle(cleaned.trim());
-}
+};
 
+// 备用 prompt（最后兜底）
 App.buildBackupPrompt = function(character) {
     let gender = 'young person';
     if (character.gender === '男') gender = 'young man';
@@ -47,9 +105,169 @@ App.buildBackupPrompt = function(character) {
         if (/男|男人|男子|先生|他/.test(character.appearance)) gender = 'young man';
         else if (/女|女人|女子|女士|她/.test(character.appearance)) gender = 'young woman';
     }
-    return `Character portrait, ${gender}, ${character.age || 20} years old, friendly expression, clean simple background, soft lighting, detailed character design, professional concept art`;
-}
+    return `Character portrait, ${gender}, ${character.age || 20} years old, friendly expression, clean simple background, soft lighting, detailed character design, professional concept art` + App.getArtStyleSuffix();
+};
 
+// 三级降级生图：完整 → 半身 → 特写 → 备用
+App.generateCharacterImage = async function(character) {
+    if (!character || !character.name) {
+        throw new Error('无效的角色对象，无法生成图片');
+    }
+
+    // 提取模块化字段
+    const mods = App.extractModules(character);
+
+    // 检查是否有模块化数据
+    const hasModules = mods.imageStyle || mods.imageFace || mods.imageHair || mods.imageBody || mods.imageClothes || mods.imageEnvironment;
+
+    let imageUrl;
+
+    if (hasModules) {
+        // 模块化流程：三级降级
+        // level 0 = 全身(face+hair+body+clothes+env)，level 1 = 半身(face+hair+body+clothes)，level 2 = 特写(face+hair)
+        const levels = [
+            { name: '全身', level: 0 },
+            { name: '半身', level: 1 },
+            { name: '特写', level: 2 }
+        ];
+
+        for (const tier of levels) {
+            try {
+                rpLog('info', 'IMG', `尝试 ${tier.name} 生图: ${character.name}`);
+                const prompt = App.buildModularPrompt(character, tier.level);
+                rpLog('debug', 'IMG', `Prompt (${tier.name}): ${prompt.slice(0, 120)}...`);
+                imageUrl = await App.agnesImageGen(prompt);
+                if (imageUrl) {
+                    rpLog('info', 'IMG', `${tier.name} 生成成功: ${character.name}`);
+                    return imageUrl;
+                }
+            } catch (e) {
+                rpLog('warn', 'IMG', `${tier.name} 失败 (${e.message}), 降级到 ${levels[levels.indexOf(tier) + 1]?.name || '备用'}`);
+            }
+        }
+
+        // 模块化全部失败，走备用
+        rpLog('warn', 'IMG', `模块化全部失败，使用备用 prompt: ${character.name}`);
+    }
+
+    // 兜底：旧版 sanitize 流程
+    try {
+        const oldPrompt = character.imagePrompt || '';
+        if (oldPrompt) {
+            const sanitized = App.sanitizeImagePrompt(oldPrompt, character);
+            imageUrl = await App.agnesImageGen(sanitized);
+            if (imageUrl) return imageUrl;
+        }
+    } catch (e) {
+        rpLog('warn', 'IMG', `旧版 prompt 失败: ${e.message}`);
+    }
+
+    // 最终兜底：buildBackupPrompt
+    rpLog('info', 'IMG', '使用最终备用 prompt: ' + character.name);
+    const backup = App.buildBackupPrompt(character);
+    rpLog('debug', 'IMG', `Backup prompt: ${backup.slice(0, 120)}...`);
+    imageUrl = await App.agnesImageGen(backup);
+    if (!imageUrl) throw new Error('所有生图方式均失败');
+    return imageUrl;
+};
+
+// 旧接口：generateCharacterFace（向后兼容，内部调用 generateCharacterImage）
+App.generateCharacterFace = async function(character, imagePrompt) {
+    if (!character || !character.name) {
+        throw new Error('无效的角色对象，无法生成头像');
+    }
+    console.log('开始生成头像:', character.name, imagePrompt?.slice(0, 100) || 'modular');
+
+    const imageUrl = await App.generateCharacterImage(character);
+
+    console.log('头像生成成功:', character.name, imageUrl.slice(0, 80));
+    if (!imageUrl) {
+        throw new Error('未获取到图片 URL');
+    }
+
+    character.faceImageUrl = imageUrl;
+    await saveState();
+
+    // 发送头像消息
+    state.messages.push({
+        id: 'msg_face_' + Date.now(),
+        role: 'char',
+        type: 'image',
+        content: imageUrl,
+        caption: `${character.name} 的角色形象`,
+        charIndex: state.characters.indexOf(character),
+        timestamp: new Date().toISOString()
+    });
+    renderMessage(state.messages[state.messages.length - 1]);
+    await saveMessages();
+
+    addSystemMessage('角色头像生成完成');
+};
+
+// 静默版（并行时使用）
+App.generateCharacterFaceSilent = async function(character, imagePrompt) {
+    if (!character || !character.name) {
+        return null;
+    }
+    console.log('[并行] 开始生成头像:', character.name);
+
+    try {
+        const imageUrl = await App.generateCharacterImage(character);
+        if (!imageUrl) {
+            console.error('[并行] 头像生成失败:', character.name);
+            return null;
+        }
+        character.faceImageUrl = imageUrl;
+        await saveState();
+
+        state.messages.push({
+            id: 'msg_face_' + Date.now(),
+            role: 'char',
+            type: 'image',
+            content: imageUrl,
+            caption: `${character.name} 的角色形象`,
+            charIndex: state.characters.indexOf(character),
+            timestamp: new Date().toISOString()
+        });
+        renderMessage(state.messages[state.messages.length - 1]);
+        await saveMessages();
+
+        console.log('[并行] 头像生成成功:', character.name);
+        return imageUrl;
+    } catch (e) {
+        console.warn('[并行] 头像生成失败:', character.name, e.message);
+        return null;
+    }
+};
+
+// 生成主角头像
+App.generatePlayerAvatar = async function() {
+    const gender = state.player?.gender || '男';
+    const pw = gender === '男' ? 'young man' : 'young woman';
+    const appearance = gender === '男' ? 'handsome, sharp features' : 'beautiful, delicate features';
+    const artStyle = state.story?.imageStyle || 'anime';
+    const styleSuffix = App.artStyleSuffixes[artStyle] || App.artStyleSuffixes['anime'];
+    const prompt = `Portrait of ${pw}, ${appearance}, modern casual clothing, clean background, professional character concept art, detailed facial features${styleSuffix}`;
+
+    console.log(`[主角] 开始生成头像 (性别: ${gender})`);
+
+    try {
+        const imageUrl = await App.agnesImageGen(prompt);
+        if (!imageUrl) {
+            console.error('[主角] 头像生成失败');
+            return null;
+        }
+        state.player.faceImageUrl = imageUrl;
+        await saveState();
+        console.log('[主角] 头像生成成功:', imageUrl.slice(0, 80));
+        return imageUrl;
+    } catch (e) {
+        console.warn('[主角] 头像生成失败:', e.message);
+        return null;
+    }
+};
+
+// 生图 API 调用
 App.agnesImageGen = async function(prompt, size = '768x1024') {
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
@@ -92,4 +310,4 @@ App.agnesImageGen = async function(prompt, size = '768x1024') {
         throw new Error('未获取到图片 URL，API 返回格式异常');
     }
     return imgUrl;
-}
+};

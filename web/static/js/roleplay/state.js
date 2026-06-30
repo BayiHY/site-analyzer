@@ -11,12 +11,16 @@ let state = {
     emotions: {},
     apiKeys: { chat: '', image: '' },
     currentPanel: null,
+    // 玩家信息（主角）
+    player: { gender: '男', faceImageUrl: '' },
     // 渐进式披露：每个角色的已发现信息
     // revealed[charName] = { appearance: bool, personality: bool, background: bool, relationship: bool }
     revealed: {},
     // 场景历史记录：用于判断是否需要生场景图
     // sceneHistory = [{ charName, sceneDesc, imageUrl }]
-    sceneHistory: []
+    sceneHistory: [],
+    // 聊天窗口当前背景场景图 URL
+    currentSceneBg: ''
 };
 
 // ===== IndexedDB 存储（带 localStorage 回退）=====
