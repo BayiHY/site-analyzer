@@ -66,7 +66,7 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
 - speechStyle: 说话风格（20字以内，比如毒舌、温柔、简洁等）
 
 生图模块化字段（全部用英文，供 AI 绘画使用）：
-- imageStyle: 画面风格（英文，如 anime, watercolor, oil painting, digital realism, pencil sketch, comic book）
+- imageStyle: 画面风格（英文，如 anime, watercolor, oil painting, digital realism, pencil sketch, comic book, photorealistic, 3D render, studio ghibli, cyberpunk, fantasy art, chibi, pixel art, ink wash, vaporwave, dark fantasy）
 - imageFace: 五官脸型（英文，描述面部特征，如 sharp jawline, round face, large amber eyes, thin lips）
 - imageHair: 妆扮发型（英文，发型+妆容，如 long silver hair in twin tails, light makeup with smoky eyes）
 - imageBody: 身体四肢（英文，体型+姿态，如 slender figure, athletic build, graceful posture）

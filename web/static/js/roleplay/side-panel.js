@@ -164,6 +164,16 @@ App.renderSettingsPanel = function() {
                 <option value="digital realism" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'digital realism' ? 'selected' : ''}>数字写实 (digital realism)</option>
                 <option value="pencil sketch" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'pencil sketch' ? 'selected' : ''}>铅笔素描 (pencil sketch)</option>
                 <option value="comic book" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'comic book' ? 'selected' : ''}>漫画风 (comic book)</option>
+                <option value="photorealistic" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'photorealistic' ? 'selected' : ''}>照片写实 (photorealistic)</option>
+                <option value="3D render" ${(state.story?.imageStyle || state.story?.artStyle || '') === '3D render' ? 'selected' : ''}>3D渲染 (3D render)</option>
+                <option value="studio ghibli" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'studio ghibli' ? 'selected' : ''}>吉卜力 (Studio Ghibli)</option>
+                <option value="cyberpunk" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'cyberpunk' ? 'selected' : ''}>赛博朋克 (cyberpunk)</option>
+                <option value="fantasy art" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'fantasy art' ? 'selected' : ''}>奇幻插画 (fantasy art)</option>
+                <option value="chibi" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'chibi' ? 'selected' : ''}>Q版 (chibi)</option>
+                <option value="pixel art" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'pixel art' ? 'selected' : ''}>像素风 (pixel art)</option>
+                <option value="ink wash" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'ink wash' ? 'selected' : ''}>水墨画 (ink wash)</option>
+                <option value="vaporwave" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'vaporwave' ? 'selected' : ''}>蒸汽波 (vaporwave)</option>
+                <option value="dark fantasy" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'dark fantasy' ? 'selected' : ''}>暗黑奇幻 (dark fantasy)</option>
             </select>
             <div class="setting-hint">所有角色头像和场景图将使用此统一风格</div>
         </div>

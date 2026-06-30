@@ -8,7 +8,17 @@ App.artStyleSuffixes = {
     'oil painting': ', oil painting style, rich textures, impasto brushstrokes, classical',
     'digital realism': ', digital painting, photorealistic, highly detailed, cinematic lighting',
     'pencil sketch': ', pencil sketch style, graphite drawing, crosshatching, monochrome',
-    'comic book': ', comic book style, bold outlines, halftone dots, graphic novel art'
+    'comic book': ', comic book style, bold outlines, halftone dots, graphic novel art',
+    'photorealistic': ', photorealistic photography, DSLR, natural lighting, 35mm lens, ultra detailed',
+    '3D render': ', 3D render, Octane render, ray tracing, subsurface scattering, volumetric lighting',
+    'studio ghibli': ', Studio Ghibli style, Hayao Miyazaki inspired, lush backgrounds, whimsical',
+    'cyberpunk': ', cyberpunk style, neon lights, futuristic cityscape, dark atmosphere, glowing accents',
+    'fantasy art': ', fantasy art, ethereal atmosphere, magical elements, epic composition, painterly',
+    'chibi': ', chibi style, cute proportion, big head small body, kawaii, adorable',
+    'pixel art': ', pixel art, 16-bit retro game style, dithering, nostalgic',
+    'ink wash': ', Chinese ink wash painting, sumi-e, traditional brushwork, flowing lines, monochrome',
+    'vaporwave': ', vaporwave aesthetic, pastel colors, retro 80s, glitch art, dreamy atmosphere',
+    'dark fantasy': ', dark fantasy, gothic atmosphere, dramatic shadows, moody, mysterious'
 };
 
 // 获取当前艺术风格后缀
