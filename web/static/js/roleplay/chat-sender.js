@@ -28,33 +28,111 @@ App.sendMessage = async function() {
     showTyping();
 
     try {
-        // 构建对话历史
+        // ===== 构建对话历史（保留有意义的对话，过滤 UI 噪声）=====
+        // 过滤规则：
+        // - 保留 user 消息和 char 消息（对话内容）
+        // - 过滤纯 UI 消息（如"正在生成..."、"✅ 角色生成完成！"）
+        // - 过滤 scene 类型消息（场景图）和 img 类型消息（头像图）
+        const HISTORY_LIMIT = 20;
+        const uiNoisePatterns = [
+            /^正在/, /^✅/, /^⚠️/, /^❌/, /^🎨/, /^🔄/, /^📝/, /^🔍/, /^👥/, /^📊/, /^🏗️/
+        ];
+        const isUINoise = (text) => {
+            if (!text || typeof text !== 'string') return false;
+            return uiNoisePatterns.some(p => p.test(text.trim()));
+        };
+
         const history = state.messages
-            .filter(m => m.role !== 'system')
-            .slice(-20)
-            .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
+            .filter(m => {
+                // 保留 user 和 char 类型的消息
+                if (m.role === 'user' || m.role === 'char') return true;
+                // 过滤 UI 噪声
+                if (m.type === 'system' && isUINoise(m.content)) return false;
+                // 保留非噪声的 system 消息（如开场白）
+                if (m.type === 'system') return true;
+                return false;
+            })
+            .slice(-HISTORY_LIMIT)
+            .map(m => ({
+                role: m.role === 'user' ? 'user' : 'assistant',
+                content: m.content || ''
+            }));
 
-        const emotions = state.emotions[activeChar.name] || {};
-        const emotionDesc = Object.entries(emotions).map(([k, v]) => {
-            const val = v.current ?? 0;
-            const label = val >= 60 ? '非常积极' : val >= 30 ? '中性偏积极' : '冷淡/警惕';
-            return `${k}(${val}/100, ${label})`;
-        }).join('、');
-
+        // ===== 构建全局上下文 =====
+        // 1) 世界观概要（精简版，≤200字）
+        const worldviewBrief = (state.story?.worldview || '').slice(0, 200);
+        
+        // 2) 主线弧光当前阶段
+        const mainArcBrief = state.story?.mainArc?.length > 0
+            ? state.story.mainArc.slice(0, 3).map(a => `・${a.phase}：${a.description}`).join('\n')
+            : '';
+        
+        // 3) 氛围基调
+        const toneKeywords = (state.story?.toneKeywords || []).join('、');
+        
+        // 4) 所有角色列表
+        const allChars = state.characters || [];
+        
+        // 5) 角色间关系提示（从 background 中提取与其他角色的关系名）
+        const relationshipHints = allChars.flatMap((c, i) => {
+            if (!c.background) return [];
+            const otherNames = allChars
+                .filter((_, j) => j !== i)
+                .map(o => o.name);
+            const mentions = otherNames.filter(n => c.background.includes(n));
+            return mentions.map(m => `  ${c.name} ↔ ${m}（背景中提及）`);
+        });
+        const relationshipSection = relationshipHints.length > 0
+            ? '\n【角色关系网】\n' + relationshipHints.join('\n')
+            : '';
+        
+        // 6) 动态属性
+        const perception = activeChar.perception ? `玩家印象：${activeChar.perception}` : '';
+        const secret = activeChar.secret ? `秘密线索：${activeChar.secret}` : '';
+        const currentMood = activeChar.currentMood ? `当前心情：${activeChar.currentMood}` : '';
+        const dynamicAttrs = [perception, secret, currentMood].filter(Boolean).join('；') || '暂无';
+        
+        // 7) 披露状态
+        const revealed = state.revealed[activeChar.name] || {};
+        const revealedStatus = Object.entries(revealed)
+            .filter(([k, v]) => typeof v === 'boolean' && k !== '_lastNew')
+            .map(([k, v]) => `${k}: ${v ? '已发现' : '未发现'}`)
+            .join('、');
+        
         const systemPrompt = `你是${activeChar.name}，${activeChar.gender ? activeChar.gender + '性' : ''}${activeChar.age ? '，' + activeChar.age + '岁' : ''}。
 请使用中文回复。
+
+=== 世界设定 ===
+【世界观概要】${worldviewBrief || '未设定'}
+${mainArcBrief ? '【主线弧光】\n' + mainArcBrief : ''}
+【氛围基调】${toneKeywords || '未设定'}
+【画面风格】${state.story?.imageStyle || 'anime'}。场景描写、环境氛围、角色动作都要符合这一视觉风格。
+
+=== 当前角色档案 ===
+姓名：${activeChar.name}
 性别：${activeChar.gender || '未指定'}
+年龄：${activeChar.age || '未知'}
 外貌：${activeChar.appearance || '未指定'}
 性格：${activeChar.personality || '温柔'}
 背景：${activeChar.background || ''}
 与用户关系：${activeChar.relationship || '普通认识'}
+核心动机：${activeChar.motivation || ''}
+隐藏秘密：${activeChar.secret || '暂未发现'}
+说话风格：${activeChar.speechStyle || ''}
+${dynamicAttrs !== '暂无' ? '【动态属性】' + dynamicAttrs : ''}
+${revealedStatus ? '【信息披露】' + revealedStatus : ''}
 
-【画面风格】${state.story?.imageStyle || 'anime'}。场景描写、环境氛围、角色动作都要符合这一视觉风格。
+=== 场景中其他角色 ===${allChars.filter((_, i) => i !== state.activeCharIndex).map(c => `
+- ${c.name}（${c.gender}，${c.age}岁）— ${c.appearance ? '外貌：' + c.appearance.slice(0, 30) : ''}${c.relationship ? '，与主角：' + c.relationship : ''}`).join('')}${relationshipSection ? '【角色关系网】\n' + relationshipSection : ''}
 
-当前情感指标（隐性，不向玩家展示）：${emotionDesc || '无'}
+=== 情感指标（隐性，不向玩家展示） ===
+${Object.entries(state.emotions[activeChar.name] || {}).map(([k, v]) => {
+    const val = v.current ?? 50;
+    return `${k}：${val}/100（${val >= 60 ? '非常积极' : val >= 30 ? '中性偏积极' : '冷淡/警惕'}）`;
+}).join('，') || '无数据'}
 - 好感度高时表现热情主动，低时表现疏离或试探
 
-【回复格式要求】
+=== 回复格式要求 ===
 请严格按以下格式回复（每个符号都不能省略）：
 
 {场景描述}角色1:(动作)对话内容[内心想法]|角色2:(动作)对话内容[内心想法]<建议回复1|建议回复2|建议回复3>
@@ -76,10 +154,10 @@ App.sendMessage = async function() {
 
 注意：
 - 如果场景发生变化，{场景} 要体现新场景
-- 对话内容要符合角色性格和当前情境
-- 建议回复是主角的语言或动作表现，推动剧情发展，每条不超过15字
-- 内心想法默认以"内心想法"按钮呈现，点击才显示
-- 多个角色同时互动时，用 | 分隔各角色对话段`;
+- 对话内容要符合角色性格、背景和当前情境
+- 多个角色同时互动时，用 | 分隔各角色对话段
+- 角色之间的互动要考虑他们的关系网（如亲友、敌对、师徒等）
+- 建议回复是主角的语言或动作表现，推动剧情发展，每条不超过15字`;
 
         const messages = [
             { role: 'system', content: systemPrompt },
@@ -99,46 +177,56 @@ App.sendMessage = async function() {
         }
         await saveMessages();
 
-        // ===== 后处理 1: 场景图生成 → 见 scene-images.js =====
-        try {
-            const sceneDesc = App.parseSceneFromReply(response);
-            if (sceneDesc && App.isSceneChanged(activeChar.name, sceneDesc)) {
-                await App.generateSceneImage(activeChar.name, sceneDesc, activeChar);
-            }
-        } catch (e) {
-            console.warn('场景图生成失败:', e);
-        }
+        // 角色消息渲染完成，立即解锁发送按钮
+        document.getElementById('send-btn').disabled = false;
 
-        // ===== 后处理 2: 情感指标更新 → 见 emotion-update.js =====
-        try {
-            await App.updateEmotions(activeChar.name, text, response);
-        } catch (e) {
-            console.warn('情感更新失败:', e);
-        }
-
-        // ===== 后处理 3: 信息披露评估 → 见 progressive-disclosure.js =====
-        try {
-            await App.updateRevealedInfo(activeChar.name, text, response);
-            if (state.currentPanel === 'characters') {
-                document.getElementById('panel-body').innerHTML = renderCharactersPanel();
-            }
-        } catch (e) {
-            console.warn('信息披露评估失败:', e);
-        }
-
-        // ===== 后处理 4: 动态属性更新 → 见 dynamic-attrs.js =====
-        try {
-            await App.updateDynamicAttributes(activeChar.name, text, response);
-        } catch (e) {
-            console.warn('动态属性更新失败:', e);
-        }
+        // ===== 后处理：4 项并行执行，后台运行不阻塞用户操作 =====
+        Promise.allSettled([
+            // 后处理 1: 场景图生成 → 见 scene-images.js
+            (async () => {
+                try {
+                    const sceneDesc = App.parseSceneFromReply(response);
+                    if (sceneDesc && App.isSceneChanged(activeChar.name, sceneDesc)) {
+                        await App.generateSceneImage(activeChar.name, sceneDesc, activeChar);
+                    }
+                } catch (e) {
+                    console.warn('场景图生成失败:', e);
+                }
+            })(),
+            // 后处理 2: 情感指标更新 → 见 emotion-update.js
+            (async () => {
+                try {
+                    await App.updateEmotions(activeChar.name, text, response);
+                } catch (e) {
+                    console.warn('情感更新失败:', e);
+                }
+            })(),
+            // 后处理 3: 信息披露评估 → 见 progressive-disclosure.js
+            (async () => {
+                try {
+                    await App.updateRevealedInfo(activeChar.name, text, response);
+                    if (state.currentPanel === 'characters') {
+                        document.getElementById('panel-body').innerHTML = renderCharactersPanel();
+                    }
+                } catch (e) {
+                    console.warn('信息披露评估失败:', e);
+                }
+            })(),
+            // 后处理 4: 动态属性更新 → 见 dynamic-attrs.js
+            (async () => {
+                try {
+                    await App.updateDynamicAttributes(activeChar.name, text, response);
+                } catch (e) {
+                    console.warn('动态属性更新失败:', e);
+                }
+            })()
+        ]);
 
     } catch (err) {
         hideTyping();
         addSystemMessage(`回复失败: ${err.message || '未知错误'}`);
+        document.getElementById('send-btn').disabled = false;
     }
-
-    document.getElementById('send-btn').disabled = false;
 }
 
 // === 解析新格式的多角色回复 ===
