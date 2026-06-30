@@ -50,7 +50,10 @@ App.buildModularPrompt = function(character, level) {
     if (!base) base = 'character portrait';
 
     // 追加角色信息 + 分级 framing 提示词
-    base += `, ${character.name || 'character'}, ${character.age || 20} years old`;
+    let genderStr = 'male';
+    if (character.gender === '男') genderStr = 'male';
+    else if (character.gender === '女') genderStr = 'female';
+    base += `, ${character.name || 'character'}, ${character.age || 20} years old, ${genderStr}`;
     if (level === 0) {
         base += ', full body shot from head to toe, standing pose, complete figure';
     } else if (level === 1) {
@@ -97,7 +100,10 @@ App.sanitizeImagePrompt = function(prompt, character) {
         .replace(/\blingerie\b/gi, 'casual wear');
 
     if (character && character.appearance) {
-        cleaned += `, ${character.name}, ${character.age} years old, wearing ${character.appearance}`;
+        let genderStr = '';
+        if (character.gender === '男') genderStr = 'male ';
+        else if (character.gender === '女') genderStr = 'female ';
+        cleaned += `, ${character.name}, ${character.age} years old, ${genderStr}wearing ${character.appearance}`;
     }
 
     return App.appendArtStyle(cleaned.trim());

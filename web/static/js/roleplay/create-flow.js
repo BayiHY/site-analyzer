@@ -35,11 +35,17 @@ App.createCharacter = async function() {
     state.emotions = {};
     state.revealed = {};
 
-    // 从用户灵感中自动检测画面风格
+    // 画面风格优先级：用户手动选择 > 灵感检测 > 默认 anime
+    const setupSelect = document.getElementById('setup-art-style');
+    const userSelectedStyle = setupSelect && setupSelect.value ? setupSelect.value : null;
     const detectedStyle = App.detectVisualStyleFromInspiration(storyPrompt);
-    const imageStyle = detectedStyle || 'anime';
-    if (detectedStyle) {
+    const imageStyle = userSelectedStyle || detectedStyle || 'anime';
+    rpLog('info', 'STYLE', `[createCharacter] userSelectedStyle="${userSelectedStyle}", detectedStyle="${detectedStyle}", final imageStyle="${imageStyle}"`);
+    if (detectedStyle && !userSelectedStyle) {
         rpLog('info', 'STYLE', `从灵感中检测到画面风格: ${detectedStyle}`);
+    }
+    if (userSelectedStyle) {
+        rpLog('info', 'STYLE', `使用用户手动选择的画面风格: ${userSelectedStyle}`);
     }
 
     state.story = {

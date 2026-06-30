@@ -20,14 +20,10 @@ App.generateWorldview = async function(userInspiration) {
         }));
     }
 
-    // 从用户灵感中检测画面风格
-    const detectedStyle = App.detectVisualStyleFromInspiration(userInspiration || '');
-    const visualStyle = detectedStyle || state.story?.imageStyle || 'anime';
-    if (detectedStyle) {
-        rpLog('info', 'WORLDVIEW', `画面风格: ${visualStyle}（从灵感检测）`);
-    } else {
-        rpLog('info', 'WORLDVIEW', `画面风格: ${visualStyle}（默认/设置）`);
-    }
+    // 画面风格：直接使用 state.story.imageStyle（已在 create-character 中设置好）
+    // 不再在此处重复检测灵感，避免与生图风格产生矛盾
+    const visualStyle = state.story?.imageStyle || 'anime';
+    rpLog('info', 'WORLDVIEW', `画面风格: ${visualStyle}`);
 
     let systemPrompt;
     if (factors) {

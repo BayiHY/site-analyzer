@@ -33,8 +33,20 @@
             </div>
             <div class="form-group api-key-group">
                 <label>生图 API Key <span style="color:#666;font-weight:normal;">（选填，用于生成角色头像）</span></label>
-                <input type="password" id="setup-image-key" placeholder="输入 Agnes 生图 API Key">
+                <input type="password" id="setup-image-key" placeholder="输入 Agnes 生图 API Key" oninput="App.onSetupImageKeyChange()">
                 <button type="button" class="api-key-clear" onclick="clearApiKey('setup-image-key')" title="清除">清除</button>
+            </div>
+            <div class="form-group">
+                <label>🎨 画面风格 <span style="color:#666;font-weight:normal;">（用于角色头像和场景图生成，留空则默认动漫风）</span></label>
+                <select id="setup-art-style">
+                    <option value="anime">动漫风 (anime)</option>
+                    <option value="watercolor">水彩风 (watercolor)</option>
+                    <option value="oil painting">油画风 (oil painting)</option>
+                    <option value="digital realism">数字写实 (digital realism)</option>
+                    <option value="pencil sketch">铅笔素描 (pencil sketch)</option>
+                    <option value="comic book">漫画风 (comic book)</option>
+                </select>
+                <div class="setting-hint" style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">灵感中检测到画面风格会自动选中，也可手动修改</div>
             </div>
             <div class="form-group">
                 <label>故事灵感 <span style="color:#666;font-weight:normal;">（选填）</span></label>

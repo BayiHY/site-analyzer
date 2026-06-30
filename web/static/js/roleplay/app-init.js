@@ -32,6 +32,38 @@ App.detectVisualStyleFromInspiration = function(inspiration) {
     return null;
 };
 
+// === 画面风格选择器显示/隐藏 ===
+App.setupArtStyleOptions = function(detectedStyle) {
+    const select = document.getElementById('setup-art-style');
+    if (!select) return detectedStyle || 'anime';
+    // 只有在检测到风格时才覆盖用户选择，不检测到时保持用户当前的选择
+    if (detectedStyle) {
+        select.value = detectedStyle;
+        return detectedStyle;
+    }
+    return select.value || 'anime';
+};
+
+App.onSetupImageKeyChange = function() {
+    // 生图 key 变化时，如果灵感框有内容，重新检测画面风格
+    const storyPrompt = document.getElementById('story-prompt')?.value.trim() || '';
+    if (storyPrompt) {
+        const detectedStyle = App.detectVisualStyleFromInspiration(storyPrompt);
+        App.setupArtStyleOptions(detectedStyle);
+    }
+};
+
+// 监听灵感输入框变化，实时更新画面风格预选
+document.addEventListener('DOMContentLoaded', () => {
+    const storyPromptEl = document.getElementById('story-prompt');
+    if (storyPromptEl) {
+        storyPromptEl.addEventListener('input', function() {
+            const detectedStyle = App.detectVisualStyleFromInspiration(this.value.trim());
+            App.setupArtStyleOptions(detectedStyle);
+        });
+    }
+});
+
 App.resetStory = async function() {
     if (!confirm('确定要重新生成随机故事吗？当前故事将被替换为全新的随机故事。')) return;
     
