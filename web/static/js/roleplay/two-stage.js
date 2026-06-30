@@ -127,11 +127,10 @@ App.initializeStory = async function(userInspiration, playerGender) {
     
     state.messages.push({
         id: 'msg_' + Date.now(),
-        role: 'char',
+        role: 'system',
         type: 'text',
         content: openingText,
         timestamp: new Date().toISOString(),
-        charIndex: 0,
         suggestedReplies: openingReplies
     });
     renderMessage(state.messages[state.messages.length - 1]);
