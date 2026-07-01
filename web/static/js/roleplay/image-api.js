@@ -46,7 +46,7 @@ App.buildModularPrompt = function(character, level) {
         imageHair: level >= 0,
         imageBody: level >= 1,
         imageClothes: level >= 1,
-        imageEnvironment: level >= 0
+        imageEnvironment: level >= 0 && level <= 1
     };
 
     // 不再使用 LLM 填的 mods.imageStyle（经常填错），直接用全局风格
@@ -69,7 +69,7 @@ App.buildModularPrompt = function(character, level) {
     } else if (level === 1) {
         base += ', medium shot from waist up, upper body portrait';
     } else {
-        base += ', close-up portrait from upper chest to collarbone, face detail shot';
+        base += ', face close-up, front view, head and neck framing, shoulder contour visible, calm natural expression, soft even diffused lighting, character reference sheet style, high detail, high quality, moderate framing, tasteful composition, implicit and non-explicit content';
     }
 
     return App.appendArtStyle(base.trim());
