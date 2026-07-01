@@ -41,12 +41,14 @@ App.buildModularPrompt = function(character, level) {
     const parts = [];
     const mods = character.__modules__ || {};
 
+    // 一级/二级：只用 imageFace + imageHair（面部特写）
+    // 零级/一级（全身/半身）：face + hair + body + clothes + environment
     const include = {
-        imageFace: level >= 0,
-        imageHair: level >= 0,
-        imageBody: level >= 1,
-        imageClothes: level >= 1,
-        imageEnvironment: level >= 0 && level <= 1
+        imageFace: true,
+        imageHair: true,
+        imageBody: level <= 1 && mods.imageBody,
+        imageClothes: level <= 1 && mods.imageClothes,
+        imageEnvironment: level <= 1 && mods.imageEnvironment
     };
 
     // 不再使用 LLM 填的 mods.imageStyle（经常填错），直接用全局风格
@@ -64,12 +66,19 @@ App.buildModularPrompt = function(character, level) {
     if (character.gender === '男') genderStr = 'male';
     else if (character.gender === '女') genderStr = 'female';
     base += `, ${character.name || 'character'}, ${character.age || 20} years old, ${genderStr}`;
-    if (level === 0) {
-        base += ', full body shot from head to toe, standing pose, complete figure';
-    } else if (level === 1) {
-        base += ', medium shot from waist up, upper body portrait';
+
+    if (level === 2) {
+        // 一阶段面部特写：仅用脸型五官发型妆扮，精确约束
+        base += ', front view, head and neck framing, shoulder contour visible, calm natural expression, soft even diffused lighting, character reference sheet style, high detail, high quality, moderate framing, tasteful composition, implicit and non-explicit content';
     } else {
-        base += ', face close-up, front view, head and neck framing, shoulder contour visible, calm natural expression, soft even diffused lighting, character reference sheet style, high detail, high quality, moderate framing, tasteful composition, implicit and non-explicit content';
+        // 二阶段全身/半身：强调与一阶段面部特写参考图保持一致性
+        // 去掉可能与一致性产生冲突的提示词（如表情、光影、构图等），由参考图承担面部特征
+        base += ', consistent facial features with character reference, matching face shape and hairstyle and makeup, ';
+        if (level === 0) {
+            base += 'full body shot from head to toe, standing pose, complete figure';
+        } else {
+            base += 'medium shot from waist up, upper body portrait';
+        }
     }
 
     return App.appendArtStyle(base.trim());
