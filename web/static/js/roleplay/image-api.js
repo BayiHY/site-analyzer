@@ -140,7 +140,7 @@ App.buildBackupPrompt = function(character) {
     return `Character portrait, ${gender}, ${character.age || 20} years old, friendly expression, soft lighting, detailed character design, professional concept art` + App.getArtStyleSuffix();
 };
 
-// 三级降级生图：完整 → 半身 → 特写 → 备用
+// 两阶段生图：一阶段面部特写（无降级）→ 二阶段全身/半身（三级降级）
 // 新流程：先生成面部特写（level 2），再用 img2img 从特写生成全身/半身
 App.generateCharacterImage = async function(character) {
     if (!character || !character.name) {
@@ -156,7 +156,7 @@ App.generateCharacterImage = async function(character) {
     let imageUrl;
 
     if (hasModules) {
-        // === 第一步：生成面部特写（高精度） ===
+        // === 第一步：生成面部特写（无降级，失败则跳过） ===
         rpLog('info', 'IMG', `📷 第一步：生成面部特写: ${character.name}`);
         const facePrompt = App.buildModularPrompt(character, 2); // level 2 = 特写
         rpLog('debug', 'IMG', `面部特写 Prompt: ${facePrompt.slice(0, 150)}...`);
@@ -174,8 +174,7 @@ App.generateCharacterImage = async function(character) {
         // === 第二步：从面部特写出发，三级降级生成全身/半身 ===
         const levels = [
             { name: '全身', level: 0 },
-            { name: '半身', level: 1 },
-            { name: '特写', level: 2 }
+            { name: '半身', level: 1 }
         ];
 
         for (const tier of levels) {
