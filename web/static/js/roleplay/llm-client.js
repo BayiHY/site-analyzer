@@ -76,6 +76,14 @@ App.agnesChat = async function(messages, options = {}) {
     rpLog('info', 'LLM', `温度: ${temperature}, 消息数: ${normalizedMessages.length} (原始 ${messages.length})`);
     rpLog('info', 'LLM', `输入字符数: ${inputChars}`);
 
+    // 【日志】输出完整请求内容（每条消息的 role + content）
+    rpLog('info', 'LLM-REQUEST', '--- 完整请求内容 ---');
+    normalizedMessages.forEach((m, idx) => {
+        rpLog('info', 'LLM-REQUEST', `[消息 ${idx}] role=${m.role}, content_len=${(m.content || '').length}`);
+        const c = m.content || '';
+        rpLog('info', 'LLM-REQUEST', c.length > 10000 ? c.slice(0, 10000) + '\n\n[内容过长，已截断至10000字符，原始长度=' + c.length + ']' : c);
+    });
+
     const startTime = Date.now();
     const resp = await fetch(url, {
         method: 'POST',
@@ -103,6 +111,12 @@ App.agnesChat = async function(messages, options = {}) {
     const data = await resp.json();
     const reply = data.choices?.[0]?.message?.content || '';
     const outputChars = reply.length;
+
+    // 【日志】输出完整返回内容
+    rpLog('info', 'LLM-RESPONSE', '--- 完整返回内容 ---');
+    const respDisplay = reply.length > 10000 ? reply.slice(0, 10000) + '\n\n[内容过长，已截断至10000字符，原始长度=' + reply.length + ']' : reply;
+    rpLog('info', 'LLM-RESPONSE', respDisplay);
+
     rpLog('info', 'LLM', `✅ 对话请求成功, 耗时: ${(elapsedMs/1000).toFixed(1)}s, 输入: ${inputChars}字符, 输出: ${outputChars}字符`);
     rpLog('debug', 'LLM', `回复预览: ${reply.slice(0, 120)}...`);
     return reply;
