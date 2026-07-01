@@ -64,7 +64,13 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
 - motivation: 核心动机/欲望（20字以内，驱动角色行动的根本原因）
 - secret: 隐藏的秘密（30字以内，可以在冒险中逐步揭示）
 - speechStyle: 说话风格（20字以内，比如毒舌、温柔、简洁等）
-- voice: Edge TTS 语音名称（英文，如 zh-CN-XiaoxiaoNeural, zh-CN-YunxiNeural 等）。根据角色性别和性格自动匹配：女角色用 Xiaoxiao/Xiaoyi，男角色用 Yunxi/Yunjian。同一故事不同角色尽量用不同音色。
+- voice: Edge TTS 语音名称（必须从以下列表中选取，不要编造不存在的声音）
+
+【女声（4个）】zh-CN-XiaoxiaoNeural（温柔知性）、zh-CN-XiaoyiNeural（活泼甜美）、zh-CN-liaoning-XiaobeiNeural（东北俏皮）、zh-CN-shaanxi-XiaoniNeural（西北温婉）
+
+【男声（4个）】zh-CN-YunxiNeural（沉稳磁性）、zh-CN-YunjianNeural（阳光开朗）、zh-CN-YunxiaNeural（温和儒雅）、zh-CN-YunyangNeural（成熟稳重）
+
+根据角色性别和性格自动匹配对应声线。同一故事不同角色尽量用不同音色，避免重复。
 
 生图模块化字段（全部用英文，供 AI 绘画使用）：
 - imageStyle: 画面风格（英文，如 anime, watercolor, oil painting, digital realism, pencil sketch, comic book, photorealistic, 3D render, studio ghibli, cyberpunk, fantasy art, chibi, pixel art, ink wash, vaporwave, dark fantasy）
