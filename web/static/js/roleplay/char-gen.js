@@ -105,6 +105,8 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
     let retryPromptSuffix = '';
 
     do {
+        rpLog('info', 'TIMEOUT', `LLM 请求开始: characters, count=${count}, retry=${retryCount}`);
+        const charStartTime = Date.now();
         resp = await App.agnesChat([{
             role: 'system',
             content: '你是专业的角色设计师，擅长创造立体、有深度的虚构角色。输出必须严格按照分隔符格式。'
@@ -112,6 +114,11 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
             role: 'user',
             content: prompt + retryPromptSuffix
         }]);
+        const charElapsed = Date.now() - charStartTime;
+        rpLog('info', 'TIMEOUT', `LLM 请求完成: characters, 耗时 ${charElapsed}ms`);
+        if (charElapsed > 60000) {
+            rpLog('error', 'TIMEOUT', `⚠️ 超时警告: characters 请求耗时 ${charElapsed}ms`);
+        }
 
         try {
             parsedBlocks = parseDelimited(resp);
@@ -124,8 +131,8 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
             if (Array.isArray(parsedBlocks)) {
                 rpLog('info', 'CHARS', `所有解析块 names: ${JSON.stringify(parsedBlocks.map(b => b.name))}`);
             }
-            // 调试：打印 LLM 原始输出（脱敏后）
-            rpLog('debug', 'CHARS', `LLM 原始输出预览: ${resp.slice(0, 500)}...`);
+            // 调试：打印 LLM 原始输出
+            rpLog('info', 'TITLE', `LLM 原始输出: ${resp.slice(0, 2000)}...`);
         } catch (e) {
             rpLog('warn', 'CHARS', '分隔符解析失败: ' + e.message);
             rpLog('warn', 'CHARS', `LLM 原始返回: ${resp}`);
@@ -243,7 +250,7 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
 
     // 声线去重：LLM 分配的 voice 优先，未分配的按性别从可用池中轮询选取
     const allVoicesByGender = {
-        '女': ['zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural', 'zh-CN-liaoning-XiaobeiNeural', 'zh-CN-shaanxi-XiaoniNeural'],
+        '女': ['zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural'],
         '男': ['zh-CN-YunxiNeural', 'zh-CN-YunjianNeural', 'zh-CN-YunxiaNeural', 'zh-CN-YunyangNeural']
     };
     const usedVoices = new Set();

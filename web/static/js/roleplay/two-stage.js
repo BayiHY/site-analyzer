@@ -10,8 +10,23 @@ App.initializeStory = async function(userInspiration, playerGender) {
         addSystemMessage('✅ 世界观已生成！现在可以生成角色了。');
         rpLog('info', 'INIT', '第一阶段完成');
     } catch (err) {
-        rpLog('error', 'INIT', '世界观生成失败: ' + (err.message || String(err)));
-        throw err;
+        const errMsg = (err.message || String(err));
+        rpLog('error', 'INIT', '世界观生成失败: ' + errMsg);
+        // 如果是因为超时（abort），降级到 agnes-1.5-flash + 温度 0.6 重试
+        if (errMsg.includes('abort') || errMsg.includes('Abort') || errMsg.includes('Failed to fetch')) {
+            rpLog('warn', 'INIT', '检测到超时/中断，降级到 agnes-1.5-flash + 温度 0.6 重试...');
+            addSystemMessage('⏱️ 生成超时，正在使用备用模型重试...');
+            try {
+                await App.generateWorldview(userInspiration, { model: 'agnes-1.5-flash', temperature: 0.6 });
+                addSystemMessage('✅ 世界观已通过备用模型生成！');
+                rpLog('info', 'INIT', '第一阶段降级重试成功');
+            } catch (err2) {
+                rpLog('error', 'INIT', '降级重试也失败: ' + (err2.message || String(err2)));
+                throw err2;
+            }
+        } else {
+            throw err;
+        }
     }
 
     addSystemMessage('正在生成角色...');
@@ -87,7 +102,15 @@ App.initializeStory = async function(userInspiration, playerGender) {
             if (state.story.openingScene) {
                 rpLog('info', 'SCENE', '角色头像全部完成，开始生成初始场景图');
                 addSystemMessage('🖼️ 正在生成场景图...');
-                await App.generateInitialSceneImage(state.story.openingScene);
+                // 初始场景图：没有 LLM 元数据，传入所有角色作为在场角色
+                const allCharNames = state.characters.map(c => c.name);
+                const initMeta = allCharNames.length > 0 ? {
+                    sceneDesc: state.story.openingScene.slice(0, 200),
+                    presentCharacters: allCharNames,
+                    actions: {},
+                    dialogues: {}
+                } : null;
+                await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene, initMeta);
                 rpLog('info', 'SCENE', '初始场景图生成完成');
             }
         } catch (imgErr) {

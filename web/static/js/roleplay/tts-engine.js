@@ -4,7 +4,7 @@
 
 // ===== TTS 音色配置 =====
 const TTS_VOICES = {
-    // 普通话 - 女声
+    // 普通话 - 女声（Edge TTS 实际可用的只有2个）
     'zh-CN-XiaoxiaoNeural': { name: '晓晓', gender: '女', style: '温暖', desc: '温柔型女主、治愈系' },
     'zh-CN-XiaoyiNeural':   { name: '晓伊', gender: '女', style: '活泼', desc: '元气少女、邻家妹妹' },
     // 普通话 - 男声
@@ -12,9 +12,6 @@ const TTS_VOICES = {
     'zh-CN-YunxiNeural':    { name: '云希', gender: '男', style: '阳光', desc: '阳光少年、暖男' },
     'zh-CN-YunxiaNeural':   { name: '云夏', gender: '男', style: '可爱', desc: '正太、呆萌系' },
     'zh-CN-YunyangNeural':  { name: '云扬', gender: '男', style: '专业', desc: '医生、律师、上司' },
-    // 方言
-    'zh-CN-liaoning-XiaobeiNeural': { name: '晓北', gender: '女', style: '幽默', desc: '辽宁话' },
-    'zh-CN-shaanxi-XiaoniNeural':   { name: '晓妮', gender: '女', style: '明亮', desc: '陕西话' },
     // 港台
     'zh-HK-HiuGaaiNeural':  { name: '希佳', gender: '女', style: '友善', desc: '粤语' },
     'zh-HK-HiuMaanNeural':  { name: '希曼', gender: '女', style: '友善', desc: '粤语' },
@@ -392,7 +389,6 @@ App.renderVoiceSelector = function(selectEl, selectedVoice, onChange) {
     const groups = {
         '普通话 - 女声': ['zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural'],
         '普通话 - 男声': ['zh-CN-YunjianNeural', 'zh-CN-YunxiNeural', 'zh-CN-YunxiaNeural', 'zh-CN-YunyangNeural'],
-        '方言': ['zh-CN-liaoning-XiaobeiNeural', 'zh-CN-shaanxi-XiaoniNeural'],
         '港台': ['zh-HK-HiuGaaiNeural', 'zh-HK-HiuMaanNeural', 'zh-HK-WanLungNeural', 'zh-TW-HsiaoChenNeural', 'zh-TW-HsiaoYuNeural', 'zh-TW-YunJheNeural']
     };
     

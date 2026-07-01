@@ -4,10 +4,20 @@
 window._rpLogEntries = [];
 let _rpLogCollapsed = false;
 
+// 日志过滤：只打印特定 tag 的日志（精简模式）
+const _RP_LOG_FILTER_ACTIVE = true;
+const _RP_LOG_TAGS = new Set(['TITLE', 'SCENE', 'TIMEOUT', 'META', 'PARSE', 'PARSE-REPLY', 'WORLDVIEW']);
+
 function rpLog(level, tag, msg) {
     const now = new Date();
     const ts = now.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3, '0');
     const entry = { level, tag, msg, t: Date.now(), ts };
+    
+    // 精简模式：只打印过滤列表中的 tag
+    if (_RP_LOG_FILTER_ACTIVE && !_RP_LOG_TAGS.has(tag)) {
+        return;
+    }
+    
     console.log('[' + ts + '] [' + level.toUpperCase() + '] [' + tag + '] ' + msg);
     window._rpLogEntries.push(entry);
     renderLogPanel();

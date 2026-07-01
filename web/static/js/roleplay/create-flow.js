@@ -35,19 +35,12 @@ App.createCharacter = async function() {
     state.emotions = {};
     state.revealed = {};
 
-    // 画面风格优先级：用户手动选择 > 灵感检测 > 默认 anime
+    // 画面风格优先级：灵感检测 > 用户手动选择 > 默认 anime
+    // 灵感检测使用 LLM 语义识别，不做转译/映射
     const setupSelect = document.getElementById('setup-art-style');
     const userSelectedStyle = setupSelect && setupSelect.value ? setupSelect.value : null;
-    const detectedStyle = App.detectVisualStyleFromInspiration(storyPrompt);
-    const imageStyle = userSelectedStyle || detectedStyle || 'anime';
-    rpLog('info', 'STYLE', `[createCharacter] userSelectedStyle="${userSelectedStyle}", detectedStyle="${detectedStyle}", final imageStyle="${imageStyle}"`);
-    if (detectedStyle && !userSelectedStyle) {
-        rpLog('info', 'STYLE', `从灵感中检测到画面风格: ${detectedStyle}`);
-    }
-    if (userSelectedStyle) {
-        rpLog('info', 'STYLE', `使用用户手动选择的画面风格: ${userSelectedStyle}`);
-    }
-
+    
+    // 立即切换到聊天界面，避免用户看到卡死
     state.story = {
         title: '',
         worldview: '',
@@ -58,9 +51,8 @@ App.createCharacter = async function() {
         factors: null,
         userInspiration: '',
         phase: 'idle',
-        imageStyle: imageStyle
+        imageStyle: userSelectedStyle || 'anime'
     };
-
     state.messages = [];
 
     try {
@@ -71,9 +63,30 @@ App.createCharacter = async function() {
 
     showChatScreen();
     renderMessages();
-
     document.getElementById('send-btn').disabled = true;
     addSystemMessage('正在初始化故事世界...');
+
+    // LLM 语义识别画面风格（异步，失败则 fallback 到用户选择）
+    let detectedStyle = null;
+    try {
+        detectedStyle = await App.extractStyleFromInspiration(storyPrompt);
+    } catch (e) {
+        rpLog('warn', 'STYLE', `LLM 风格识别异常: ${e.message}，使用用户选择`);
+    }
+    
+    // 优先使用 LLM 检测到的风格（即使不在预设选项中，也直接用作提示词后缀）
+    let imageStyle;
+    if (detectedStyle && detectedStyle !== 'anime') {
+        imageStyle = detectedStyle;
+        rpLog('info', 'STYLE', `从灵感中检测到画面风格（最高优先级）: ${detectedStyle}`);
+    } else if (userSelectedStyle) {
+        imageStyle = userSelectedStyle;
+        rpLog('info', 'STYLE', `使用用户手动选择的画面风格: ${userSelectedStyle}`);
+    } else {
+        imageStyle = 'anime';
+        rpLog('info', 'STYLE', `使用默认画面风格: anime`);
+    }
+    state.story.imageStyle = imageStyle;
 
     try {
         rpLog('info', 'CREATE', `开始两阶段初始化，玩家性别: ${playerGender}`);
@@ -128,7 +141,15 @@ App.generateCharactersAndStart = async function() {
                 if (state.story.openingScene) {
                     rpLog('info', 'SCENE', '角色头像全部完成，开始生成初始场景图');
                     addSystemMessage('🖼️ 正在生成场景图...');
-                    await App.generateInitialSceneImage(state.story.openingScene);
+                    // 初始场景：传入所有角色作为在场角色
+                    const allCharNames = state.characters.map(c => c.name);
+                    const initMeta = allCharNames.length > 0 ? {
+                        sceneDesc: state.story.openingScene.slice(0, 200),
+                        presentCharacters: allCharNames,
+                        actions: {},
+                        dialogues: {}
+                    } : null;
+                    await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene, initMeta);
                     rpLog('info', 'SCENE', '初始场景图生成完成');
                 }
             } catch (imgErr) {
@@ -243,7 +264,14 @@ App.regenerateCharacters = async function() {
                 if (state.story.openingScene) {
                     rpLog('info', 'SCENE', '角色头像全部完成，开始重新生成初始场景图');
                     addSystemMessage('🖼️ 正在重新生成场景图...');
-                    await App.generateInitialSceneImage(state.story.openingScene);
+                    const allCharNames = state.characters.map(c => c.name);
+                    const initMeta = allCharNames.length > 0 ? {
+                        sceneDesc: state.story.openingScene.slice(0, 200),
+                        presentCharacters: allCharNames,
+                        actions: {},
+                        dialogues: {}
+                    } : null;
+                    await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene, initMeta);
                     rpLog('info', 'SCENE', '初始场景图重新生成完成');
                 }
             } catch (imgErr) {

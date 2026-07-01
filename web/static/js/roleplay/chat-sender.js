@@ -86,6 +86,30 @@ App.sendMessage = async function() {
             ? '\n【角色关系网】\n' + relationshipHints.join('\n')
             : '';
         
+        // 5b) 最近一轮对话的目标角色（用于推断当前场景谁在场）
+        let lastTargetRole = '';
+        const recentChars = state.messages.filter(m => m.role === 'char' && m.charName).reverse();
+        if (recentChars.length > 0) {
+            // 从最近几条角色消息中提取出现过的角色名
+            const seen = new Set();
+            for (const m of recentChars) {
+                if (m.charName && !seen.has(m.charName)) {
+                    seen.add(m.charName);
+                    if (seen.size >= 3) break;
+                }
+            }
+            lastTargetRole = Array.from(seen).join('、');
+        }
+        
+        // 5c) 场景中角色状态（谁在场、谁不在场）
+        // 默认所有角色都在场，但如果用户消息提到了特定角色，其他角色标记为"可能被召唤到场"
+        const inSceneNote = allChars.map(c => {
+            if (c.name === activeChar.name) {
+                return `- ${c.name}（**当前对话角色**，在场）`;
+            }
+            return `- ${c.name}（${c.gender}，${c.age}岁）— ${c.appearance ? '外貌：' + c.appearance.slice(0, 30) : ''}${c.relationship ? '，与主角：' + c.relationship : ''}`;
+        }).join('\n');
+        
         // 6) 动态属性
         const perception = activeChar.perception ? `玩家印象：${activeChar.perception}` : '';
         const secret = activeChar.secret ? `秘密线索：${activeChar.secret}` : '';
@@ -122,8 +146,12 @@ ${mainArcBrief ? '【主线弧光】\n' + mainArcBrief : ''}
 ${dynamicAttrs !== '暂无' ? '【动态属性】' + dynamicAttrs : ''}
 ${revealedStatus ? '【信息披露】' + revealedStatus : ''}
 
-=== 场景中其他角色 ===${allChars.filter((_, i) => i !== state.activeCharIndex).map(c => `
-- ${c.name}（${c.gender}，${c.age}岁）— ${c.appearance ? '外貌：' + c.appearance.slice(0, 30) : ''}${c.relationship ? '，与主角：' + c.relationship : ''}`).join('')}${relationshipSection ? '【角色关系网】\n' + relationshipSection : ''}
+=== 场景中其他角色 ===${inSceneNote}${relationshipSection ? '【角色关系网】\n' + relationshipSection : ''}
+        
+**场景规则**：
+- 只有**当前对话角色**（${activeChar.name}）和**刚刚在对话中出现过的角色**才在场
+- 如果用户说要找某个角色但该角色不在场景中，**不要让在场角色替被找的角色回答**
+- 例如：用户说"我来找小满"，小满不在场 → 林浅可以说"小满刚走了"，但不能代替小满说话
 
 === 情感指标（隐性，不向玩家展示） ===
 ${Object.entries(state.emotions[activeChar.name] || {}).map(([k, v]) => {
@@ -135,41 +163,83 @@ ${Object.entries(state.emotions[activeChar.name] || {}).map(([k, v]) => {
 === 回复格式要求 ===
 请严格按以下格式回复（每个符号都不能省略）：
 
-{场景描述}角色1:(动作)对话内容[内心想法]|角色2:(动作)对话内容[内心想法]<建议回复1|建议回复2|建议回复3>
+{场景描述}角色1:(动作)对话内容[内心想法]┆角色2:(动作)对话内容[内心想法]┆角色3:(动作)对话内容[内心想法]<建议回复1|建议回复2|建议回复3>
 
 格式说明：
 1. {场景} — 花括号内的当前环境/场景描写（1-2句话），单独解析为一条消息
-2. 角色对话 — 多个角色用 | 分隔，每个角色格式为：角色名:(动作)对话内容[内心想法]
-   - 如果只有一个角色参与对话，可以省略角色名前缀，直接写 (动作)对话内容[内心想法]
+2. 角色对话 — 多个角色用 ┆（U+2506 三竖线框分隔符）分隔，每个角色格式为：角色名:(动作)对话内容[内心想法]
+   - 即使只有一个角色参与对话，也不能省略角色名前缀，必须写 角色名:(动作)对话内容
    - 多个角色同时交流互动时，各自分别解析为独立的消息
 3. (动作) — 圆括号内的角色动作描写
 4. 对话内容 — 角色的说话内容（直接写，不用引号）
 5. [内心想法] — 方括号内的内心独白，渲染为"内心想法"文字按钮，点击后才显示内容
-6. <建议回复1|建议回复2|建议回复3> — 尖括号内**必须**用英文竖线 | 分隔3条建议回复。**严禁**使用顿号（、）、逗号（，）、>。< 或其他任何符号作为分隔符。每条都是主角（玩家）可以对当前情境做出的**语言回应或动作表现**（如「你是谁？」、「后退一步，保持警惕」、「默默观察他的表情」），而不是决策选项（如「选择逃跑」或「决定调查」）。每条不超过20字。
+6. <建议回复1|建议回复2|建议回复3> — 尖括号内**必须**用英文竖线 | 分隔3条建议回复。**严禁**使用顿号（、）、逗号（，）、>。< 或其他任何符号作为分隔符。每条都是主角（玩家）可以对当前情境做出的**语言回应或动作表现**如 <你是谁？|(后退一步)|(默默观察他的表情)>，而不是决策选项（如「选择逃跑」或「决定调查」）。每条不超过20字。
 
-【建议回复分隔符强制规则】尖括号 <> 内的建议回复分隔符只能是英文竖线 |。正确示例：<「你是谁？」|「后退一步」|「默默观察」>。错误示例：<「你是谁？」、 「后退一步」> 或 <「你是谁？」>。<「后退一步」>。如果你不确定，就用 | 分隔。
+【建议回复分隔符强制规则】尖括号 <> 内的建议回复分隔符只能是英文竖线 |。正确示例：<你是谁？|(后退一步)|(默默观察)>。错误示例：<「你是谁？」、 「后退一步」> 或 <「你是谁？」>。<「后退一步」>。如果你不确定，就用 | 分隔。
 
 示例：
-{昏暗的地下室里}林悦:(微笑着递过一杯茶)你终于来了，我等你很久了[其实我早就知道你会来]|张浩:(靠在墙边抱臂沉默)(眼神复杂地打量着你)<「你是谁？」|「后退一步，保持警惕」|「默默观察他的表情」>
+{昏暗的地下室里}林悦:(微笑着递过一杯茶)你终于来了，我等你很久了[其实我早就知道你会来]┆张浩:(靠在墙边抱臂沉默)(眼神复杂地打量着你)<你是谁？|(后退一步，保持警惕)|(默默观察他的表情)>
+
+【多角色回复规则】
+当场景中有多个角色在场时：
+- 玩家的对话/动作通常是针对**特定角色**的，LLM 应判断谁最适合作为回复者
+- 默认情况下，**只让一个角色回复**（即最合适的角色），不要每个角色都出场
+- 只有当其他角色**想插嘴/打断/有反应**时，才让第二个角色用 ┆ 分隔出场
+- 回复者应根据上下文判断：谁被点名了、谁在对话中、谁与话题最相关
+- **禁止抢话**：如果用户说"我来找X"，X不在场，只让一个在场角色简短回应（如"X刚走了"），不要追加其他评价
+- **禁止连发**：每个角色每轮只说一次话，不要连续输出多条消息
+- 示例：玩家对苏清歌说「你好」→ 只有苏清歌回复，除非江野想插话
 
 注意：
 - 如果场景发生变化，{场景} 要体现新场景
 - 对话内容要符合角色性格、背景和当前情境
-- 多个角色同时互动时，用 | 分隔各角色对话段
+- 多个角色同时互动时，用 ┆ 分隔各角色对话段（不是 |）
 - 角色之间的互动要考虑他们的关系网（如亲友、敌对、师徒等）
-- 建议回复是主角的语言或动作表现，推动剧情发展，每条不超过15字`;
+- 建议回复是主角的语言或动作表现，推动剧情发展，每条不超过15字
+
+=== 场景图元数据（必须）===
+在你的回复**最后**，另起一行附加一个 JSON 块，格式如下：
+{"sceneDesc":"{场景描述的文字版，不含花括号}","presentCharacters":["角色1","角色2"],"actions":{"角色1":"动作描述","角色2":"动作描述"},"dialogues":{"角色1":"对话内容","角色2":"对话内容"}}
+要求：
+- sceneDesc: 场景描述的纯文本版本（去掉花括号）
+- presentCharacters: 本回合回复中**实际出现**的角色名数组
+- actions: 每个角色的动作描述（从 (动作) 中提取）
+- dialogues: 每个角色的对话内容
+- 只包含实际出现在回复中的角色，不要包含未发言的角色
+- JSON 必须是合法的，用双引号，不要有多余逗号
+- 在 JSON 前后各放一行 \`\`\`json 和 \`\`\` 标记，例如：
+
+\`\`\`json
+{"sceneDesc":"走廊里","presentCharacters":["林浅","苏糖"],"actions":{"林浅":"微笑","苏糖":"挥手"},"dialogues":{"林浅":"你好","苏糖":"早上好"}}
+\`\`\`
+`;
 
         const messages = [
             { role: 'system', content: systemPrompt },
             ...history
         ];
 
+        rpLog('info', 'TIMEOUT', `LLM 请求开始: chat, history_msgs=${messages.length}`);
+        const chatStart = Date.now();
         const response = await App.agnesChat(messages);
+        const chatElapsed = Date.now() - chatStart;
+        rpLog('info', 'TIMEOUT', `LLM 请求完成: chat, 耗时 ${chatElapsed}ms, output_chars=${(response || '').length}`);
+        if (chatElapsed > 60000) {
+            rpLog('error', 'TIMEOUT', `⚠️ 超时警告: chat 请求耗时 ${chatElapsed}ms`);
+        }
 
         hideTyping();
 
+        // 提取 LLM 输出的结构化 JSON 元数据（场景图用）
+        const meta = App.extractSceneMetadata(response);
+        if (meta) {
+            rpLog('info', 'META', `解析到场景元数据: presentCharacters=${JSON.stringify(meta.presentCharacters)}, sceneDesc=${meta.sceneDesc?.slice(0, 50)}`);
+        } else {
+            rpLog('warn', 'META', '未解析到场景元数据，将使用正则 fallback');
+        }
+
         // 解析新格式，可能产生多条消息（多角色对话时）
-        const parsedMessages = App.parseMultiCharReply(response, state.activeCharIndex);
+        const parsedMessages = App.parseMultiCharReply(response, state.activeCharIndex, meta);
 
         for (const msg of parsedMessages) {
             state.messages.push(msg);
@@ -185,9 +255,9 @@ ${Object.entries(state.emotions[activeChar.name] || {}).map(([k, v]) => {
             // 后处理 1: 场景图生成 → 见 scene-images.js
             (async () => {
                 try {
-                    const sceneDesc = App.parseSceneFromReply(response);
+                    const sceneDesc = meta?.sceneDesc || App.parseSceneFromReply(response);
                     if (sceneDesc && App.isSceneChanged(activeChar.name, sceneDesc)) {
-                        await App.generateSceneImage(activeChar.name, sceneDesc, activeChar);
+                        await App.generateSceneImage(activeChar.name, sceneDesc, activeChar, response, meta);
                     }
                 } catch (e) {
                     console.warn('场景图生成失败:', e);
@@ -229,11 +299,53 @@ ${Object.entries(state.emotions[activeChar.name] || {}).map(([k, v]) => {
     }
 }
 
+/**
+* 从 LLM 回复中提取结构化 JSON 元数据
+* LLM 会在回复末尾附加 ```json {...} ``` 块
+* 返回 { sceneDesc, presentCharacters, actions, dialogues } 或 null
+*/
+App.extractSceneMetadata = function(response) {
+if (!response) return null;
+// 匹配 ```json {...} ``` 或 ``` {...} ``` 或裸 JSON
+let jsonMatch = response.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+if (!jsonMatch) {
+    // 尝试匹配裸 JSON 块（响应末尾的 { ... }）
+    jsonMatch = response.match(/\{[\s\S]*"sceneDesc"[\s\S]*\}$/);
+}
+if (!jsonMatch) return null;
+
+try {
+    const jsonStr = jsonMatch[1] || jsonMatch[0];
+    const meta = JSON.parse(jsonStr);
+    // 验证必要字段
+    if (!meta.sceneDesc && !meta.presentCharacters) return null;
+    return {
+        sceneDesc: meta.sceneDesc || '',
+        presentCharacters: Array.isArray(meta.presentCharacters) ? meta.presentCharacters : [],
+        actions: meta.actions || {},
+        dialogues: meta.dialogues || {}
+    };
+} catch (e) {
+    rpLog('warn', 'META', `JSON 解析失败: ${e.message}`);
+    return null;
+}
+}
+
 // === 解析新格式的多角色回复 ===
 // 格式: {场景}角色1:(动作)语言[内心想法]|角色2:(动作)语言[内心想法]<建议回复1|建议回复2|建议回复3>
-App.parseMultiCharReply = function(rawText, defaultCharIndex) {
+App.parseMultiCharReply = function(rawText, defaultCharIndex, metadata) {
     const messages = [];
     let text = rawText.trim();
+
+    // 如果存在结构化元数据，从文本中剥离 JSON 块（避免被误解析为对话内容）
+    if (metadata) {
+        const jsonBlockMatch = text.match(/```(?:json)?\s*[\s\S]*?\n?```/);
+        if (jsonBlockMatch) {
+            text = text.slice(0, jsonBlockMatch.index) + text.slice(jsonBlockMatch.index + jsonBlockMatch[0].length);
+            text = text.trim();
+            rpLog('info', 'PARSE', '已从文本中剥离 JSON 元数据块');
+        }
+    }
 
     // 提取场景（如果有）
     let sceneText = null;
@@ -241,12 +353,26 @@ App.parseMultiCharReply = function(rawText, defaultCharIndex) {
     if (sceneMatch) {
         sceneText = sceneMatch[1].trim();
         text = text.slice(sceneMatch[0].length);
+    } else {
+        // 没有 {场景} 时，检查开头是否有无角色旁白（即不以角色名:开头的段落）
+        // 无角色旁白自动视为隐含的场景描写
+        const leadingTextMatch = text.match(/^([^(┆][^┆]*)┆/);
+        if (leadingTextMatch) {
+            const potentialScene = leadingTextMatch[1].trim();
+            // 如果这段文字不以角色名:开头（即没有 "名字:" 前缀），视为场景旁白
+            if (!potentialScene.match(/^[\u4e00-\u9fa5a-zA-Z]+[:：]/)) {
+                sceneText = potentialScene;
+                text = text.slice(leadingTextMatch[0].length);
+                rpLog('INFO', 'PARSE-SCENE', `检测到无角色旁白，视为场景: "${sceneText}"`);
+            }
+        }
     }
 
     // 提取建议回复（最右边的 <...>）
     // 使用非贪婪匹配，避免 LLM 回复中包含 < 符号时匹配到错误位置
     let suggestedReplies = [];
-    const replyMatch = text.match(/<(.*?)>$/);
+    // 允许尖括号后跟可选的 |（LLM 有时会在 <> 后多打一个 |）
+    const replyMatch = text.match(/<([^>]*)>\|?\s*$/);
     if (replyMatch) {
         rpLog('INFO', 'PARSE-REPLY', `原始文本含 <> 标签: "${replyMatch[0]}"`);
         rpLog('INFO', 'PARSE-REPLY', `尖括号内内容: "${replyMatch[1]}"`);
@@ -282,7 +408,7 @@ App.parseMultiCharReply = function(rawText, defaultCharIndex) {
 
     // 提取场景消息
     if (sceneText) {
-        messages.push({
+        const sceneMsg = {
             id: 'msg_scene_' + Date.now(),
             role: 'char',
             type: 'text',
@@ -290,14 +416,19 @@ App.parseMultiCharReply = function(rawText, defaultCharIndex) {
             charIndex: defaultCharIndex,
             isScene: true,
             timestamp: new Date().toISOString()
-        });
+        };
+        // 附带结构化元数据供场景图生成使用
+        if (metadata) {
+            sceneMsg._sceneMeta = metadata;
+        }
+        messages.push(sceneMsg);
     }
 
-    // 按 | 分割多角色对话
-    // 但要注意：建议回复已经被提取了，剩余的 | 是角色分隔符
-    let charParts = text.split('|').filter(s => s.trim());
+    // 按 ┆ 分割多角色对话
+    // 但要注意：建议回复已经被提取了，剩余的 | 只在尖括号 <...> 内
+    let charParts = text.split('┆').filter(s => s.trim());
 
-        // 如果 | 分割后只有 1 段，尝试用 "名字:" 模式拆分多角色（LLM 有时不用 | 分隔角色）
+        // 如果 ┆ 分割后只有 1 段，尝试用 "名字:" 模式拆分多角色（LLM 有时不用 ┆ 分隔角色）
         if (charParts.length === 1) {
             const singleText = charParts[0].trim();
             // 匹配模式：可选前导空白 + 汉字/字母 + 冒号(:或：)，后面跟着角色内容
@@ -317,14 +448,16 @@ App.parseMultiCharReply = function(rawText, defaultCharIndex) {
             // 如果找到至少 1 个 "名字:" 匹配，用这种模式拆分
             if (nameMatches.length >= 1) {
                 const splitParts = [];
-                let prevEnd = 0;
-                
-                for (const nm of nameMatches) {
-                    const segment = singleText.substring(prevEnd, nm.index).trim();
-                    if (segment) splitParts.push(segment);
-                    prevEnd = nm.colonEnd;
+                // 第一段：第一个命名角色之前的所有内容（无名角色）
+                const firstSeg = singleText.substring(0, nameMatches[0].index).trim();
+                if (firstSeg) splitParts.push(firstSeg);
+                // 后续段落：每个命名角色的 "名字: 内容"
+                for (let i = 0; i < nameMatches.length; i++) {
+                    const nm = nameMatches[i];
+                    const nextStart = (i + 1 < nameMatches.length) ? nameMatches[i + 1].index : singleText.length;
+                    const seg = singleText.substring(nm.index, nextStart).trim();
+                    if (seg) splitParts.push(seg);
                 }
-                splitParts.push(singleText.substring(prevEnd).trim());
                 charParts = splitParts.filter(s => s);
                 rpLog('INFO', 'PARSE-CHAR', `使用 "名字:" 模式拆分为 ${charParts.length} 段: ${charParts.map(p => p.slice(0, 40)).join(' | ')}`);
             }

@@ -18,13 +18,25 @@ App.artStyleSuffixes = {
     'pixel art': ', pixel art, 16-bit retro game style, dithering, nostalgic',
     'ink wash': ', Chinese ink wash painting, sumi-e, traditional brushwork, flowing lines, monochrome',
     'vaporwave': ', vaporwave aesthetic, pastel colors, retro 80s, glitch art, dreamy atmosphere',
-    'dark fantasy': ', dark fantasy, gothic atmosphere, dramatic shadows, moody, mysterious'
+    'dark fantasy': ', dark fantasy, gothic atmosphere, dramatic shadows, moody, mysterious',
+    'line art': ', clean line art style, crisp outlines, minimal shading, monochrome line drawing',
+    'cel shading': ', cel shading style, flat colors, clean outlines, anime style',
+    'concept art': ', concept art style, detailed character design, professional illustration',
+    'unreal engine': ', unreal engine style, photorealistic, cinematic lighting, highly detailed',
+    'blender cartoon': ', blender 3D cartoon style, smooth rendering, vibrant colors',
+    'thick paint': ', thick paint style, impasto technique, rich texture, expressive brushwork',
+    'flat design': ', flat design style, minimalist, geometric shapes, solid colors',
 };
 
 // 获取当前艺术风格后缀
+// 注意：灵感检测到的风格即使不在预设选项中，也直接作为后缀使用（不做转译/映射）
 App.getArtStyleSuffix = function() {
     const style = state.story?.imageStyle || state.story?.artStyle || 'anime';
-    return App.artStyleSuffixes[style] || App.artStyleSuffixes['anime'];
+    if (App.artStyleSuffixes[style]) {
+        return App.artStyleSuffixes[style];
+    }
+    // 未知风格：直接作为后缀追加（不转译为预设风格）
+    return `, ${style} style`;
 };
 
 // 拼接风格后缀到 prompt

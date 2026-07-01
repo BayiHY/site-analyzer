@@ -54,14 +54,15 @@ App.normalizeMessagesForProvider = function(provider, messages) {
     return userMessages;
 }
 
-App.agnesChat = async function(messages) {
+App.agnesChat = async function(messages, options = {}) {
     const apiKey = state.apiKeys.chat;
     if (!apiKey) {
         throw new Error('请先在设置中配置 API Key');
     }
 
-    const { url, model, provider } = App.getEndpointAndModel(apiKey);
-    const temperature = provider === 'glm' ? 0.6 : 1.0;
+    const { url, model: defaultModel, provider } = App.getEndpointAndModel(apiKey);
+    const temperature = options.temperature ?? (provider === 'glm' ? 0.6 : 1.0);
+    const model = options.model || defaultModel;
 
     // GLM 不支持 system role，需要转换
     const normalizedMessages = App.normalizeMessagesForProvider(provider, messages);

@@ -111,16 +111,6 @@ App.renderCharactersPanel = function() {
         `;
     }).join('');
     rpLog('info', 'PANEL', 'rendered ' + state.characters.length + ' char cards, HTML length=' + result.length);
-    setTimeout(() => {
-        logComputedStyles('.side-panel', ['display', 'position', 'top', 'right', 'width', 'height', 'z-index']);
-        logComputedStyles('.side-panel.open', ['display', 'right']);
-        logComputedStyles('.overlay', ['display', 'position', 'z-index']);
-        logComputedStyles('.overlay.active', ['display']);
-        logComputedStyles('.char-card', ['background', 'border', 'border-radius', 'padding']);
-        logComputedStyles('.char-card-avatar', ['width', 'height', 'border-radius', 'overflow']);
-        logComputedStyles('.char-card-avatar img', ['width', 'height', 'object-fit', 'display', 'max-width', 'max-height']);
-        logComputedStyles('.char-card-header', ['display', 'gap']);
-    }, 100);
     return result;
 }
 
@@ -155,28 +145,12 @@ App.renderSettingsPanel = function() {
             🔄 刷新角色
         </button>` : ''}
         <hr style="border-color:var(--border);margin:20px 0;">
-        <div class="setting-item">
+        <div class="setting-item" style="opacity:0.7;">
             <label>🎨 画面风格</label>
-            <select id="setting-art-style" style="width:100%;padding:6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px;">
-                <option value="cel shading" ${(state.story?.imageStyle || state.story?.artStyle || 'cel shading') === 'cel shading' ? 'selected' : ''}>赛璐璐风 (cel shading)</option>
-                <option value="watercolor" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'watercolor' ? 'selected' : ''}>水彩风 (watercolor)</option>
-                <option value="oil painting" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'oil painting' ? 'selected' : ''}>油画风 (oil painting)</option>
-                <option value="thick paint" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'thick paint' ? 'selected' : ''}>厚涂风 (thick paint)</option>
-                <option value="pencil sketch" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'pencil sketch' ? 'selected' : ''}>铅笔素描 (pencil sketch)</option>
-                <option value="manga" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'manga' ? 'selected' : ''}>黑白漫画 (manga)</option>
-                <option value="concept art" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'concept art' ? 'selected' : ''}>概念设计图 (concept art)</option>
-                <option value="unreal engine" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'unreal engine' ? 'selected' : ''}>虚幻引擎写实 (unreal engine)</option>
-                <option value="blender cartoon" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'blender cartoon' ? 'selected' : ''}>Blender卡通3D (blender cartoon)</option>
-                <option value="studio ghibli" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'studio ghibli' ? 'selected' : ''}>吉卜力 (Studio Ghibli)</option>
-                <option value="cyberpunk" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'cyberpunk' ? 'selected' : ''}>赛博朋克 (cyberpunk)</option>
-                <option value="chibi" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'chibi' ? 'selected' : ''}>Q版 (chibi)</option>
-                <option value="pixel art" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'pixel art' ? 'selected' : ''}>像素风 (pixel art)</option>
-                <option value="ink wash" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'ink wash' ? 'selected' : ''}>水墨画 (ink wash)</option>
-                <option value="vaporwave" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'vaporwave' ? 'selected' : ''}>蒸汽波 (vaporwave)</option>
-                <option value="dark fantasy" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'dark fantasy' ? 'selected' : ''}>暗黑奇幻 (dark fantasy)</option>
-                <option value="flat design" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'flat design' ? 'selected' : ''}>扁平矢量 (flat design)</option>
-            </select>
-            <div class="setting-hint">所有角色头像和场景图将使用此统一风格</div>
+            <div style="padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.9rem;min-height:36px;display:flex;align-items:center;">
+                ${App.getArtStyleDisplayName(state.story?.imageStyle || state.story?.artStyle || 'cel shading')}
+            </div>
+            <div class="setting-hint">灵感中自动检测的画面风格，不可修改</div>
         </div>
         <button class="btn btn-outline btn-sm" onclick="App.exportData()" style="margin-top:8px;width:100%;">导出数据 (JSON)</button>
         <button class="btn btn-outline btn-sm" onclick="App.importData()" style="margin-top:8px;width:100%;">导入数据</button>
