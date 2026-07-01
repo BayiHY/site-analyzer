@@ -34,7 +34,7 @@
 }
 .chat-header .header-left { flex: 1; min-width: 0; }
 .chat-header .story-title {
-    font-weight: 700; font-size: 0.95rem; color: var(--text);
+    font-weight: 700; font-size: 0.95rem; color: #ffffff;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .chat-header .story-summary {

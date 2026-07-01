@@ -115,12 +115,6 @@ App.renderCharactersPanel = function() {
 }
 
 App.renderSettingsPanel = function() {
-    const phase = state.story?.phase || 'idle';
-    const showWorldviewBtn = phase === 'worldview' || phase === 'idle';
-    const showCharsBtn = phase === 'chat';
-    const regenCharsDisabled = phase === 'regenerating_chars' || phase === 'regenerating_worldview';
-    const regenWwDisabled = phase === 'regenerating_worldview';
-
     return `
         <div class="setting-item">
             <label>对话 API Key</label>
@@ -136,14 +130,10 @@ App.renderSettingsPanel = function() {
         <hr style="border-color:var(--border);margin:20px 0;">
         <div class="setting-item">
             <label>故事标题</label>
-            <input type="text" id="setting-story-title" value="${state.story ? state.story.title : ''}" placeholder="输入故事标题">
+            <div style="padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:#ffffff;font-size:0.9rem;min-height:36px;display:flex;align-items:center;">
+                ${state.story ? state.story.title : '—'}
+            </div>
         </div>
-        ${showWorldviewBtn ? `\n        <button class="btn btn-outline btn-sm" onclick="App.regenerateWorldview()" style="margin-top:8px;width:100%;" ${regenWwDisabled ? 'disabled' : ''}>
-            🔄 刷新世界观
-        </button>` : ''}
-        ${showCharsBtn ? `\n        <button class="btn btn-outline btn-sm" onclick="App.regenerateCharacters()" style="margin-top:8px;width:100%;" ${regenCharsDisabled ? 'disabled' : ''}>
-            🔄 刷新角色
-        </button>` : ''}
         <hr style="border-color:var(--border);margin:20px 0;">
         <div class="setting-item" style="opacity:0.7;">
             <label>🎨 画面风格</label>
