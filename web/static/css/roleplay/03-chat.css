@@ -202,17 +202,17 @@
     cursor: not-allowed;
 }
 
-/* 底部输入区 - flex 内自然排列 */
+/* 底部输入区 - 固定锁定 */
 .chat-input-area {
     padding: 12px 16px; 
     background: rgba(26, 35, 50, 0.65);
     border-top: 1px solid rgba(45, 58, 74, 0.5);
     display: flex; gap: 8px; 
-    position: static;
-    bottom: auto;
-    left: auto;
-    right: auto;
-    flex-shrink: 0;
+    position: fixed;
+    bottom: 22px;
+    left: 0;
+    right: 0;
+    z-index: 20;
 }
 .chat-input-area textarea {
     flex: 1; padding: 10px 12px; 
