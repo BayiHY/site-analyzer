@@ -12,7 +12,7 @@ let state = {
     apiKeys: { chat: '', image: '' },
     currentPanel: null,
     // 玩家信息（主角）
-    player: { gender: '男', faceImageUrl: '' },
+    player: { gender: '男', faceImageUrl: '', portraitImageUrl: '' },
     // 渐进式披露：每个角色的已发现信息
     // revealed[charName] = { appearance: bool, personality: bool, background: bool, relationship: bool }
     revealed: {},
@@ -91,7 +91,8 @@ App.loadState = async function() {
                         personality: state.character.personality || '',
                         background: state.character.background || '',
                         relationship: state.character.relationship || '',
-                        faceImageUrl: state.character.faceImageUrl || ''
+                        faceImageUrl: state.character.faceImageUrl || '',
+                        portraitImageUrl: state.character.portraitImageUrl || ''
                     }];
                     state.activeCharIndex = 0;
                     if (!state.emotions[state.characters[0].name]) {
@@ -140,7 +141,8 @@ App.loadState = async function() {
                         personality: state.character.personality || '',
                         background: state.character.background || '',
                         relationship: state.character.relationship || '',
-                        faceImageUrl: state.character.faceImageUrl || ''
+                        faceImageUrl: state.character.faceImageUrl || '',
+                        portraitImageUrl: state.character.portraitImageUrl || ''
                     }];
                     state.activeCharIndex = 0;
                     if (!state.emotions[state.characters[0].name]) {

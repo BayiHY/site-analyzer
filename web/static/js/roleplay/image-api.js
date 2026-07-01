@@ -183,7 +183,7 @@ App.generateCharacterImage = async function(character) {
                 
                 if (imageUrl) {
                     rpLog('info', 'IMG', `${tier.name} 生成成功: ${character.name}`);
-                    character.faceImageUrl = imageUrl;
+                    character.portraitImageUrl = imageUrl;
                     await saveState();
                     return imageUrl;
                 }
@@ -263,7 +263,7 @@ App.generateCharacterFaceSilent = async function(character, imagePrompt) {
             console.error('[并行] 头像生成失败:', character.name);
             return null;
         }
-        character.faceImageUrl = imageUrl;
+        character.portraitImageUrl = imageUrl;
         await saveState();
 
         state.messages.push({

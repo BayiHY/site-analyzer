@@ -78,7 +78,7 @@ App.renderCharactersPanel = function() {
                 <div class="char-card-header">
                     <div class="char-card-avatar">
                         ${c.faceImageUrl
-                            ? `<img src="${c.faceImageUrl}" onerror="this.parentElement.textContent='🎭'">`
+                            ? `<img src="${c.faceImageUrl}" onerror="this.parentElement.textContent='🎭'" title="面部特写">`
                             : '🎭'}
                     </div>
                     <div>
@@ -158,22 +158,23 @@ App.renderSettingsPanel = function() {
         <div class="setting-item">
             <label>🎨 画面风格</label>
             <select id="setting-art-style" style="width:100%;padding:6px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px;">
-                <option value="anime" ${(state.story?.imageStyle || state.story?.artStyle || 'anime') === 'anime' ? 'selected' : ''}>动漫风 (anime)</option>
+                <option value="cel shading" ${(state.story?.imageStyle || state.story?.artStyle || 'cel shading') === 'cel shading' ? 'selected' : ''}>赛璐璐风 (cel shading)</option>
                 <option value="watercolor" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'watercolor' ? 'selected' : ''}>水彩风 (watercolor)</option>
                 <option value="oil painting" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'oil painting' ? 'selected' : ''}>油画风 (oil painting)</option>
-                <option value="digital realism" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'digital realism' ? 'selected' : ''}>数字写实 (digital realism)</option>
+                <option value="thick paint" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'thick paint' ? 'selected' : ''}>厚涂风 (thick paint)</option>
                 <option value="pencil sketch" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'pencil sketch' ? 'selected' : ''}>铅笔素描 (pencil sketch)</option>
-                <option value="comic book" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'comic book' ? 'selected' : ''}>漫画风 (comic book)</option>
-                <option value="photorealistic" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'photorealistic' ? 'selected' : ''}>照片写实 (photorealistic)</option>
-                <option value="3D render" ${(state.story?.imageStyle || state.story?.artStyle || '') === '3D render' ? 'selected' : ''}>3D渲染 (3D render)</option>
+                <option value="manga" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'manga' ? 'selected' : ''}>黑白漫画 (manga)</option>
+                <option value="concept art" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'concept art' ? 'selected' : ''}>概念设计图 (concept art)</option>
+                <option value="unreal engine" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'unreal engine' ? 'selected' : ''}>虚幻引擎写实 (unreal engine)</option>
+                <option value="blender cartoon" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'blender cartoon' ? 'selected' : ''}>Blender卡通3D (blender cartoon)</option>
                 <option value="studio ghibli" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'studio ghibli' ? 'selected' : ''}>吉卜力 (Studio Ghibli)</option>
                 <option value="cyberpunk" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'cyberpunk' ? 'selected' : ''}>赛博朋克 (cyberpunk)</option>
-                <option value="fantasy art" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'fantasy art' ? 'selected' : ''}>奇幻插画 (fantasy art)</option>
                 <option value="chibi" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'chibi' ? 'selected' : ''}>Q版 (chibi)</option>
                 <option value="pixel art" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'pixel art' ? 'selected' : ''}>像素风 (pixel art)</option>
                 <option value="ink wash" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'ink wash' ? 'selected' : ''}>水墨画 (ink wash)</option>
                 <option value="vaporwave" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'vaporwave' ? 'selected' : ''}>蒸汽波 (vaporwave)</option>
                 <option value="dark fantasy" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'dark fantasy' ? 'selected' : ''}>暗黑奇幻 (dark fantasy)</option>
+                <option value="flat design" ${(state.story?.imageStyle || state.story?.artStyle || '') === 'flat design' ? 'selected' : ''}>扁平矢量 (flat design)</option>
             </select>
             <div class="setting-hint">所有角色头像和场景图将使用此统一风格</div>
         </div>
