@@ -156,19 +156,28 @@ App.generateCharacterImage = async function(character) {
     let imageUrl;
 
     if (hasModules) {
-        // === 第一步：生成面部特写（无降级，失败则跳过） ===
+        // === 第一步：生成面部特写（一阶段，失败自动用 2.0-flash 重试，最多两次） ===
         rpLog('info', 'IMG', `📷 第一步：生成面部特写: ${character.name}`);
         const facePrompt = App.buildModularPrompt(character, 2); // level 2 = 特写
         rpLog('debug', 'IMG', `面部特写 Prompt: ${facePrompt.slice(0, 150)}...`);
         
         let faceImageUrl;
-        try {
-            faceImageUrl = await App.agnesImageGen(facePrompt, '512x512');
-            rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
-            character.faceImageUrl = faceImageUrl;
-            await saveState();
-        } catch (e) {
-            rpLog('warn', 'IMG', `面部特写生成失败: ${e.message}`);
+        const faceModels = ['agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const model = faceModels[attempt % faceModels.length];
+                rpLog('info', 'IMG', `面部特写尝试 ${attempt + 1}/3 (model=${model}): ${character.name}`);
+                faceImageUrl = await App.agnesImageGen(facePrompt, '512x512', model);
+                rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
+                character.faceImageUrl = faceImageUrl;
+                await saveState();
+                break;
+            } catch (e) {
+                rpLog('warn', 'IMG', `面部特写失败 (尝试 ${attempt + 1}/3): ${e.message}`);
+                if (attempt === 2) {
+                    rpLog('error', 'IMG', `面部特写全部重试失败: ${character.name}`);
+                }
+            }
         }
 
         // === 第二步：从面部特写出发，三级降级生成全身/半身 ===
@@ -322,10 +331,13 @@ App.generatePlayerAvatar = async function() {
 };
 
 // 生图 API 调用
-App.agnesImageGen = async function(prompt, size = '768x1024') {
+App.agnesImageGen = async function(prompt, size = '768x1024', model) {
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
         throw new Error('未配置生图 API Key');
+    }
+    if (!model) {
+        model = 'agnes-image-2.1-flash';
     }
 
     const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
@@ -335,7 +347,7 @@ App.agnesImageGen = async function(prompt, size = '768x1024') {
             'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-            model: 'agnes-image-2.1-flash',
+            model: model,
             prompt: prompt,
             size: size,
             n: 1,
