@@ -145,9 +145,9 @@ function parseKeyValLines(lines) {
 // 安全的 | 分割：处理值中包含 | 的情况
 function splitPipe(str) {
     const parts = str.split('|');
-    if (parts.length <= 16) return parts;
-    // 列数过多：前 15 列保持原样，剩余全部合并到最后一列（imageEnvironment 通常最长）
-    const result = parts.slice(0, 15);
-    result.push(parts.slice(15).join('|'));
+    if (parts.length <= 17) return parts;
+    // 列数过多：前 16 列保持原样，剩余全部合并到最后一列（imageEnvironment 通常最长）
+    const result = parts.slice(0, 16);
+    result.push(parts.slice(16).join('|'));
     return result;
 }

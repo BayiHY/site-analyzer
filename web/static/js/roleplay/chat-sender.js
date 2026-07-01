@@ -321,15 +321,19 @@ App.parseMultiCharReply = function(rawText, defaultCharIndex) {
         if (nameMatches.length >= 1) {
             const splitParts = [];
             let prevEnd = 0;
-            // 检查开头是否有 "名字:" 前缀（第一个角色可能在开头）
-            const firstPrefix = singleText.match(/^([\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_•·]{0,10})([:：])\s*/);
-            let startOffset = 0;
-            if (firstPrefix && nameMatches.length >= 2) {
-                // 开头有名字:，第一个角色从冒号后开始
-                startOffset = firstPrefix[0].length;
-                // 把第一个角色名加入匹配列表头部
-                nameMatches.unshift({ index: 0, name: firstPrefix[1].trim(), colonEnd: startOffset });
+            
+            for (let i = 0; i < nameMatches.length; i++) {
+                const nm = nameMatches[i];
+                // 截取上一个位置到当前角色名之间的内容
+                const segment = singleText.substring(prevEnd, nm.index).trim();
+                if (segment) splitParts.push(segment);
+                prevEnd = nm.colonEnd;
             }
+            // 最后一段：最后一个角色冒号之后的所有内容
+            splitParts.push(singleText.substring(prevEnd).trim());
+            charParts = splitParts.filter(s => s);
+            rpLog('INFO', 'PARSE-CHAR', `使用 "名字:" 模式拆分为 ${charParts.length} 段: ${charParts.map(p => p.slice(0, 40)).join(' | ')}`);
+        }
             for (let i = 0; i < nameMatches.length; i++) {
                 const nm = nameMatches[i];
                 if (nm.index >= startOffset) {

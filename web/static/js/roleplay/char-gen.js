@@ -120,6 +120,12 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
             if (Array.isArray(parsedBlocks) && parsedBlocks.length > 0) {
                 rpLog('info', 'CHARS', `第一个元素类型: ${typeof parsedBlocks[0]}, 内容: ${JSON.stringify(parsedBlocks[0]).slice(0, 300)}`);
             }
+            // 调试：打印所有解析块的 name 字段
+            if (Array.isArray(parsedBlocks)) {
+                rpLog('info', 'CHARS', `所有解析块 names: ${JSON.stringify(parsedBlocks.map(b => b.name))}`);
+            }
+            // 调试：打印 LLM 原始输出（脱敏后）
+            rpLog('debug', 'CHARS', `LLM 原始输出预览: ${resp.slice(0, 500)}...`);
         } catch (e) {
             rpLog('warn', 'CHARS', '分隔符解析失败: ' + e.message);
             rpLog('warn', 'CHARS', `LLM 原始返回: ${resp}`);
