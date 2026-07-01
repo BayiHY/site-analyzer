@@ -96,6 +96,7 @@
             <button onclick="App.togglePanel('characters')">👥</button>
             <button onclick="App.togglePanel('settings')">⚙️</button>
             <button onclick="App.resetStory()">🔄</button>
+            <button id="tts-toggle-btn" onclick="App.toggleTTS()" title="切换语音">🔊</button>
         </div>
     </div>
 
@@ -148,6 +149,7 @@
 <script src="/static/js/roleplay/chat-sender.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/reply-options.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/message-renderer.js?v={{ cb }}"></script>
+<script src="/static/js/roleplay/tts-engine.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/ui-switcher.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/side-panel.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/progressive-disclosure.js?v={{ cb }}"></script>

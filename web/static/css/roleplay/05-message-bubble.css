@@ -138,3 +138,48 @@
     display: block;
     margin-bottom: 2px;
 }
+
+/* ========================================
+   TTS 语音播放器样式
+   ======================================== */
+
+.tts-audio-player {
+    width: 100%;
+    height: 32px;
+    border-radius: 8px;
+    margin-top: 8px;
+    opacity: 0.85;
+    transition: opacity 0.2s;
+}
+
+.tts-audio-player:hover {
+    opacity: 1;
+}
+
+/* 暗色主题适配 */
+.msg.char .tts-audio-player {
+    filter: brightness(0.85) saturate(1.2);
+}
+
+/* 语音生成中 */
+.tts-loading {
+    animation: tts-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tts-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+/* 语音生成失败 */
+.tts-error:hover {
+    opacity: 1 !important;
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+    .tts-audio-player {
+        height: 28px;
+        border-radius: 6px;
+    }
+}

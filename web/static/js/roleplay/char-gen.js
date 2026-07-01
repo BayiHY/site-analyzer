@@ -47,7 +47,7 @@ ${genderHint ? `\n【性别倾向】${genderHint}` : ''}
 输出格式要求（TSV 表格格式，用 | 分隔字段，不要输出任何其他文字）：
 
 第一行必须是表头，后续每一行是一个角色：
-name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|imageStyle|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
+name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|imageStyle|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
 
 ⚠️ 重要：第一行必须是完整的表头，不要省略任何字段！
 
@@ -64,6 +64,7 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
 - motivation: 核心动机/欲望（20字以内，驱动角色行动的根本原因）
 - secret: 隐藏的秘密（30字以内，可以在冒险中逐步揭示）
 - speechStyle: 说话风格（20字以内，比如毒舌、温柔、简洁等）
+- voice: Edge TTS 语音名称（英文，如 zh-CN-XiaoxiaoNeural, zh-CN-YunxiNeural 等）。根据角色性别和性格自动匹配：女角色用 Xiaoxiao/Xiaoyi，男角色用 Yunxi/Yunjian。同一故事不同角色尽量用不同音色。
 
 生图模块化字段（全部用英文，供 AI 绘画使用）：
 - imageStyle: 画面风格（英文，如 anime, watercolor, oil painting, digital realism, pencil sketch, comic book, photorealistic, 3D render, studio ghibli, cyberpunk, fantasy art, chibi, pixel art, ink wash, vaporwave, dark fantasy）
@@ -78,9 +79,9 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
 降级特写 = imageStyle + imageFace（面部到锁骨）
 
 示例（不要照抄内容，只照格式）：
-name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|imageStyle|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
-阿德拉|28|女|苍白瘦削，左眼黄铜义眼|冷静理智，极度缺乏安全感|曾是贵族家替补厨师，因被诬陷遭驱逐|起初视主角为棋子，后转为生死搭档|复仇并查明父亲失踪真相|义眼中封印着低阶怨灵|冷嘲热讽，用烹饪术语隐喻人生险恶|anime|pale skin, left eye is a brass gear prosthetic, sharp cheekbones|long black hair in a neat bob cut, minimal makeup|slender and slightly hunched frame|white apron over dark Victorian dress, brass goggles on head|dimly lit kitchen with steam and warm amber glow
-巴尔扎|45|男|魁梧如熊，右臂机械锅铲义肢|暴躁冲动，护短|前地下拳手，被深渊灶台改造为活体搅拌机|雇佣兵兼守护者，认为主角是少数不把他当怪物看的人|保护主角，终结自己作为器具的命运|机械义肢内部连接着未成熟的灵体心脏|粗鲁直白，常伴有吞咽口水的声音|digital realism|broad square jaw, scar across nose, thick eyebrows|short buzz cut, sweat-dampened hair|massive muscular build, right arm is a mechanical spatula|torn tank top revealing mechanical parts, leather combat pants|gritty underground arena with sparks and smoke
+name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|imageStyle|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
+阿德拉|28|女|苍白瘦削，左眼黄铜义眼|冷静理智，极度缺乏安全感|曾是贵族家替补厨师，因被诬陷遭驱逐|起初视主角为棋子，后转为生死搭档|复仇并查明父亲失踪真相|义眼中封印着低阶怨灵|冷嘲热讽，用烹饪术语隐喻人生险恶|zh-CN-XiaoxiaoNeural|anime|pale skin, left eye is a brass gear prosthetic, sharp cheekbones|long black hair in a neat bob cut, minimal makeup|slender and slightly hunched frame|white apron over dark Victorian dress, brass goggles on head|dimly lit kitchen with steam and warm amber glow
+巴尔扎|45|男|魁梧如熊，右臂机械锅铲义肢|暴躁冲动，护短|前地下拳手，被深渊灶台改造为活体搅拌机|雇佣兵兼守护者，认为主角是少数不把他当怪物看的人|保护主角，终结自己作为器具的命运|机械义肢内部连接着未成熟的灵体心脏|粗鲁直白，常伴有吞咽口水的声音|zh-CN-YunxiNeural|digital realism|broad square jaw, scar across nose, thick eyebrows|short buzz cut, sweat-dampened hair|massive muscular build, right arm is a mechanical spatula|torn tank top revealing mechanical parts, leather combat pants|gritty underground arena with sparks and smoke
 
 要求：
 1. 角色之间要有关系网（亲友、敌对、师徒、竞争对手等）
@@ -216,12 +217,14 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
             background: c.background || '',
             relationship: c.relationship || '',
             faceImageUrl: '',
+            portraitImageUrl: '',
             imagePrompt: imagePrompt,
             perception: '',
             secret: c.secret || '',
             currentMood: '',
             motivation: c.motivation || '',
             speechStyle: c.speechStyle || '',
+            voice: c.voice || App.autoMatchVoice({ gender: c.gender }),
             __modules__: modules
         };
     });

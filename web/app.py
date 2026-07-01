@@ -1052,6 +1052,65 @@ def test_ip():
             'response_time': 0
         })
 
+# ==================== 角色扮演 TTS API ====================
+
+import io
+import hashlib
+import time
+
+# 全局 TTS 缓存：{ md5(text+voice+rate+pitch+volume): mp3_bytes }
+_tts_cache = {}
+_TTS_CACHE_MAX_AGE = 86400  # 24 小时过期
+
+
+def _generate_mp3(text, voice='zh-CN-XiaoxiaoNeural', rate='+0%', volume='+0%', pitch='+0Hz'):
+    """调用 edge-tts 生成 MP3，结果缓存到内存"""
+    import edge_tts
+    cache_key = hashlib.md5(f"{text}|{voice}|{rate}|{pitch}|{volume}".encode()).hexdigest()
+    if cache_key in _tts_cache:
+        entry = _tts_cache[cache_key]
+        if time.time() - entry['time'] < _TTS_CACHE_MAX_AGE:
+            return entry['data']
+        else:
+            del _tts_cache[cache_key]
+
+    communicate = edge_tts.Communicate(text, voice, rate=rate, volume=volume, pitch=pitch)
+    audio_chunks = []
+    for chunk in communicate.stream_sync():
+        if chunk['type'] == 'audio':
+            audio_chunks.append(chunk['data'])
+    audio_data = b''.join(audio_chunks)
+
+    _tts_cache[cache_key] = {'data': audio_data, 'time': time.time()}
+    return audio_data
+
+
+@app.route('/api/tts', methods=['POST'])
+def tts_api():
+    """TTS 端点：接收文本+音色参数，返回 MP3 音频流"""
+    data = request.get_json()
+    text = data.get('text', '').strip()
+    if not text:
+        return jsonify({'error': 'text is required'}), 400
+
+    voice = data.get('voice', 'zh-CN-XiaoxiaoNeural')
+    rate = data.get('rate', '+0%')
+    volume = data.get('volume', '+0%')
+    pitch = data.get('pitch', '+0Hz')
+
+    try:
+        mp3_bytes = _generate_mp3(text, voice, rate, volume, pitch)
+        resp = make_response(mp3_bytes)
+        resp.headers['Content-Type'] = 'audio/mpeg'
+        resp.headers['Content-Disposition'] = f'attachment; filename=tts_{hashlib.md5(text.encode()).hexdigest()[:8]}.mp3'
+        # 缓存 1 天（浏览器侧）
+        resp.headers['Cache-Control'] = 'public, max-age=86400'
+        return resp
+    except Exception as e:
+        app.logger.error(f'TTS error: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 # ==================== 优雅关闭 ====================
 
 def graceful_shutdown(signum, frame):

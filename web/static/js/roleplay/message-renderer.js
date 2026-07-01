@@ -25,9 +25,11 @@ App.renderMessage = function(msg) {
 
     if (msg.role === 'char' && msg.charIndex != null && state.characters[msg.charIndex]) {
         const c = state.characters[msg.charIndex];
-        if (c.faceImageUrl) {
+        // 对话头像优先用 portraitImageUrl（全身/半身立绘），fallback 到 faceImageUrl（面部特写）
+        const avatarUrl = c.portraitImageUrl || c.faceImageUrl;
+        if (avatarUrl) {
             const img = document.createElement('img');
-            img.src = c.faceImageUrl;
+            img.src = avatarUrl;
             img.alt = c.name;
             img.loading = 'lazy';
             img.onerror = function() {
@@ -40,9 +42,12 @@ App.renderMessage = function(msg) {
         }
         avatar.title = c.name;
         avatar.dataset.faceUrl = c.faceImageUrl || '';
+        avatar.dataset.portraitUrl = c.portraitImageUrl || '';
         avatar.onclick = function() {
-            if (c.faceImageUrl) {
-                document.getElementById('img-overlay-img').src = c.faceImageUrl;
+            // 点击放大：优先 portrait，fallback 到 face
+            const showUrl = c.portraitImageUrl || c.faceImageUrl;
+            if (showUrl) {
+                document.getElementById('img-overlay-img').src = showUrl;
                 document.getElementById('img-overlay').classList.add('show');
             }
         };
@@ -120,6 +125,11 @@ App.renderMessage = function(msg) {
     div.appendChild(bubble);
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+
+    // 异步生成语音（不阻塞 UI 渲染）
+    if (msg.role === 'char') {
+        setTimeout(() => App.attachAudioToBubble(div, msg), 100);
+    }
 }
 
 // 格式化多角色消息：(动作)对话[内心想法]<建议回复>
