@@ -135,8 +135,42 @@ volume（音量）：-100% 到 +100%，步长 10%。正常 = 0%，大声 = +20%~
 {"emotion":"情绪标签","rate":"参数值","pitch":"参数值","volume":"参数值","reason":"一句话解释"}`;
 }
 
-// ===== LLM 推理 TTS 参数 =====
+// ===== LLM 推理 TTS 参数（带 IndexedDB 缓存）=====
+const TTS_PARAMS_DB = 'tts-params-db';
+const TTS_PARAMS_STORE = 'params';
+
+App._getTtsParamsDb = async function() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(TTS_PARAMS_DB, 1);
+        req.onupgradeneeded = (e) => {
+            e.target.result.createObjectStore(TTS_PARAMS_STORE, { keyPath: 'key' });
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+    });
+}
+
 App.inferTTSParams = async function(msg, character) {
+    // 1. 先查 IndexedDB 缓存
+    const db = await App._getTtsParamsDb();
+    if (db) {
+        const cacheKey = App.ttsParamsCacheKey(msg, character);
+        return new Promise((resolve) => {
+            const tx = db.transaction(TTS_PARAMS_STORE, 'readonly');
+            const req = tx.objectStore(TTS_PARAMS_STORE).get(cacheKey);
+            req.onsuccess = () => {
+                if (req.result) {
+                    rpLog('TTS', 'PARAM-CACHE-HIT', `命中参数缓存: ${msg.dialogue?.substring(0, 20) || msg.content?.substring(0, 20)}`);
+                    resolve(req.result.value);
+                } else {
+                    resolve(null);
+                }
+            };
+            req.onerror = () => resolve(null);
+        });
+    }
+    
+    // 2. 缓存未命中，调 LLM 推理
     try {
         const prompt = buildTTSPrompt(msg, character);
         const reply = await App.agnesChat([{ role: 'user', content: prompt }]);
@@ -145,11 +179,28 @@ App.inferTTSParams = async function(msg, character) {
         const jsonMatch = reply.match(/\{[^}]+\}/);
         if (!jsonMatch) return null;
         
-        return JSON.parse(jsonMatch[0]);
+        const params = JSON.parse(jsonMatch[0]);
+        
+        // 3. 存入 IndexedDB 缓存
+        if (db) {
+            const cacheKey = App.ttsParamsCacheKey(msg, character);
+            const tx = db.transaction(TTS_PARAMS_STORE, 'readwrite');
+            tx.objectStore(TTS_PARAMS_STORE).put({ key: cacheKey, value: params });
+        }
+        
+        return params;
     } catch (e) {
         rpLog('TTS', 'WARN', `LLM 推理 TTS 参数失败: ${e.message}`);
         return null;
     }
+}
+
+App.ttsParamsCacheKey = function(msg, character) {
+    // 用对话文本 + 角色名 + 音色作为缓存 key
+    const dialogue = msg.dialogue || msg.content || '';
+    const charName = character?.name || '';
+    const voice = character?.voice || '';
+    return `${charName}:${voice}:${dialogue.substring(0, 50)}`;
 }
 
 // ===== 生成语音（带情绪参数）=====
@@ -158,7 +209,7 @@ App.generateTTS = async function(text, voice, rate='+0%', volume='+0%', pitch='+
 
     const cacheKey = App.ttsCacheKey(text, voice, rate, pitch, volume);
     
-    // 1. 先查 Cache API
+    // 1. 先查精确缓存（text+voice+参数完全匹配）
     try {
         const cache = await App.getTtsCache();
         const cachedResp = await cache.match(cacheKey);
@@ -187,7 +238,7 @@ App.generateTTS = async function(text, voice, rate='+0%', volume='+0%', pitch='+
 
         const blob = await resp.blob();
         
-        // 3. 存入 Cache API
+        // 3. 存入 Cache API（用精确 key）
         try {
             const cache = await App.getTtsCache();
             await cache.put(cacheKey, new Response(blob, {
@@ -196,7 +247,6 @@ App.generateTTS = async function(text, voice, rate='+0%', volume='+0%', pitch='+
             rpLog('TTS', 'CACHED', `已缓存: ${text.substring(0, 30)}...`);
         } catch (e) {
             rpLog('TTS', 'WARN', `缓存写入失败（空间不足?）: ${e.message}`);
-            // 不阻塞，继续返回 blob
         }
 
         return URL.createObjectURL(blob);
