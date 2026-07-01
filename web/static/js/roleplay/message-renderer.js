@@ -151,7 +151,8 @@ App.formatMultiCharMessage = function(msg) {
 
     // 动作
     if (action) {
-        html += `<span class="format-action">${App.escHtml('(' + action + ')')}</span>`;
+        // action 已包含外层括号，直接转义即可
+        html += `<span class="format-action">${App.escHtml(action)}</span>`;
     }
 
     // 对话

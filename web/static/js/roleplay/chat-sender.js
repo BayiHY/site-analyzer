@@ -313,18 +313,85 @@ App.parseMultiCharReply = function(rawText, defaultCharIndex) {
             content = prefixMatch[2].trim();
         }
 
-        // 解析 (动作)语言[内心想法]
-        const actionMatch = content.match(/^\(([^)]+)\)(.*)/);
-        const action = actionMatch ? actionMatch[1].trim() : '';
-        const rest = actionMatch ? actionMatch[2].trim() : content;
+        // 解析 (动作)语言[内心想法] — 支持交错出现的多个 (动作) 和 [想法]
+        // 使用迭代扫描，与 formatInteraction 保持一致
+        let action = '';
+        let thought = '';
+        let remaining = content;
 
-        const speakMatch = rest.match(/^([^\[]*)\[([^\]]*)\]$/);
-        const dialogue = speakMatch ? speakMatch[1].trim() : rest.replace(/\[.*\]$/, '').trim();
-        const thought = speakMatch ? (speakMatch[2] || '') : '';
+        // 第一步：如果文本以 (动作) 开头，提取第一个动作
+        const firstActionMatch = remaining.match(/^\(([^)]+)\)(.*)/s);
+        if (firstActionMatch) {
+            action = '(' + firstActionMatch[1].trim() + ')';
+            remaining = firstActionMatch[2].trimStart();
+        }
+
+        // 第二步：在剩余文本中迭代扫描 (动作) 和 [想法]
+        // 收集所有动作和内心想法，其余作为对话
+        let dialogueParts = [];
+        let scanPos = 0;
+        let scanRemaining = remaining;
+
+        while (scanPos < scanRemaining.length) {
+            let bestMatch = null;
+            let bestPos = scanRemaining.length;
+
+            // 查找下一个 (动作)
+            const openParen = scanRemaining.indexOf('(', scanPos);
+            if (openParen !== -1 && openParen < bestPos) {
+                const closeParen = scanRemaining.indexOf(')', openParen + 1);
+                if (closeParen !== -1) {
+                    bestMatch = { pos: openParen, end: closeParen + 1, type: 'action' };
+                    bestPos = openParen;
+                }
+            }
+
+            // 查找下一个 [想法]
+            const openBracket = scanRemaining.indexOf('[', scanPos);
+            if (openBracket !== -1 && openBracket < bestPos) {
+                const closeBracket = scanRemaining.indexOf(']', openBracket + 1);
+                if (closeBracket !== -1) {
+                    bestMatch = { pos: openBracket, end: closeBracket + 1, type: 'thought' };
+                    bestPos = openBracket;
+                }
+            }
+
+            if (!bestMatch) {
+                // 没有更多标记，剩余全部是对话
+                dialogueParts.push(scanRemaining.slice(scanPos));
+                break;
+            }
+
+            // 收集标记前的纯文本作为对话
+            if (bestMatch.pos > scanPos) {
+                const segment = scanRemaining.slice(scanPos, bestMatch.pos).trim();
+                if (segment) dialogueParts.push(segment);
+            }
+
+            // 根据标记类型分类
+            if (bestMatch.type === 'action') {
+                const actionContent = scanRemaining.slice(bestMatch.pos + 1, bestMatch.end - 1).trim();
+                if (actionContent) {
+                    // 追加到已有动作（用空格分隔）
+                    action += ' ' + '(' + actionContent + ')';
+                }
+            } else if (bestMatch.type === 'thought') {
+                const thoughtContent = scanRemaining.slice(bestMatch.pos + 1, bestMatch.end - 1).trim();
+                if (thoughtContent) {
+                    // 追加到已有想法（用空格分隔）
+                    thought += (thought ? ' ' : '') + thoughtContent;
+                }
+            }
+
+            scanPos = bestMatch.end;
+        }
+
+        // 合并对话部分
+        const dialogue = dialogueParts.join(' ').trim();
 
         // 构建格式化内容字符串
         let formattedContent = '';
-        if (action) formattedContent += '(' + action + ')';
+        if (action) formattedContent += action;
         if (dialogue) formattedContent += dialogue;
         if (thought) formattedContent += '[' + thought + ']';
         if (!formattedContent) formattedContent = content;
