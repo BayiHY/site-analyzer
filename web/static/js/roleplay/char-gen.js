@@ -230,10 +230,51 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
             currentMood: '',
             motivation: c.motivation || '',
             speechStyle: c.speechStyle || '',
-            voice: c.voice || App.autoMatchVoice({ gender: c.gender }),
+            voice: c.voice || '',
             __modules__: modules
         };
     });
+
+    // 声线去重：LLM 分配的 voice 优先，未分配的按性别从可用池中轮询选取
+    const allVoicesByGender = {
+        '女': ['zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural', 'zh-CN-liaoning-XiaobeiNeural', 'zh-CN-shaanxi-XiaoniNeural'],
+        '男': ['zh-CN-YunxiNeural', 'zh-CN-YunjianNeural', 'zh-CN-YunxiaNeural', 'zh-CN-YunyangNeural']
+    };
+    const usedVoices = new Set();
+    const voiceIndexByGender = { '女': 0, '男': 0 };
+
+    // 第一轮：保留 LLM 已分配的声线
+    for (const char of state.characters) {
+        if (char.voice && TTS_VOICES[char.voice]) {
+            usedVoices.add(char.voice);
+        }
+    }
+
+    // 第二轮：为未分配声线的角色轮询选取
+    for (const char of state.characters) {
+        if (!char.voice || !TTS_VOICES[char.voice]) {
+            const gender = char.gender === '男' ? '男' : '女';
+            const pool = allVoicesByGender[gender] || allVoicesByGender['女'];
+            const idx = voiceIndexByGender[gender] || 0;
+            // 从当前位置开始找第一个未使用的声线
+            let assigned = false;
+            for (let i = 0; i < pool.length; i++) {
+                const candidate = pool[(idx + i) % pool.length];
+                if (!usedVoices.has(candidate)) {
+                    char.voice = candidate;
+                    usedVoices.add(candidate);
+                    voiceIndexByGender[gender] = ((idx + i) % pool.length) + 1;
+                    assigned = true;
+                    break;
+                }
+            }
+            // 如果所有声线都已用尽，允许重复（防止角色数超过声线数时崩溃）
+            if (!assigned) {
+                char.voice = pool[idx % pool.length];
+                voiceIndexByGender[gender] = (idx + 1) % pool.length;
+            }
+        }
+    }
 
     // 仅在有 imagePrompt 字段时才记录诊断
     state.characters.forEach((c, i) => {

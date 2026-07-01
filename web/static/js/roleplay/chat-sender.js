@@ -295,7 +295,53 @@ App.parseMultiCharReply = function(rawText, defaultCharIndex) {
 
     // 按 | 分割多角色对话
     // 但要注意：建议回复已经被提取了，剩余的 | 是角色分隔符
-    const charParts = text.split('|').filter(s => s.trim());
+    let charParts = text.split('|').filter(s => s.trim());
+
+    // 如果 | 分割后只有 1 段，尝试用 "名字:" 模式拆分多角色（LLM 有时不用 | 分隔角色）
+    if (charParts.length === 1) {
+        const singleText = charParts[0].trim();
+        // 匹配模式：汉字/字母 + 可选空格/换行 + 冒号(:或：)，后面跟着角色内容
+        // 同时支持换行和空格分隔的角色名
+        const nameColonPattern = /(?:^|\n|\s+)([\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_•·]{0,10})([:：])\s*/g;
+        let nameMatches = [];
+        let m;
+        while ((m = nameColonPattern.exec(singleText)) !== null) {
+            // 确保冒号前面不是 (动作 开头的标记
+            const beforeColon = singleText.substring(Math.max(0, m.index - 5), m.index);
+            if (!beforeColon.includes('(')) {
+                // 记录冒号结束位置（用于截取第一个角色前的内容）
+                const colonEnd = m.index + m[0].length;
+                // 记录实际角色名开始位置（去掉前导空白）
+                const nameStart = m.index + (m[0].length - m[1].length - m[2].length);
+                nameMatches.push({ index: nameStart, name: m[1].trim(), colonEnd: colonEnd });
+            }
+        }
+
+        // 如果找到至少 1 个 "名字:" 匹配（加上开头那段 = 至少 2 个角色），用这种模式拆分
+        if (nameMatches.length >= 1) {
+            const splitParts = [];
+            let prevEnd = 0;
+            // 检查开头是否有 "名字:" 前缀（第一个角色可能在开头）
+            const firstPrefix = singleText.match(/^([\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_•·]{0,10})([:：])\s*/);
+            let startOffset = 0;
+            if (firstPrefix && nameMatches.length >= 2) {
+                // 开头有名字:，第一个角色从冒号后开始
+                startOffset = firstPrefix[0].length;
+                // 把第一个角色名加入匹配列表头部
+                nameMatches.unshift({ index: 0, name: firstPrefix[1].trim(), colonEnd: startOffset });
+            }
+            for (let i = 0; i < nameMatches.length; i++) {
+                const nm = nameMatches[i];
+                if (nm.index >= startOffset) {
+                    splitParts.push(singleText.substring(prevEnd, nm.index).trim());
+                    prevEnd = nm.colonEnd;
+                }
+            }
+            splitParts.push(singleText.substring(prevEnd).trim());
+            charParts = splitParts.filter(s => s);
+            rpLog('INFO', 'PARSE-CHAR', `| 分割只有1段，使用 "名字:" 模式拆分为 ${charParts.length} 段`);
+        }
+    }
 
     for (const part of charParts) {
         const trimmed = part.trim();
