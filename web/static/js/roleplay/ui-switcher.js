@@ -47,3 +47,10 @@ App.hideTyping = function() {
     const el = document.getElementById('typing-indicator');
     if (el) el.remove();
 }
+
+// ===== 工具函数 =====
+App.escapeHtml = function(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}

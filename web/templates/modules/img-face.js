@@ -3,7 +3,7 @@
 // === Section: 风格统一工具 ===
 // === Section: Agnes 图片生成 ===
     // ===== Agnes 图片生成 =====
-    App.agnesImageGen = async function(prompt, size = '768x1024') {
+    App.agnesImageGen = async function(prompt, size = '256x341') {
         const apiKey = state.apiKeys.image;
         if (!apiKey) {
             throw new Error('未配置生图 API Key');
@@ -200,7 +200,7 @@
             const requestBody = {
                 model: 'agnes-image-2.1-flash',
                 prompt: prompt,
-                size: '1024x768',
+                size: '341x256',
                 n: 1,
                 extra_body: { response_format: 'url' }
             };

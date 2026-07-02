@@ -179,7 +179,7 @@ App.generateCharacterImage = async function(character) {
             try {
                 const model = faceModels[attempt % faceModels.length];
                 rpLog('info', 'IMG', `面部特写尝试 ${attempt + 1}/3 (model=${model}): ${character.name}`);
-                faceImageUrl = await App.agnesImageGen(facePrompt, '512x512', model);
+                faceImageUrl = await App.agnesImageGen(facePrompt, '341x341', model);
                 rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
                 character.faceImageUrl = faceImageUrl;
                 await saveState();
@@ -343,7 +343,7 @@ App.generatePlayerAvatar = async function() {
 };
 
 // 生图 API 调用
-App.agnesImageGen = async function(prompt, size = '768x1024', model) {
+App.agnesImageGen = async function(prompt, size = '256x341', model) {
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
         throw new Error('未配置生图 API Key');
@@ -391,7 +391,7 @@ App.agnesImageGen = async function(prompt, size = '768x1024', model) {
 };
 
 // === img2img 变体：传入面部参考图，确保面部一致性 ===
-App.agnesImageGenWithRefImg = async function(prompt, faceImageUrl, size = '768x1024') {
+App.agnesImageGenWithRefImg = async function(prompt, faceImageUrl, size = '256x341') {
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
         throw new Error('未配置生图 API Key');

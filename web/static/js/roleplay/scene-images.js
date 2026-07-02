@@ -240,7 +240,7 @@ App.generateInitialSceneImage = async function(openingScene, replyText, metadata
         const requestBody = {
             model: 'agnes-image-2.1-flash',
             prompt: prompt,
-            size: '768x1024',
+            size: '256x341',
             n: 1,
             extra_body: { response_format: 'url' }
         };
@@ -329,7 +329,7 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText,
         const requestBody = {
             model: 'agnes-image-2.1-flash',
             prompt: prompt,
-            size: '768x1024',
+            size: '256x341',
             n: 1,
             extra_body: { response_format: 'url' }
         };

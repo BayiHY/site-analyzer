@@ -47,6 +47,27 @@ App.togglePanel = function(type) {
             rpLog('error', 'PANEL', 'renderSettingsPanel error: ' + err.message);
             body.innerHTML = '<p style="color:red;">渲染设置面板失败: ' + err.message + '</p>';
         }
+    } else if (type === 'story') {
+        title.textContent = '📖 故事概要';
+        const story = state.story;
+        if (story) {
+            body.innerHTML = `
+                <div class="setting-item">
+                    <label>故事标题</label>
+                    <div style="padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:#ffffff;font-size:0.9rem;min-height:36px;display:flex;align-items:center;">
+                        ${App.escapeHtml(story.title || '未命名')}
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>世界观概要</label>
+                    <div style="padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.85rem;line-height:1.6;white-space:pre-wrap;min-height:60px;">
+                        ${App.escapeHtml(story.worldview || '暂无')}
+                    </div>
+                </div>
+            `;
+        } else {
+            body.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:20px;">故事尚未生成</p>';
+        }
     }
 }
 
