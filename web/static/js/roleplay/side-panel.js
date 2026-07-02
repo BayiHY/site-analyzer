@@ -54,15 +54,11 @@ App.togglePanel = function(type) {
             body.innerHTML = `
                 <div class="setting-item">
                     <label>故事标题</label>
-                    <div style="padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:#ffffff;font-size:0.9rem;min-height:36px;display:flex;align-items:center;">
-                        ${App.escapeHtml(story.title || '未命名')}
-                    </div>
+                    <div class="story-field">${App.escapeHtml(story.title || '未命名')}</div>
                 </div>
                 <div class="setting-item">
                     <label>世界观概要</label>
-                    <div style="padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.85rem;line-height:1.6;white-space:pre-wrap;min-height:60px;">
-                        ${App.escapeHtml(story.worldview || '暂无')}
-                    </div>
+                    <div class="story-field story-field-wrap">${App.escapeHtml(story.worldview || '暂无')}</div>
                 </div>
             `;
         } else {

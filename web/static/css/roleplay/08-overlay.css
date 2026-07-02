@@ -162,3 +162,19 @@
     color: var(--text-dim);
     margin-top: 4px;
 }
+
+/* --- 故事概要面板字段 --- */
+.story-field {
+    padding: 8px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: #ffffff;
+    font-size: 0.9rem;
+}
+.story-field-wrap {
+    white-space: pre-wrap;
+    line-height: 1.6;
+    font-size: 0.85rem;
+    color: var(--text);
+}
