@@ -96,8 +96,12 @@ App.getSceneCharacterFaceUrls = function(replyText, allCharacters, metadata) {
 // 正则解析版本（旧逻辑，作为 fallback）
 App._getSceneCharacterFaceUrlsRegex = function(replyText, allCharacters) {
     if (!replyText) {
-        // 无回复文本时 fallback 到所有角色
-        return App.getAllCharacterFaceUrls();
+        // 无回复文本时只返回当前活跃角色的参考图
+        const activeChar = allCharacters && allCharacters.length > 0 ? allCharacters[0] : null;
+        if (activeChar && activeChar.faceImageUrl) {
+            return [activeChar.faceImageUrl];
+        }
+        return [];
     }
     // 提取出场角色名
     const sceneMatch = replyText.match(/\{([^}]+)\}/);
@@ -139,19 +143,29 @@ App._getSceneCharacterFaceUrlsRegex = function(replyText, allCharacters) {
         rpLog('info', 'SCENE', `⚠️ 过滤非角色名: ${[...presentNames].join(', ')} → ${[...validNames].join(', ')}`);
     }
     
-    // 如果有效角色名太少，fallback 到所有角色
-    if (validNames.size < Math.max(allCharacters.length * 0.5, 1) && allCharacters.length > 1) {
-        rpLog('info', 'SCENE', `⚠️ 有效出场角色(${validNames.size})少于阈值(${Math.max(allCharacters.length * 0.5, 1)})，fallback 到全部角色`);
-        return App.getAllCharacterFaceUrls();
-    }
-    
-    // 返回在场角色的参考图
+    // 不再 fallback 到全部角色 —— 现场有几个角色就用几个角色的参考
+    // 同时检测主角是否在场景中互动，如果是则加入主角参考图
     const urls = [];
     for (const char of (allCharacters || [])) {
         if (char.faceImageUrl && validNames.has(char.name)) {
             urls.push(char.faceImageUrl);
         }
     }
+    
+    // 检测主角是否在场：检查 replyText 中是否有 "你" 或主角名
+    if (replyText && state.player && state.player.faceImageUrl) {
+        const playerName = state.player.name;
+        const playerInScene = replyText.includes('你') || 
+                              replyText.includes(playerName) ||
+                              replyText.includes(playerName + '（') ||
+                              replyText.includes(playerName + '：');
+        if (playerInScene) {
+            urls.push(state.player.faceImageUrl);
+            rpLog('info', 'SCENE', `👤 主角在场，加入主角参考图`);
+        }
+    }
+    
+    rpLog('info', 'SCENE', `✅ 场景参考图: ${urls.length} 张 (${[...validNames].join(', ')}${urls.some(u => u === state.player?.faceImageUrl) ? ', 主角' : ''})`);
     return urls;
 }
 

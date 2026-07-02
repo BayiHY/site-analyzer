@@ -26,7 +26,7 @@ App.renderMessage = function(msg) {
     if (msg.role === 'char' && msg.charIndex != null && state.characters[msg.charIndex]) {
         const c = state.characters[msg.charIndex];
         // 对话头像优先用 portraitImageUrl（全身/半身立绘），fallback 到 faceImageUrl（面部特写）
-        const avatarUrl = c.portraitImageUrl || c.faceImageUrl;
+        let avatarUrl = c.portraitImageUrl || c.faceImageUrl;
         if (avatarUrl) {
             const img = document.createElement('img');
             img.src = avatarUrl;
@@ -45,7 +45,7 @@ App.renderMessage = function(msg) {
         avatar.dataset.portraitUrl = c.portraitImageUrl || '';
         avatar.onclick = function() {
             // 点击放大：优先 portrait，fallback 到 face
-            const showUrl = c.portraitImageUrl || c.faceImageUrl;
+            let showUrl = c.portraitImageUrl || c.faceImageUrl;
             if (showUrl) {
                 document.getElementById('img-overlay-img').src = showUrl;
                 document.getElementById('img-overlay').classList.add('show');
@@ -53,7 +53,7 @@ App.renderMessage = function(msg) {
         };
     } else if (msg.role === 'user') {
         // 玩家头像
-        const playerFace = state.player?.faceImageUrl;
+        let playerFace = state.player?.faceImageUrl;
         if (playerFace) {
             const img = document.createElement('img');
             img.src = playerFace;
@@ -67,10 +67,11 @@ App.renderMessage = function(msg) {
         } else {
             avatar.textContent = '😊';
         }
-        avatar.dataset.faceUrl = playerFace || '';
+        avatar.dataset.faceUrl = state.player?.faceImageUrl || '';
         avatar.onclick = function() {
-            if (playerFace) {
-                document.getElementById('img-overlay-img').src = playerFace;
+            let pf = state.player?.faceImageUrl;
+            if (pf) {
+                document.getElementById('img-overlay-img').src = pf;
                 document.getElementById('img-overlay').classList.add('show');
             }
         };
@@ -83,11 +84,12 @@ App.renderMessage = function(msg) {
 
     if (msg.type === 'image') {
         div.classList.add('img-msg');
+        let imgSrc = msg.content;
         const img = document.createElement('img');
-        img.src = msg.content;
+        img.src = imgSrc;
         img.alt = msg.caption || '';
         img.onclick = () => {
-            document.getElementById('img-overlay-img').src = msg.content;
+            document.getElementById('img-overlay-img').src = imgSrc;
             document.getElementById('img-overlay').classList.add('show');
         };
         if (msg.caption) {

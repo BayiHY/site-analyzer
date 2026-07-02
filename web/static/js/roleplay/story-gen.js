@@ -114,33 +114,46 @@ storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
 
     let data;
     try {
-        data = App.parseWorldviewDelimited(resp);
-        // 检查解析结果是否有有效字段——如果 LLM 未按要求输出 TSV 格式，
-        // 解析会返回空对象而不报错，需要额外检测
-        if (Object.keys(data).length === 0) {
-            throw new Error('TSV 解析返回空对象（LLM 可能未使用 | 分隔格式）');
+        // 第一优先级：newline key:value 格式（LLM 最常输出）
+        data = App.parseWorldviewKeyValue(resp);
+        if (!data || Object.keys(data).length === 0) {
+            throw new Error('key:value 解析返回空结果');
         }
         // 检查关键字段 worldviewSummary 是否为空
         if (!data.worldviewSummary || data.worldviewSummary.trim().length < 10) {
-            throw new Error('世界观概要缺失或过短（LLM 可能未按要求输出 | 分隔格式）');
+            throw new Error('世界观概要缺失或过短');
         }
-            rpLog('info', 'WORLDVIEW', '分隔符解析成功');
+        rpLog('info', 'WORLDVIEW', 'key:value 解析成功');
         rpLog('info', 'TITLE', `LLM 原始返回: ${resp}`);
     } catch (e) {
-        rpLog('warn', 'WORLDVIEW', '分隔符解析失败: ' + e.message);
-        rpLog('warn', 'WORLDVIEW', `LLM 原始返回: ${resp}`);
+        rpLog('warn', 'WORLDVIEW', 'key:value 解析失败: ' + e.message);
         try {
-            data = App.parseWorldviewJson(resp);
-            rpLog('info', 'WORLDVIEW', 'JSON 解析成功');
+            // 第二优先级：TSV | 分隔格式
+            data = App.parseWorldviewDelimited(resp);
+            if (Object.keys(data).length === 0) {
+                throw new Error('TSV 解析返回空对象');
+            }
+            if (!data.worldviewSummary || data.worldviewSummary.trim().length < 10) {
+                throw new Error('世界观概要缺失或过短（LLM 可能未按要求输出 | 分隔格式）');
+            }
+            rpLog('info', 'WORLDVIEW', 'TSV 分隔符解析成功');
+            rpLog('info', 'TITLE', `LLM 原始返回: ${resp}`);
         } catch (e2) {
-            rpLog('warn', 'WORLDVIEW', 'JSON 解析也失败: ' + e2.message + '，启用兜底文本解析');
+            rpLog('warn', 'WORLDVIEW', 'TSV 分隔符解析失败: ' + e2.message);
             try {
-                data = App.parseWorldviewFallback(resp);
-                rpLog('info', 'WORLDVIEW', '兜底文本解析成功');
+                // 第三优先级：JSON 解析
+                data = App.parseWorldviewJson(resp);
+                rpLog('info', 'WORLDVIEW', 'JSON 解析成功');
             } catch (e3) {
-                rpLog('error', 'WORLDVIEW', '所有解析方式均失败: ' + e3.message);
-                rpLog('error', 'WORLDVIEW', `LLM 原始返回: ${resp}`);
-                throw new Error('世界观生成失败：无法解析 LLM 返回的数据');
+                rpLog('warn', 'WORLDVIEW', 'JSON 解析也失败: ' + e3.message + '，启用兜底文本解析');
+                try {
+                    data = App.parseWorldviewFallback(resp);
+                    rpLog('info', 'WORLDVIEW', '兜底文本解析成功');
+                } catch (e4) {
+                    rpLog('error', 'WORLDVIEW', '所有解析方式均失败: ' + e4.message);
+                    rpLog('error', 'WORLDVIEW', `LLM 原始返回: ${resp}`);
+                    throw new Error('世界观生成失败：无法解析 LLM 返回的数据');
+                }
             }
         }
     }
@@ -167,6 +180,59 @@ storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
     rpLog('info', 'WORLDVIEW', '世界观生成完成: ' + state.story.title);
     rpLog('info', 'TITLE', `故事标题: "${state.story.title}" | 原始数据: ${JSON.stringify({storyTitle: data.storyTitle, worldviewSummary: (data.worldviewSummary || '').slice(0, 50), openingScene: (data.openingScene || '').slice(0, 50)})}`);
     return data;
+};
+
+// 解析世界观 — 优先尝试 newline key:value 格式（LLM 最常输出的格式）
+// 示例：
+//   故事标题:海风与异能
+//   worldviewSummary:大航海时代背景下...
+//   openingScene:阳光透过...
+App.parseWorldviewKeyValue = function(text) {
+    const result = {};
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    
+    // 字段名映射：支持英文 key 和中文 key
+    const fieldMap = {
+        'storytitle': 'storyTitle',
+        '故事标题': 'storyTitle',
+        '标题': 'storyTitle',
+        'worldviewsummary': 'worldviewSummary',
+        '世界观概要': 'worldviewSummary',
+        '世界观': 'worldviewSummary',
+        '设定概要': 'worldviewSummary',
+        'openingscene': 'openingScene',
+        '开场场景': 'openingScene',
+        '开场': 'openingScene',
+        'mainarc': 'mainArc',
+        '主线剧情': 'mainArc',
+        '主要弧光': 'mainArc',
+        '主线': 'mainArc',
+        'tonekeywords': 'toneKeywords',
+        '氛围关键词': 'toneKeywords',
+        'tone ic keywords': 'toneKeywords',
+        'tonekeywords': 'toneKeywords',
+        'worldviewnotes': 'worldviewNotes',
+        '世界观备注': 'worldviewNotes',
+        '世界观笔记': 'worldviewNotes',
+    };
+    
+    for (const line of lines) {
+        // 匹配 key:value 或 key: value 格式（支持 : 和 ：）
+        const match = line.match(/^([^\s:：]+?)[\s]*[:：]\s*(.+)$/s);
+        if (!match) continue;
+        
+        const rawKey = match[1].trim().toLowerCase();
+        const value = match[2].trim();
+        const fieldName = fieldMap[rawKey];
+        
+        if (fieldName) {
+            result[fieldName] = value;
+        }
+    }
+    
+    // 如果至少解析到了 2 个字段，认为成功
+    if (Object.keys(result).length >= 2) return result;
+    return null; // 字段太少，交给下一级
 };
 
 // 解析世界观 TSV 表格（| 分隔字段）
