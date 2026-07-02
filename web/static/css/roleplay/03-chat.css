@@ -66,7 +66,17 @@
 .msg.char { align-self: flex-start; }
 .msg.user { align-self: flex-end; flex-direction: row-reverse; }
 .msg.system { align-self: stretch; }
-.msg.system .bubble { opacity: 0.65; }
+.msg.system .bubble { 
+    background: rgba(26, 35, 50, 0.65); 
+    border: 1px solid rgba(45, 58, 74, 0.5); 
+    border-radius: 12px; 
+    padding: 10px 14px; 
+    font-size: 0.9rem; 
+    line-height: 1.6; 
+    white-space: pre-wrap; 
+    text-align: center; 
+    opacity: 0.65; 
+}
 .msg .avatar {
     width: 32px; height: 32px; border-radius: 50%; background: rgba(26, 35, 50, 0.65);
     display: flex; align-items: center; justify-content: center;
