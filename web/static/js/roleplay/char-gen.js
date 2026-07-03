@@ -28,13 +28,15 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     do {
         rpLog('info', 'TIMEOUT', `LLM 请求开始: characters, count=${count}, retry=${retryCount}`);
         const charStartTime = Date.now();
-        resp = await App.agnesChat([{
-            role: 'system',
-            content: '你是专业的角色设计师，擅长创造立体、有深度的虚构角色。输出必须严格按照分隔符格式。'
-        }, {
-            role: 'user',
-            content: prompt + retryPromptSuffix
-        }]);
+        resp = await App.agnesChatWithFallback([
+            {
+                role: 'system',
+                content: '你是专业的角色设计师，擅长创造立体、有深度的虚构角色。输出必须严格按照分隔符格式。'
+            }, {
+                role: 'user',
+                content: prompt + retryPromptSuffix
+            }
+        ], { route: 'characters' });
         const charElapsed = Date.now() - charStartTime;
         rpLog('info', 'TIMEOUT', `LLM 请求完成: characters, 耗时 ${charElapsed}ms`);
         if (charElapsed > 60000) {

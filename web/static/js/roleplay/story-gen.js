@@ -89,13 +89,13 @@ storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
     rpLog('info', 'WORLDVIEW', '调用 LLM 生成世界观骨架');
     const startTime = Date.now();
     rpLog('info', 'TIMEOUT', `LLM 请求开始: worldview, temp=${options?.temperature ?? 1}`);
-    const resp = await App.agnesChat([{
+    const resp = await App.agnesChatWithFallback([{
         role: 'system',
         content: systemPrompt
     }, {
         role: 'user',
         content: userPrompt
-    }], options);
+    }], { ...options, route: 'worldview' });
     const elapsed = Date.now() - startTime;
     rpLog('info', 'TIMEOUT', `LLM 请求完成: worldview, 耗时 ${elapsed}ms`);
     if (elapsed > 60000) {
