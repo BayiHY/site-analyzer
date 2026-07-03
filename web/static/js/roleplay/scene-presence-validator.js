@@ -15,23 +15,6 @@ export function validateScenePresence(replyText, activeCharName, allCharacters) 
 
     // 1. 从 replyText 中提取"声明不在场"的角色
     const declaredAbsent = [];
-    const absentPatterns = [
-        /([^\s|┆]{2,10})[^\n]{0,30}(不|没|没有|不在|没在|不在这里|不在场|还在|还没|不在这儿)[^\n]{0,30}(这里|在场|在|这儿|这)/g,
-        /([^\s|┆]{2,10})[^\n]{0,30}(不在|没在|不在这里|不在场|还没到|不在这儿)/g,
-        /([^\s|┆]{2,10})[^\n]{0,30}(还在上面|还在外面|还在里面|还在忙|还没来|还没到)/g,
-    ];
-    for (const pattern of absentPatterns) {
-        let m;
-        while ((m = pattern.exec(replyText)) !== null) {
-            const name = m[1].trim();
-            if (name && allCharacters.some(c => c.name === name) && !declaredAbsent.includes(name)) {
-                declaredAbsent.push(name);
-            }
-            pattern.lastIndex = 0; // reset
-        }
-    }
-    // Reset regex state for all patterns
-    declaredAbsent.length = 0;
     const absentRe = /([^\s|┆]{2,10})[^\n]{0,30}(不|没|没有|不在|没在|不在这里|不在场|还没到|还没来|不在这儿)/g;
     let rm;
     while ((rm = absentRe.exec(replyText)) !== null) {

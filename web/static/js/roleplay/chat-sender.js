@@ -10,6 +10,7 @@ App.sendMessage = async function() {
     input.style.height = 'auto';
 
     const activeChar = state.characters[state.activeCharIndex];
+    rpLog('info', 'TIMEOUT', `sendMessage 开始: "${text.slice(0, 50)}..."`);
 
     // 用户消息
     state.messages.push({
@@ -25,6 +26,7 @@ App.sendMessage = async function() {
     // 显示加载
     document.getElementById('send-btn').disabled = true;
     showTyping();
+    rpLog('info', 'TIMEOUT', '用户消息已渲染，开始构建历史');
 
     try {
         // ===== 1. 构建对话历史 =====
@@ -85,14 +87,18 @@ ${formatModule.buildFormatRequirements()}`;
         document.getElementById('send-btn').disabled = false;
 
         // ===== 5. 后处理：4 项并行执行 =====
+        rpLog('info', 'TIMEOUT', '后处理开始: 4 项并行');
+        const postProcessStart = Date.now();
         Promise.allSettled([
             // 后处理 1: 场景图生成 → 见 scene-images.js
             (async () => {
                 try {
+                    rpLog('info', 'TIMEOUT', '后处理[1/4] 场景图生成开始');
                     const sceneDesc = App.parseSceneFromReply(response);
                     if (sceneDesc && App.isSceneChanged(activeChar.name, sceneDesc)) {
                         await App.generateSceneImage(activeChar.name, sceneDesc, activeChar, response, null);
                     }
+                    rpLog('info', 'TIMEOUT', `后处理[1/4] 场景图完成 (${Date.now()-postProcessStart}ms)`);
                 } catch (e) {
                     console.warn('场景图生成失败:', e);
                 }
@@ -100,7 +106,9 @@ ${formatModule.buildFormatRequirements()}`;
             // 后处理 2: 情感指标更新 → 见 emotion-update.js
             (async () => {
                 try {
+                    rpLog('info', 'TIMEOUT', '后处理[2/4] 情感更新开始');
                     await App.updateEmotions(activeChar.name, text, response);
+                    rpLog('info', 'TIMEOUT', `后处理[2/4] 情感完成 (${Date.now()-postProcessStart}ms)`);
                 } catch (e) {
                     console.warn('情感更新失败:', e);
                 }
@@ -108,10 +116,12 @@ ${formatModule.buildFormatRequirements()}`;
             // 后处理 3: 信息披露评估 → 见 progressive-disclosure.js
             (async () => {
                 try {
+                    rpLog('info', 'TIMEOUT', '后处理[3/4] 信息披露开始');
                     await App.updateRevealedInfo(activeChar.name, text, response);
                     if (state.currentPanel === 'characters') {
                         document.getElementById('panel-body').innerHTML = renderCharactersPanel();
                     }
+                    rpLog('info', 'TIMEOUT', `后处理[3/4] 信息披露完成 (${Date.now()-postProcessStart}ms)`);
                 } catch (e) {
                     console.warn('信息披露评估失败:', e);
                 }
@@ -119,12 +129,16 @@ ${formatModule.buildFormatRequirements()}`;
             // 后处理 4: 动态属性更新 → 见 dynamic-attrs.js
             (async () => {
                 try {
+                    rpLog('info', 'TIMEOUT', '后处理[4/4] 动态属性开始');
                     await App.updateDynamicAttributes(activeChar.name, text, response);
+                    rpLog('info', 'TIMEOUT', `后处理[4/4] 动态属性完成 (${Date.now()-postProcessStart}ms)`);
                 } catch (e) {
                     console.warn('动态属性更新失败:', e);
                 }
             })()
-        ]);
+        ]).then(() => {
+            rpLog('info', 'TIMEOUT', `后处理全部完成 (${Date.now()-postProcessStart}ms)`);
+        });
 
     } catch (err) {
         hideTyping();
@@ -140,6 +154,8 @@ ${formatModule.buildFormatRequirements()}`;
 App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
     const messages = [];
     let text = rawText.trim();
+    rpLog('info', 'TIMEOUT', `解析多角色回复开始: ${(text||'').length} 字符`);
+    const parseStart = Date.now();
 
     // 统一时间戳基准：确保场景消息的时间戳早于角色消息
     const baseTimestamp = new Date().toISOString();
@@ -243,5 +259,6 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
         });
     }
 
+    rpLog('info', 'TIMEOUT', `解析多角色回复完成: ${messages.length} 条消息, 耗时 ${Date.now()-parseStart}ms`);
     return messages;
 };
