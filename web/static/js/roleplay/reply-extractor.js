@@ -109,6 +109,12 @@ export function extractSuggestedReplies(text) {
                 rpLog('warn', 'PARSE-REPLY', `${rejectedCount}/${suggestedReplies.length} 个选项视角异常，标记待修正`);
             }
             rpLog('INFO', 'PARSE-REPLY', `解析出 ${suggestedReplies.length} 条建议回复: ${JSON.stringify(suggestedReplies)}`);
+            
+            // 检测推荐回复是否完全重复（模板化迹象）
+            const uniqueReplies = new Set(suggestedReplies);
+            if (uniqueReplies.size < suggestedReplies.length && uniqueReplies.size <= 2) {
+                rpLog('warn', 'PARSE-REPLY', `⚠️ 建议回复高度重复: ${suggestedReplies.length} 条中仅有 ${uniqueReplies.size} 种不同内容，可能存在模板化问题`);
+            }
         }
     } else {
         if (typeof rpLog !== 'undefined') {

@@ -343,9 +343,8 @@ App.attachAudioToBubble = async function(msgEl, msg) {
                 
                 bubble.appendChild(audio);
                 
-                msg._audioUrl = audioUrl;
-                msg._audioBlobUrl = audioUrl;
-                
+                // 注意：不持久化 blob URL，仅保存在内存中
+                // msg._audioUrl 和 msg._audioBlobUrl 不会被 saveMessages() 持久化
                 rpLog('TTS', 'PLAYING', `气泡音频已嵌入: ${char?.name || '角色'}`);
             } else {
                 // 生成失败：替换为错误提示

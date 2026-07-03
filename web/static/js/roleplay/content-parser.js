@@ -94,12 +94,63 @@ export function parseContent(trimmed, charName, defaultCharIndex, suggestedRepli
     if (thought) formattedContent += '[' + thought + ']';
     if (!formattedContent) formattedContent = trimmed;
 
-    // 查找对应的角色索引
+    // 查找对应的角色索引 — 精确匹配优先，模糊匹配兜底
     let charIdx = defaultCharIndex;
     if (charName) {
-        const found = state.characters.findIndex(c => c.name === charName);
-        if (found >= 0) charIdx = found;
+        // 1. 精确匹配
+        const exact = state.characters.findIndex(c => c.name === charName);
+        if (exact >= 0) {
+            charIdx = exact;
+        } else {
+            // 2. 模糊匹配：检测开场白角色名与设定名不一致
+            // 策略 A：首字匹配（"林鸢" → "凛夜" 首字不同，跳过）
+            // 策略 B：编辑距离 ≤ 1 的近似名
+            let bestDist = Infinity;
+            let bestIdx = -1;
+            for (let i = 0; i < state.characters.length; i++) {
+                const cName = state.characters[i].name;
+                if (!cName) continue;
+                // 如果开场名包含设定名或设定名包含开场名（子串匹配）
+                if (cName.includes(charName) || charName.includes(cName)) {
+                    charIdx = i;
+                    rpLog('INFO', 'CHAR-NAME', `模糊匹配(子串): "${charName}" → "${cName}" (idx=${i})`);
+                    break;
+                }
+                // 编辑距离
+                const dist = levenshteinDistance(charName, cName);
+                if (dist < bestDist && dist <= Math.max(1, Math.floor(charName.length * 0.5))) {
+                    bestDist = dist;
+                    bestIdx = i;
+                }
+            }
+            if (bestIdx >= 0) {
+                charIdx = bestIdx;
+                rpLog('INFO', 'CHAR-NAME', `模糊匹配(编辑距离${bestDist}): "${charName}" → "${state.characters[bestIdx].name}" (idx=${bestIdx})`);
+            } else {
+                // 3. 完全找不到匹配 → 保留原名字（不崩溃），但标记警告
+                rpLog('warn', 'CHAR-NAME', `⚠️ 未找到匹配角色: "${charName}"，使用默认索引 ${defaultCharIndex}`);
+            }
+        }
     }
 
     return { charName, charIdx, action, dialogue, thought, formattedContent };
+}
+
+// 简易编辑距离（Levenshtein Distance）
+function levenshteinDistance(a, b) {
+    if (!a) return b.length;
+    if (!b) return a.length;
+    const matrix = Array.from({ length: b.length + 1 }, (_, i) => [i]);
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            const cost = a[j - 1] === b[i - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1,
+                matrix[i][j - 1] + 1,
+                matrix[i - 1][j - 1] + cost
+            );
+        }
+    }
+    return matrix[b.length][a.length];
 }

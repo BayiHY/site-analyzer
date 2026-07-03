@@ -141,87 +141,105 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
     const messages = [];
     let text = rawText.trim();
 
-    // 步骤 1: 提取场景
-    const sceneExtractor = await import('./scene-extractor.js');
-    const { sceneText, remaining: afterScene } = sceneExtractor.extractScene(text);
+    // 统一时间戳基准：确保场景消息的时间戳早于角色消息
+    const baseTimestamp = new Date().toISOString();
+    const baseMs = Date.now();
 
-    // 步骤 2: 提取建议回复
-    const replyExtractor = await import('./reply-extractor.js');
-    const { replies: suggestedReplies, remaining: afterReply } = replyExtractor.extractSuggestedReplies(afterScene);
+    try {
+        // 步骤 1: 提取场景
+        const sceneExtractor = await import('./scene-extractor.js');
+        const { sceneText, remaining: afterScene } = sceneExtractor.extractScene(text);
 
-    // 步骤 3: 分割角色段落
-    const charSplitter = await import('./char-splitter.js');
-    const charParts = charSplitter.splitCharParts(afterReply);
+        // 步骤 2: 提取建议回复
+        const replyExtractor = await import('./reply-extractor.js');
+        const { replies: suggestedReplies, remaining: afterReply } = replyExtractor.extractSuggestedReplies(afterScene);
 
-    // 步骤 4: 解析每个角色段落
-    const contentParser = await import('./content-parser.js');
-    for (const part of charParts) {
-        const trimmed = part.trim();
-        if (!trimmed) continue;
+        // 步骤 3: 分割角色段落
+        const charSplitter = await import('./char-splitter.js');
+        const charParts = charSplitter.splitCharParts(afterReply);
 
-        const { charName, charIdx, action, dialogue, thought, formattedContent } = contentParser.parseContent(trimmed, null, defaultCharIndex, suggestedReplies);
+        // 步骤 4: 解析每个角色段落
+        const contentParser = await import('./content-parser.js');
+        for (let i = 0; i < charParts.length; i++) {
+            const trimmed = charParts[i].trim();
+            if (!trimmed) continue;
 
-        messages.push({
-            id: 'msg_char_' + Date.now() + '_' + charIdx,
-            role: 'char',
-            type: 'multi_char',
-            content: formattedContent,
-            charIndex: charIdx,
-            charName: charName || state.characters[charIdx]?.name || '',
-            action: action,
-            dialogue: dialogue,
-            thought: thought,
-            suggestedReplies: suggestedReplies,
-            timestamp: new Date().toISOString()
-        });
-        rpLog('INFO', 'PARSE-CHAR', `角色消息 #${messages.length} (charIdx=${charIdx}): 建议回复=${JSON.stringify(suggestedReplies)}, 动作="${action}", 对话="${dialogue}", 想法="${thought}"`);
-    }
+            const { charName, charIdx, action, dialogue, thought, formattedContent } = contentParser.parseContent(trimmed, null, defaultCharIndex, suggestedReplies);
 
-    // ===== 格式校验层：检测 LLM 回复是否严重偏离格式 =====
-    const formatValidator = await import('./format-validator.js');
-    const formatResult = formatValidator.validateFormat(rawText, messages);
-    if (formatResult.missingScene || formatResult.missingPrefix || formatResult.missingReplies) {
-        rpLog('warn', 'FORMAT-CHECK', `格式偏离: 场景描述=${formatResult.missingScene ? '缺失' : '有'}, 角色前缀=${formatResult.missingPrefix ? '缺失' : '有'}, 建议回复=${formatResult.missingReplies ? '缺失' : '有'}, 触发重试: ${formatResult.shouldRetry}`);
-    }
-
-    // ===== 场景在场规则校验 =====
-    if (messages.length > 0) {
-        const presenceValidator = await import('./scene-presence-validator.js');
-        const presenceResult = presenceValidator.validateScenePresence(
-            rawText,
-            state.characters[state.activeCharIndex]?.name,
-            state.characters
-        );
-        if (!presenceResult.valid) {
-            rpLog('warn', 'SCENE-RULE', `场景在场规则违反: ${presenceResult.conflicts.join(', ')} 声明不在场但实际出场`);
-            // 标记为需要重试，后续在 sendMessage 中处理
-            messages[0]._sceneRuleViolation = presenceResult;
+            messages.push({
+                id: 'msg_char_' + (baseMs + i + 1),
+                role: 'char',
+                type: 'multi_char',
+                content: formattedContent,
+                charIndex: charIdx,
+                charName: charName || state.characters[charIdx]?.name || '',
+                action: action,
+                dialogue: dialogue,
+                thought: thought,
+                suggestedReplies: suggestedReplies,
+                timestamp: new Date(baseMs + i + 1).toISOString()
+            });
+            rpLog('INFO', 'PARSE-CHAR', `角色消息 #${messages.length} (charIdx=${charIdx}): 建议回复=${JSON.stringify(suggestedReplies)}, 动作="${action}", 对话="${dialogue}", 想法="${thought}"`);
         }
-    }
 
-    // 附加场景消息
-    if (sceneText) {
-        const sceneMsg = {
-            id: 'msg_scene_' + Date.now(),
-            role: 'char',
-            type: 'text',
-            content: sceneText,
-            charIndex: defaultCharIndex,
-            isScene: true,
-            timestamp: new Date().toISOString()
-        };
-        messages.unshift(sceneMsg);
-    }
+        // ===== 格式校验层：检测 LLM 回复是否严重偏离格式 =====
+        const formatValidator = await import('./format-validator.js');
+        const formatResult = formatValidator.validateFormat(rawText, messages);
+        if (formatResult.missingScene || formatResult.missingPrefix || formatResult.missingReplies) {
+            rpLog('warn', 'FORMAT-CHECK', `格式偏离: 场景描述=${formatResult.missingScene ? '缺失' : '有'}, 角色前缀=${formatResult.missingPrefix ? '缺失' : '有'}, 建议回复=${formatResult.missingReplies ? '缺失' : '有'}, 触发重试: ${formatResult.shouldRetry}`);
+        }
 
-    // 如果没有解析出任何角色消息，fallback 为单条普通消息
-    if (messages.length === 0) {
+        // ===== 场景在场规则校验 =====
+        if (messages.length > 0) {
+            const presenceValidator = await import('./scene-presence-validator.js');
+            const presenceResult = presenceValidator.validateScenePresence(
+                rawText,
+                state.characters[state.activeCharIndex]?.name,
+                state.characters
+            );
+            if (!presenceResult.valid) {
+                rpLog('warn', 'SCENE-RULE', `场景在场规则违反: ${presenceResult.conflicts.join(', ')} 声明不在场但实际出场`);
+                // 标记为需要重试，后续在 sendMessage 中处理
+                messages[0]._sceneRuleViolation = presenceResult;
+            }
+        }
+
+        // 附加场景消息（时间戳必须在所有角色消息之前）
+        if (sceneText) {
+            const sceneMsg = {
+                id: 'msg_scene_' + baseMs,
+                role: 'char',
+                type: 'text',
+                content: sceneText,
+                charIndex: defaultCharIndex,
+                isScene: true,
+                timestamp: baseTimestamp
+            };
+            messages.unshift(sceneMsg);
+        }
+
+        // 如果没有解析出任何角色消息，fallback 为单条普通消息
+        if (messages.length === 0) {
+            rpLog('warn', 'PARSE', '⚠️ 未解析出任何角色消息，使用 fallback 原始文本');
+            messages.push({
+                id: 'msg_' + baseMs,
+                role: 'char',
+                type: 'text',
+                content: text,
+                charIndex: defaultCharIndex,
+                timestamp: baseTimestamp
+            });
+        }
+    } catch (parseErr) {
+        // 解析异常兜底：确保至少有一条消息返回，不会让消息被吞
+        rpLog('error', 'PARSE', `解析异常，使用兜底消息: ${parseErr.message}`);
         messages.push({
-            id: 'msg_' + Date.now(),
+            id: 'msg_' + baseMs,
             role: 'char',
             type: 'text',
-            content: text,
+            content: rawText,
             charIndex: defaultCharIndex,
-            timestamp: new Date().toISOString()
+            timestamp: baseTimestamp
         });
     }
 

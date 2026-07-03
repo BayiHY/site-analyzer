@@ -30,6 +30,8 @@ export function extractScene(text) {
                 }
             }
         }
+        // 如果连 ┆ 都没有，整段文本可能全是场景描述或纯对话
+        // 此时不做任何假设，让下游处理
     }
 
     return { sceneText, remaining };
