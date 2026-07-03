@@ -7,128 +7,78 @@ function parseDelimited(text) {
     text = text.trim();
 
     // === 清理 LLM 常见的 markdown 包裹 ===
-    // 去掉 ```tsv / ```json / ``` 等代码块标记
     text = text.replace(/^```(?:tsv|csv|txt|text)?\s*\n/i, '').replace(/\n```\s*$/i, '');
-    // 去掉首尾可能的 --- 分隔线
     text = text.replace(/^-{3,}\s*$/gm, '').trim();
 
-    // === 预处理：合并被意外拆分的行 ===
-    // 如果 LLM 在值中用了换行符（比如 background 字段跨行），需要合并
-    // 策略：先找表头行，然后只按表头行数来分割
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    
-    // === 寻找表头行：在所有行中查找包含标准字段名的行 ===
-    const standardFields = ['name', 'age', 'gender', 'appearance', 'personality', 'background', 'relationship', 'motivation', 'secret', 'speechStyle', 'voice', 'imageStyle', 'imageFace', 'imageHair', 'imageBody', 'imageClothes', 'imageEnvironment'];
-    
-    let headerRowIndex = -1;
-    let headerParts = null;
-    
-    for (let i = 0; i < lines.length; i++) {
-        const parts = lines[i].split('|').map(s => s.trim().toLowerCase());
-        let matchCount = 0;
-        for (const p of parts) {
-            if (standardFields.includes(p)) matchCount++;
-        }
-        if (matchCount >= 5) {
-            headerRowIndex = i;
-            headerParts = lines[i].split('|').map(s => s.trim());
-            break;
-        }
-    }
-    
-    // 如果找到了表头，重新解析：从表头行开始，按 | 的数量合并后续行
-    if (headerRowIndex >= 0 && headerParts) {
-        const expectedCols = headerParts.length;
-        const headerPipeCount = expectedCols - 1;
-        const dataLines = [];
-        let currentLine = '';
+    if (lines.length === 0) return null;
 
-        rpLog('info', 'CHARS-PARSE', `表头: ${expectedCols} 列, pipe数: ${headerPipeCount}, 原始行数: ${lines.length - headerRowIndex - 1}`);
+    // 固定 17 列定义（与 char-prompt.js 保持一致，imageStyle 在 voice 之后）
+    const FIXED_HEADERS = ['name','age','gender','appearance','personality','background','relationship','motivation','secret','speechStyle','voice','imageStyle','imageFace','imageHair','imageBody','imageClothes','imageEnvironment'];
+    const EXPECTED_COLS = FIXED_HEADERS.length;
+    const HEADER_PIPE_COUNT = EXPECTED_COLS - 1;
 
-        for (let i = headerRowIndex + 1; i < lines.length; i++) {
-            const line = lines[i];
-            const linePipeCount = (line.match(/\|/g) || []).length;
-            const isEmptyLine = line.trim() === '';
-            const isNewCharacter = /^[\u4e00-\u9fff]{2,4}\|/.test(line);
-            const isDigitStart = /^\d+\|/.test(line);
+    // 过滤掉表头行（LLM 可能误输出）
+    const headerPattern = /^(name\s*\|\s*age\s*\||name\|age\|)/i;
+    const dataLines = lines.filter(l => !headerPattern.test(l));
+    if (dataLines.length === 0) return null;
 
-            // 修复 1：空行 → 立即保存当前行并开始新行
-            if (isEmptyLine) {
-                if (currentLine.trim()) {
-                    dataLines.push(currentLine);
-                    rpLog('info', 'CHARS-PARSE', `  空行分隔: 保存当前行 "${currentLine.slice(0,40)}..."`);
-                }
-                currentLine = '';
-                continue;
-            }
+    // 按角色行分割：空行或新角色行（中文名字开头 + pipe 足够）作为分界
+    const blocks = [];
+    let currentBlock = '';
+    for (const line of dataLines) {
+        const pipeCount = (line.match(/\|/g) || []).length;
+        const isNewChar = /^[\u4e00-\u9fff]{2,4}\|/.test(line);
+        const isDigitStart = /^\d+\|/.test(line);
 
-            // 修复 2：新角色行检测（中文名字开头 或 数字开头 + pipe数足够）
-            if (currentLine && (linePipeCount >= headerPipeCount || isNewCharacter || isDigitStart)) {
-                dataLines.push(currentLine);
-                currentLine = line;
-            } else if (currentLine) {
-                // 继续合并碎片
-                currentLine += '\n' + line;
-            } else {
-                currentLine = line;
-            }
-        }
-        // 保存最后一个累积行
-        if (currentLine.trim()) {
-            dataLines.push(currentLine);
-        }
-
-        rpLog('info', 'CHARS-PARSE', `分块结果: ${dataLines.length} 个块, 原始行数: ${lines.length - headerRowIndex - 1}`);
-
-        if (dataLines.length > 0) {
-            const virtualLines = [lines[headerRowIndex], ...dataLines];
-            const result = parseTsvTable(virtualLines, headerParts);
-            if (result) {
-                // 修复 3：二次校验 — 如果解析结果少于块数，说明有合并问题
-                if (result.length < dataLines.length) {
-                    rpLog('warn', 'CHARS-PARSE', `二次校验: ${dataLines.length} 个块 → ${result.length} 个角色，可能有合并问题`);
-                }
-                rpLog('info', 'CHARS-PARSE', `最终有效角色列表: ${result.map(r => r.name).join(', ')}`);
-                rpLog('info', 'PARSE', `TSV 解析成功: ${result.length} 个角色 (表头 ${expectedCols} 列)`);
-                return result;
-            }
+        if (currentBlock && (isNewChar || isDigitStart || pipeCount >= HEADER_PIPE_COUNT)) {
+            blocks.push(currentBlock.trim());
+            currentBlock = line;
+        } else {
+            currentBlock = (currentBlock ? currentBlock + '\n' : '') + line;
         }
     }
-    
-    // 情况 2：没有找到标准字段名 → LLM 可能省略了表头
-    // 使用已知字段名作为默认表头
-    if (headerRowIndex < 0) {
-        const defaultHeaders = ['name','age','gender','appearance','personality','background','relationship','motivation','secret','speechStyle','voice','imageStyle','imageFace','imageHair','imageBody','imageClothes','imageEnvironment'];
-        // 把全部行都当作数据行处理
-        const virtualLines = [...lines]; // 直接用所有行，parseTsvTable 会从 index=1 开始
-        // 但 parseTsvTable 期望 index=0 是 header，所以需要加一个虚拟 header
-        virtualLines.unshift(defaultHeaders.join('|'));
-        const result = parseTsvTable(virtualLines, defaultHeaders);
-        if (result) return result;
-    }
-    
-    // 情况 3：单行或含 key|value 格式 → 对象解析
-    // 尝试 | 分隔的 key|value 对
-    const hasKeyValue = lines.some(l => l.includes('|') && l.split('|').some(p => /^[a-zA-Z_\u4e00-\u9fa5]+$/.test(p.trim())));
-    
-    if (hasKeyValue) {
-        return parseKeyValLines(lines);
-    }
-    
-    // 兜底：逐行按 | 分割，每行尝试构建对象
-    const allLines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const fallbackResult = [];
-    for (const line of allLines) {
-        const parts = line.split('|').map(s => s.trim()).filter(Boolean);
-        if (parts.length >= 2) {
-            fallbackResult.push({ name: parts[0], raw: line });
+    if (currentBlock.trim()) blocks.push(currentBlock.trim());
+
+    rpLog('info', 'CHARS-PARSE', `原始 ${lines.length} 行 → 过滤表头后 ${dataLines.length} 行 → ${blocks.length} 个角色块`);
+
+    // 解析每个角色块
+    const result = [];
+    for (const block of blocks) {
+        const obj = parseSingleCharRow(block, EXPECTED_COLS, FIXED_HEADERS);
+        if (obj && obj.name && obj.name.trim()) {
+            result.push(obj);
         }
     }
-    if (fallbackResult.length > 0) {
-        rpLog('info', 'PARSE', `兜底逐行解析成功 ${fallbackResult.length} 行`);
-        return fallbackResult;
+
+    if (result.length > 0) {
+        rpLog('info', 'CHARS-PARSE', `最终有效角色: ${result.map(r => r.name).join(', ')}`);
+        return result;
     }
     return null;
+}
+
+// 解析单个角色行（处理跨行合并的情况）
+function parseSingleCharRow(rawLine, expectedCols, headers) {
+    // 先按 | 分割
+    const vals = splitPipe(rawLine, expectedCols);
+    
+    let paddedVals;
+    if (vals.length === expectedCols) {
+        paddedVals = vals.slice();
+    } else if (vals.length > expectedCols) {
+        paddedVals = vals.slice(0, expectedCols);
+    } else {
+        paddedVals = alignWithAnchor(vals, headers);
+    }
+    
+    const obj = {};
+    headers.forEach((h, idx) => {
+        obj[h.trim()] = (paddedVals[idx] || '').trim();
+    });
+    
+    fixColumnMisalignment(obj);
+    return obj;
 }
 
 // 解析 TSV 表格（多行，首行为 header）
@@ -240,10 +190,10 @@ function parseKeyValLines(lines) {
 }
 
 // 安全的 | 分割：处理值中包含 | 的情况
-// threshold 必须等于表头列数（当前为 17）
+// threshold 必须等于表头列数（当前为 16）
 function splitPipe(str, threshold) {
     const parts = str.split('|');
-    const colThreshold = threshold || 17;
+    const colThreshold = threshold || 16;
     if (parts.length <= colThreshold) return parts;
     // 列数过多：前 colThreshold-1 列保持原样，剩余全部合并到最后一列（imageEnvironment 通常最长）
     const result = parts.slice(0, colThreshold - 1);
@@ -315,7 +265,6 @@ function isEnvLike(val) {
 }
 
 function fixColumnMisalignment(row) {
-    const rawImageStyle = row.imageStyle || '';
     const rawVoice = row.voice || '';
     const rawImageFace = row.imageFace || '';
     const rawImageHair = row.imageHair || '';
@@ -342,7 +291,8 @@ function fixColumnMisalignment(row) {
     // 快速退出：如果没有 voice 泄漏，也没有风格词错位，直接返回
     // 注意：rawVoice 匹配 VOICE_HEURISTIC 不代表有问题 —— 它可能已经在正确位置
     // 只有当 rawImageStyle 匹配 voice 特征时，才说明 voice 真的泄漏到了 imageStyle
-    if (!VOICE_HEURISTIC.test(rawImageStyle)) {
+    // imageStyle 已移除，voice 泄漏检测跳过
+    if (false) {
         // voice 没有泄漏到 imageStyle，检查 cross-swap 即可
         checkCrossSwap(row, rawImageHair, rawImageBody, rawImageClothes, rawImageEnvironment);
         return row;

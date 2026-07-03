@@ -13,10 +13,9 @@
  */
 export function buildCharPrompt(count, playerGender, inspiration, genderHint, state) {
     const pg = playerGender || state.player?.gender || '男';
-    const visualStyle = state.story?.imageStyle || 'akira toriyama style';
     const worldview = state.story.worldview || '未设定';
     const title = state.story.title || '';
-    const mainArc = (state.story.mainArc || []).map(a => `・${a.phase}：${a.description}`).join('\\n');
+    const mainArc = (state.story.mainArc || []).map(a => `・${a.phase}：${a.description}`).join('\\\\n');
     const toneKeywords = (state.story.toneKeywords || []).join('、');
     const worldviewNotes = state.story.worldviewNotes || '无额外约束';
 
@@ -85,8 +84,6 @@ export function buildCharPrompt(count, playerGender, inspiration, genderHint, st
 
     return `你是角色设计师和编剧。请根据以下世界观和用户灵感生成恰好 ${effectiveCount} 个鲜活的角色。
 
-⚠️ 【画面风格】全局统一的画面风格为「${visualStyle}」。所有角色的外观、服装、环境描写都必须符合这一视觉风格。角色生图字段（imageStyle/imageFace/imageHair/imageBody/imageClothes/imageEnvironment）要围绕这一风格构建。
-
 ⚠️ 【用户灵感优先】用户明确要求：${inspiration || '无特定要求'}。角色设计必须严格遵循用户灵感中的所有要求（时代背景、地点、角色数量、性别比例、关系类型等）。
 
 ⚠️ 【性别要求】${genderConstraint}
@@ -121,12 +118,10 @@ ${(() => {
 ${genderHint ? `【性别倾向】${genderHint}` : ''}
 
 输出格式要求（TSV 表格格式，用 | 分隔字段）：
-第一行必须是表头，后续每一行是一个角色：
-name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|imageStyle|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
-
-⚠️ 第一行必须是完整的表头，不要省略任何字段！
-⚠️ 所有角色的 imageStyle 字段必须使用同一个风格：${visualStyle}。
+⚠️ 第一行不要输出表头！直接输出角色数据行。
+字段顺序固定为 17 列：name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|imageStyle|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
 ⚠️ 所有 6 个 image* 字段必须全部填写，不得省略任何一个！
+⚠️ imageStyle 列填一个占位符即可（如 global_style），画面风格由系统全局统一注入，不需要角色智能体指定。
 
 字段说明：
 - name: 角色名（2-4个字，有特色）
@@ -143,7 +138,7 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
   【女声】zh-CN-XiaoxiaoNeural（温柔知性）、zh-CN-XiaoyiNeural（活泼甜美）、zh-CN-liaoning-XiaobeiNeural（东北俏皮）、zh-CN-shaanxi-XiaoniNeural（西北温婉）
   【男声】zh-CN-YunxiNeural（沉稳磁性）、zh-CN-YunjianNeural（阳光开朗）、zh-CN-YunxiaNeural（温和儒雅）、zh-CN-YunyangNeural（成熟稳重）
   根据角色性别和性格自动匹配声线。同一故事不同角色尽量用不同音色。
-- imageStyle: 画面风格（英文）
+- imageStyle: 填 global_style 即可（画面风格由系统全局统一注入，不需要角色智能体指定）
 - imageFace: 五官脸型（英文）
 - imageHair: 发型发色（英文）
 - imageBody: 体型体态（英文）
@@ -152,9 +147,8 @@ name|age|gender|appearance|personality|background|relationship|motivation|secret
 所有 image* 字段全部用英文，适合 AI 绘画。
 
 示例（不要照抄内容，只照格式）：
-name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|imageStyle|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
-阿德拉|28|女|苍白瘦削，左眼黄铜义眼|冷静理智，极度缺乏安全感|曾是贵族家替补厨师，因被诬陷遭驱逐|起初视主角为棋子，后转为生死搭档|复仇并查明父亲失踪真相|义眼中封印着低阶怨灵|冷嘲热讽，用烹饪术语隐喻人生险恶|zh-CN-XiaoxiaoNeural|anime|pale skin, left eye is a brass gear prosthetic, sharp cheekbones|long black hair in a neat bob cut, minimal makeup|slender and slightly hunched frame|white apron over dark Victorian dress, brass goggles on head|dimly lit kitchen with steam and warm amber glow
-巴尔扎|45|男|魁梧如熊，右臂机械锅铲义肢|暴躁冲动，护短|前地下拳手，被深渊灶台改造为活体搅拌机|雇佣兵兼守护者，认为主角是少数不把他当怪物看的人|保护主角，终结自己作为器具的命运|机械义肢内部连接着未成熟的灵体心脏|粗鲁直白，常伴有吞咽口水的声音|zh-CN-YunxiNeural|digital realism|broad square jaw, scar across nose, thick eyebrows|short buzz cut, sweat-dampened hair|massive muscular build, right arm is a mechanical spatula|torn tank top revealing mechanical parts, leather combat pants|gritty underground arena with sparks and smoke
+阿德拉|28|女|苍白瘦削，左眼黄铜义眼|冷静理智，极度缺乏安全感|曾是贵族家替补厨师，因被诬陷遭驱逐|起初视主角为棋子，后转为生死搭档|复仇并查明父亲失踪真相|义眼中封印着低阶怨灵|冷嘲热讽，用烹饪术语隐喻人生险恶|zh-CN-XiaoxiaoNeural|global_style|pale skin, left eye is a brass gear prosthetic, sharp cheekbones|long black hair in a neat bob cut, minimal makeup|slender and slightly hunched frame|white apron over dark Victorian dress, brass goggles on head|dimly lit kitchen with steam and warm amber glow
+巴尔扎|45|男|魁梧如熊，右臂机械锅铲义肢|暴躁冲动，护短|前地下拳手，被深渊灶台改造为活体搅拌机|雇佣兵兼守护者，认为主角是少数不把他当怪物看的人|保护主角，终结自己作为器具的命运|机械义肢内部连接着未成熟的灵体心脏|粗鲁直白，常伴有吞咽口水的声音|zh-CN-YunxiNeural|global_style|broad square jaw, scar across nose, thick eyebrows|short buzz cut, sweat-dampened hair|massive muscular build, right arm is a mechanical spatula|torn tank top revealing mechanical parts, leather combat pants|gritty underground arena with sparks and smoke
 
 要求：
 1. 角色之间要有关系网（亲友、敌对、师徒、竞争对手等）

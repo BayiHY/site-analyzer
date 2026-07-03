@@ -117,11 +117,10 @@ App.buildModularPrompt = function(character, level) {
 };
 
 // 从角色对象中提取模块化字段
+// 注意：imageStyle 已从角色数据移除，统一使用 state.story.imageStyle
 App.extractModules = function(character) {
     if (character.__modules__) return character.__modules__;
     const mods = {};
-    // 新格式：直接字段
-    if (character.imageStyle) mods.imageStyle = character.imageStyle;
     if (character.imageFace) mods.imageFace = character.imageFace;
     if (character.imageHair) mods.imageHair = character.imageHair;
     if (character.imageBody) mods.imageBody = character.imageBody;
@@ -183,7 +182,7 @@ App.generateCharacterImage = async function(character) {
     const mods = App.extractModules(character);
 
     // 检查是否有模块化数据
-    const hasModules = mods.imageStyle || mods.imageFace || mods.imageHair || mods.imageBody || mods.imageClothes || mods.imageEnvironment;
+    const hasModules = mods.imageFace || mods.imageHair || mods.imageBody || mods.imageClothes || mods.imageEnvironment;
 
     let imageUrl;
 

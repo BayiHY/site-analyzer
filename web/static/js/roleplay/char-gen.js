@@ -160,7 +160,7 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     // 检查每个角色的 image* 模块字段完整性
     for (let i = 0; i < charListToUse.length; i++) {
         const c = charListToUse[i];
-        const imgFields = ['imageStyle', 'imageFace', 'imageHair', 'imageBody', 'imageClothes', 'imageEnvironment'];
+        const imgFields = ['imageFace', 'imageHair', 'imageBody', 'imageClothes', 'imageEnvironment'];
         const filled = imgFields.filter(f => c[f] && c[f].trim().length > 0);
         const empty = imgFields.filter(f => !c[f] || c[f].trim().length === 0);
         if (empty.length > 0) {
@@ -169,7 +169,7 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     }
 
     // 检查是否含有模块化字段或旧版 imagePrompt
-    const hasModuleFields = rawKeys.some(k => k.startsWith('imageStyle') || k.startsWith('imageFace'));
+    const hasModuleFields = rawKeys.some(k => k.startsWith('imageFace'));
     const hasImageField = rawKeys.some(k => k.toLowerCase().includes('image') && k.toLowerCase().includes('prompt'));
     if (!hasModuleFields && !hasImageField) {
         rpLog('warn', 'CHARS', '角色数据中既没有模块化字段也没有 imagePrompt，头像将使用备用 prompt');
@@ -180,7 +180,6 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     // ===== 3. 保存角色 =====
     state.characters = charListToUse.map((c, i) => {
         const modules = {
-            imageStyle: c.imageStyle || '',
             imageFace: c.imageFace || '',
             imageHair: c.imageHair || '',
             imageBody: c.imageBody || '',
@@ -188,7 +187,7 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
             imageEnvironment: c.imageEnvironment || ''
         };
 
-        const hasAnyModule = modules.imageStyle || modules.imageFace || modules.imageHair || modules.imageBody || modules.imageClothes || modules.imageEnvironment;
+        const hasAnyModule = modules.imageFace || modules.imageHair || modules.imageBody || modules.imageClothes || modules.imageEnvironment;
 
         // 兼容旧格式
         let imagePrompt = c.imagePrompt || '';
@@ -203,7 +202,7 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
         } else if (!imagePrompt && hasAnyModule) {
             const gender = c.gender === '男' ? 'male' : c.gender === '女' ? 'female' : 'person';
             const safeName = (c.name || 'unknown').replace(/[\u4e00-\u9fff]/g, '').trim() || 'unknown';
-            imagePrompt = `Portrait of ${safeName}, ${c.age || 20} year old ${gender}, ${modules.imageFace || 'detailed facial features'}, ${modules.imageStyle || 'akira toriyama style'}`;
+            imagePrompt = `Portrait of ${safeName}, ${c.age || 20} year old ${gender}, ${modules.imageFace || 'detailed facial features'}, ${state.story?.imageStyle || 'akira toriyama style'}`;
             rpLog('info', 'CHARS', `角色 #${i} "${c.name}" 有模块化字段但无 imagePrompt，已生成兼容 prompt (safeName=${safeName})`);
         }
 
