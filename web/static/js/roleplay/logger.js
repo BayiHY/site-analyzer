@@ -91,7 +91,14 @@ function renderLogPanel() {
         };
         document.getElementById('rp-log-copy').onclick = function(e) {
             e.stopPropagation();
-            const text = visibleEntries.map(e => e.ts + ' [' + e.tag + ']: ' + e.msg).join('\n');
+            // 重新获取最新的 visibleEntries，避免闭包捕获旧值
+            const latestVisible = window._rpLogEntries.filter(entry => {
+                const t = (entry.tag || '').toUpperCase();
+                if (t.startsWith('FORMAT-')) return false;
+                if (t === 'RENDER') return false;
+                return true;
+            });
+            const text = latestVisible.map(entry => entry.ts + ' [' + entry.tag + ']: ' + entry.msg).join('\n');
             navigator.clipboard.writeText(text).then(() => {
                 const btn = document.getElementById('rp-log-copy');
                 const orig = btn.innerHTML;
@@ -127,22 +134,29 @@ function renderLogPanel() {
         return;
     }
     
-    // 计算已有条目数
-    const existingCount = body.children.length;
-    const newEntries = visibleEntries.slice(existingCount);
-    
-    if (newEntries.length > 0) {
-        // 增量追加新条目
+    // 增量追加：比较 body 中的条目数与 visibleEntries 的长度
+    // 由于 FILTER 可能移除部分条目，body.children.length 不一定等于 visibleEntries.length
+    // 因此采用追加策略：body 中的每个 div 对应 visibleEntries 中的一个条目
+    const bodyEntryCount = body.children.length;
+    if (bodyEntryCount < visibleEntries.length) {
+        // 追加新增的可见条目
         const fragment = document.createDocumentFragment();
-        newEntries.forEach(e => {
+        for (let i = bodyEntryCount; i < visibleEntries.length; i++) {
+            const e = visibleEntries[i];
             const c = levelColor[e.level] || '#ccc';
             const div = document.createElement('div');
             div.style.cssText = 'color:' + c + ';margin:1px 0;font-size:11px;white-space:pre-wrap;word-break:break-all;';
             div.innerHTML = '<span style="color:#555;">' + e.ts + '</span> [' + e.tag + ']: ' + e.msg;
             fragment.appendChild(div);
-        });
+        }
         body.appendChild(fragment);
         body.scrollTop = body.scrollHeight;
+    } else if (bodyEntryCount > visibleEntries.length) {
+        // 条目被过滤掉了，重建 body
+        body.innerHTML = visibleEntries.map(e => {
+            const c = levelColor[e.level] || '#ccc';
+            return '<div style="color:' + c + ';margin:1px 0;font-size:11px;white-space:pre-wrap;word-break:break-all;"><span style="color:#555;">' + e.ts + '</span> [' + e.tag + ']: ' + e.msg + '</div>';
+        }).join('');
     }
 }
 

@@ -13,8 +13,8 @@ function parseDelimited(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) return null;
 
-    // 固定 17 列定义（与 char-prompt.js 保持一致，imageStyle 在 voice 之后）
-    const FIXED_HEADERS = ['name','age','gender','appearance','personality','background','relationship','motivation','secret','speechStyle','voice','imageStyle','imageFace','imageHair','imageBody','imageClothes','imageEnvironment'];
+    // 固定 16 列定义（去掉 imageStyle，画面风格由系统全局统一注入）
+    const FIXED_HEADERS = ['name','age','gender','appearance','personality','background','relationship','motivation','secret','speechStyle','voice','imageFace','imageHair','imageBody','imageClothes','imageEnvironment'];
     const EXPECTED_COLS = FIXED_HEADERS.length;
     const HEADER_PIPE_COUNT = EXPECTED_COLS - 1;
 
@@ -96,7 +96,7 @@ function parseTsvTable(lines, headers) {
             paddedVals = vals.slice(0, headers.length);
         } else {
             // 缺少列：智能检测缺失位置
-            // 策略：从右侧找到 voice/imageStyle 边界，以此为锚点，
+            // 策略：从右侧找到 voice 边界，以此为锚点，
             // 左侧字段从左对齐，右侧字段从右对齐，中间缺失填空
             paddedVals = alignWithAnchor(vals, headers);
         }
@@ -116,12 +116,12 @@ function parseTsvTable(lines, headers) {
     return result.length > 0 ? result : null;
 }
 
-// 智能列对齐：找到 voice/imageStyle 边界作为锚点，左右分别对齐
+// 智能列对齐：找到 voice 特征作为锚点，左右分别对齐
 function alignWithAnchor(vals, headers) {
     const targetLen = headers.length;
     const missing = targetLen - vals.length;
     
-    // 在 vals 中查找 voice 特征（"Neural"）或 imageStyle 风格词
+    // 在 vals 中查找 voice 特征（"Neural"）
     // 从后往前找，因为 LLM 更可能省略前面的字段
     let anchorIdx = -1;
     for (let i = vals.length - 1; i >= 0; i--) {
@@ -129,17 +129,6 @@ function alignWithAnchor(vals, headers) {
         if (v.includes('neural') || v.includes('zh-cn') || v.includes('en-us')) {
             anchorIdx = i;
             break;
-        }
-    }
-    
-    // 如果没找到 voice，找 imageStyle 风格词
-    if (anchorIdx === -1) {
-        for (let i = vals.length - 1; i >= 0; i--) {
-            const v = (vals[i] || '').toLowerCase();
-            if (STYLE_KEYWORDS.some(s => v.includes(s))) {
-                anchorIdx = i;
-                break;
-            }
         }
     }
     
@@ -203,7 +192,7 @@ function splitPipe(str, threshold) {
 
 // === 列错位修复：检测 LLM 输出列偏移 ===
 // 当 LLM 漏填中间列（如 secret、motivation）时，后面所有列会整体左移
-// 检测 heuristic：如果 imageStyle 字段包含 TTS voice 特征（"Neural"），说明列错位了
+// 检测 heuristic：如果 voice 字段包含风格词，说明列错位了
 const VOICE_HEURISTIC = /Neural|zh-CN|en-US|voice_/i;
 
 // 常见风格词列表（用于检测 imageFace 是否被填入了风格词）
@@ -288,48 +277,17 @@ function fixColumnMisalignment(row) {
         return row;
     }
 
-    // 快速退出：如果没有 voice 泄漏，也没有风格词错位，直接返回
-    // 注意：rawVoice 匹配 VOICE_HEURISTIC 不代表有问题 —— 它可能已经在正确位置
-    // 只有当 rawImageStyle 匹配 voice 特征时，才说明 voice 真的泄漏到了 imageStyle
-    // imageStyle 已移除，voice 泄漏检测跳过
-    if (false) {
-        // voice 没有泄漏到 imageStyle，检查 cross-swap 即可
-        checkCrossSwap(row, rawImageHair, rawImageBody, rawImageClothes, rawImageEnvironment);
-        return row;
-    }
+    // imageStyle 已移除，不再检测 voice 泄漏到 imageStyle
+    // 直接检查 imageHair/imageBody/imageClothes/imageEnvironment 交叉错位
+    checkCrossSwap(row, rawImageHair, rawImageBody, rawImageClothes, rawImageEnvironment);
 
-    rpLog('warn', 'PARSE-COL', `━━━ 检测到列错位，开始修复 ━━━`);
-    rpLog('warn', 'PARSE-COL', `  原始: imageStyle="${rawImageStyle}" | imageFace="${rawImageFace.slice(0,60)}" | imageHair="${rawImageHair.slice(0,60)}" | imageBody="${rawImageBody.slice(0,60)}" | imageClothes="${rawImageClothes.slice(0,60)}" | imageEnvironment="${rawImageEnvironment.slice(0,60)}"`);
-
-    // 策略：
-    // 1. 把 voice 值恢复到 voice 列
-    // 2. 清空 imageStyle（后续用 state.story.imageStyle 兜底）
-    // 3. 检查 imageBody/imageClothes/imageEnvironment 是否互相串了，用语义检测修复
-    // 4. 如果 imageFace 是风格词，清空
-
-    // 恢复 voice
-    if (VOICE_HEURISTIC.test(rawImageStyle)) {
-        row.voice = rawImageStyle;
-        rpLog('info', 'PARSE-COL', `  修正: voice ← imageStyle="${row.voice}"`);
-    } else if (VOICE_HEURISTIC.test(rawVoice)) {
-        rpLog('info', 'PARSE-COL', `  voice 已在正确位置`);
-    }
-
-    // 清空 imageStyle
-    row.imageStyle = '';
-    rpLog('info', 'PARSE-COL', `  清空 imageStyle（后续使用 state.story.imageStyle 兜底）`);
-
-    // 如果 imageFace 是风格词，清空
+    // 如果 imageFace 是风格词，清空（风格由系统全局注入）
     if (isStyleWord(rawImageFace)) {
-        rpLog('info', 'PARSE-COL', `  修正: imageFace="${rawImageFace}" 是风格词，清空`);
+        rpLog('info', 'PARSE-COL', `  修正: imageFace 包含风格词，清空`);
         row.imageFace = '';
     }
 
-    // 检查 imageBody/imageClothes/imageEnvironment 是否错位
-    checkCrossSwap(row, rawImageHair, rawImageBody, rawImageClothes, rawImageEnvironment);
-
     rpLog('info', 'PARSE-COL', `  修复完成: ${JSON.stringify({
-        imageStyle: row.imageStyle,
         imageFace: row.imageFace,
         imageHair: row.imageHair,
         imageBody: row.imageBody,
