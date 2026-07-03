@@ -4,9 +4,9 @@
 window._rpLogEntries = [];
 let _rpLogCollapsed = false;
 
-// 日志过滤：只打印特定 tag 的日志（精简模式）
+// 日志过滤：精简模式 — 只保留关键 tag
 const _RP_LOG_FILTER_ACTIVE = true;
-const _RP_LOG_TAGS = new Set(['TITLE', 'SCENE', 'TIMEOUT', 'META', 'PARSE', 'PARSE-REPLY', 'WORLDVIEW']);
+const _RP_LOG_TAGS = new Set(['TITLE', 'SCENE', 'TIMEOUT', 'META', 'PARSE', 'PARSE-REPLY', 'PARSE-COL', 'WORLDVIEW', 'IMG', 'IMG-MODULAR', 'IMG-MODULES', 'IMG-API', 'IMG-IMG2IMG', 'IMG-SANITIZE', 'IMG-BACKUP', 'STYLE', 'CREATE', 'CHARS', 'REGEN', 'LLM', 'LLM-REQUEST', 'LLM-RESPONSE', 'INIT', 'IMG-MODULAR', 'IMG-MODULES', 'IMG-API', 'IMG-IMG2IMG']);
 
 function rpLog(level, tag, msg) {
     const now = new Date();

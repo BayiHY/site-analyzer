@@ -63,6 +63,18 @@ App.agnesChat = async function(messages, options = {}) {
     const { url, model: defaultModel, provider } = App.getEndpointAndModel(apiKey);
     const temperature = options.temperature ?? (provider === 'glm' ? 0.6 : 1.0);
     const model = options.model || defaultModel;
+    const route = options.route || 'default';
+
+    // 结构化输出路由使用低温度保证格式稳定
+    const tempByRoute = {
+        'chat': 0.3,          // 多角色对话回复：严格格式
+        'emotion': 0.2,       // 情感评估：JSON 格式
+        'disclosure': 0.2,    // 信息披露：JSON 格式
+        'worldview': 0.7,     // 世界观生成：需要创意
+        'characters': 0.3,    // 角色生成：TSV 格式
+        'default': temperature
+    };
+    const effectiveTemp = tempByRoute[route] ?? temperature;
 
     // GLM 不支持 system role，需要转换
     const normalizedMessages = App.normalizeMessagesForProvider(provider, messages);
@@ -73,7 +85,7 @@ App.agnesChat = async function(messages, options = {}) {
     rpLog('info', 'LLM', `=== 对话请求开始 ===`);
     rpLog('info', 'LLM', `供应商: ${provider}, 模型: ${model}`);
     rpLog('info', 'LLM', `端点: ${url}`);
-    rpLog('info', 'LLM', `温度: ${temperature}, 消息数: ${normalizedMessages.length} (原始 ${messages.length})`);
+    rpLog('info', 'LLM', `路由: ${route}, 温度: ${effectiveTemp} (原始=${temperature})`);
     rpLog('info', 'LLM', `输入字符数: ${inputChars}`);
 
     // 【日志】输出完整请求内容（每条消息的 role + content）
@@ -94,7 +106,7 @@ App.agnesChat = async function(messages, options = {}) {
         body: JSON.stringify({
             model: model,
             messages: normalizedMessages,
-            temperature: temperature,
+            temperature: effectiveTemp,
             max_tokens: 2048
         }),
         signal: AbortSignal.timeout(120000)

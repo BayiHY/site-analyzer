@@ -97,11 +97,10 @@ App.loadState = async function() {
                     state.activeCharIndex = 0;
                     if (!state.emotions[state.characters[0].name]) {
                         state.emotions[state.characters[0].name] = {
-                            好感度: { current: 50, initial: 50 },
-                            亲密感: { current: 20, initial: 20 },
-                            信任度: { current: 50, initial: 50 },
-                            吸引力: { current: 30, initial: 30 },
-                            依赖感: { current: 30, initial: 30 }
+                            好感: { current: 50, initial: 50 },
+                            戒备: { current: 20, initial: 20 },
+                            厌恶: { current: 0, initial: 0 },
+                            信任: { current: 50, initial: 50 }
                         };
                     }
                     if (!state.revealed) state.revealed = {};
@@ -119,6 +118,31 @@ App.loadState = async function() {
                 if (!state.characters) state.characters = [];
                 if (state.activeCharIndex == null) state.activeCharIndex = 0;
                 if (!state.emotions) state.emotions = {};
+
+                // 情感键名迁移：旧键名 → 新键名（从 localStorage 加载时自动迁移）
+                for (const [charName, em] of Object.entries(state.emotions)) {
+                    if (em['好感度'] !== undefined) {
+                        state.emotions[charName]['好感'] = em['好感度'];
+                    }
+                    if (em['亲密感'] !== undefined) {
+                        state.emotions[charName]['戒备'] = em['亲密感'];
+                    }
+                    if (em['信任度'] !== undefined) {
+                        state.emotions[charName]['厌恶'] = em['信任度'];
+                    }
+                    if (em['吸引力'] !== undefined) {
+                        state.emotions[charName]['信任'] = em['吸引力'];
+                    }
+                    if (em['依赖感'] !== undefined) {
+                        state.emotions[charName]['戒备'] = em['依赖感'];
+                    }
+                    // 删除旧键
+                    delete state.emotions[charName]['好感度'];
+                    delete state.emotions[charName]['亲密感'];
+                    delete state.emotions[charName]['信任度'];
+                    delete state.emotions[charName]['吸引力'];
+                    delete state.emotions[charName]['依赖感'];
+                }
                 return Promise.resolve(true);
             } catch(e) {
                 return Promise.resolve(false);

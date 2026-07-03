@@ -27,30 +27,28 @@ App.updateRevealedInfo = async function(charName, userMsg, charResponse) {
 
     if (unrevealedFields.length === 0) return;
 
-    const prompt = `根据以下对话内容，判断玩家是否已经"发现"了角色的以下信息：
-${unrevealedFields.map(f => {
-    const labels = {
-        appearance: '外貌特征（穿着、发型、体型等）',
-        personality: '性格特点（说话方式、行为倾向）',
-        background: '背景故事（过往经历、家庭、职业等）',
-        relationship: '与玩家的关系细节'
-    };
-    return `- ${f}: ${labels[f]}`;
-}).join('\n')}
+    const prompt = `根据以下对话内容，判断玩家是否已经"发现"了角色的以下信息。
+
+严格标准：只有对话中明确提及或直接展示的信息才算发现。模糊暗示、比喻、推测都不算。
 
 对话记录：
 用户：${userMsg}
 ${charName}：${charResponse}
 
-请判断哪些信息已通过对话自然展现给玩家，输出JSON格式：
-{"appearance": false, "personality": true, "background": false, "relationship": true}
-// true表示玩家已发现该信息，false表示还未发现
+请逐项判断，输出JSON格式：
+{"appearance": {"revealed": false, "reason": "对话中未提及外貌特征"}, "personality": {"revealed": false, "reason": "对话中未体现性格特点"}, "background": {"revealed": false, "reason": "对话中未提及过往经历或职业"}, "relationship": {"revealed": false, "reason": "对话中未提及与玩家的关系"}}
 
-注意：只有在对话中明确体现或通过角色言行自然流露的信息才算发现。不要过度推断。`;
+判定标准：
+- appearance: 必须有具体的外貌描述（如"穿着黑色风衣"、"银色短发"），仅有"她看起来很冷"不算
+- personality: 必须有明确的性格表现（如"她总是先考虑别人"、"说话刻薄"），仅有语气词不算
+- background: 必须有明确的背景信息（如"我以前是军人"、"我在XX长大"），仅有暗示不算
+- relationship: 必须有明确的关系描述（如"我们是敌人"、"你救过我"），仅有称呼不算
+
+注意：宁可false也不要过度推断。如果对话中没有直接证据，全部返回false。`;
 
     try {
         const resp = await App.agnesChat([
-            { role: 'system', content: '你是信息披露评估器。输出纯JSON。' },
+            { role: 'system', content: '你是信息披露评估器。输出纯JSON。必须包含reason字段。' },
             { role: 'user', content: prompt }
         ]);
 
@@ -59,22 +57,36 @@ ${charName}：${charResponse}
             const jsonMatch = resp.match(/\{[\s\S]*\}/);
             changes = JSON.parse(jsonMatch ? jsonMatch[0] : '{}');
         } catch(e) {
+            rpLog('warn', 'INFO-DISCLOSE', `JSON 解析失败: ${e.message}`);
             return;
         }
 
         if (!changes || typeof changes !== 'object') return;
 
         const newDiscoveries = [];
-        for (const [field, revealed] of Object.entries(changes)) {
+        for (const [field, data] of Object.entries(changes)) {
+            // 兼容两种格式：{"field": true} 或 {"field": {"revealed": true, "reason": "..."}}
+            const revealed = (typeof data === 'object') ? data.revealed : data;
+            const reason = (typeof data === 'object') ? data.reason || '' : '';
+
             if (revealed && !rev[field]) {
-                state.revealed[charName][field] = true;
-                const fieldLabels = {
-                    appearance: '发现了「' + charName + '」的外貌细节',
-                    personality: '了解了「' + charName + '」的性格特点',
-                    background: '知道了「' + charName + '」的背景故事',
-                    relationship: '明白了「' + charName + '」与你的关系'
-                };
-                newDiscoveries.push(fieldLabels[field] || `发现了关于「${charName}」的新信息`);
+                // 二次验证：检查 reason 是否有实质内容
+                if (reason && reason.length > 5) {
+                    state.revealed[charName][field] = true;
+                    const fieldLabels = {
+                        appearance: '发现了「' + charName + '」的外貌细节',
+                        personality: '了解了「' + charName + '」的性格特点',
+                        background: '知道了「' + charName + '」的背景故事',
+                        relationship: '明白了「' + charName + '」与你的关系'
+                    };
+                    newDiscoveries.push(fieldLabels[field] || `发现了关于「${charName}」的新信息`);
+                    rpLog('info', 'INFO-DISCLOSE', `${field}=true, 依据: "${reason}"`);
+                } else {
+                    rpLog('warn', 'INFO-DISCLOSE-WARN', `${field} 被标记为 true，但 reason 为空或过短(${reason.length})，降级为 false`);
+                    // 不标记为已发现
+                }
+            } else if (revealed && rev[field]) {
+                rpLog('info', 'INFO-DISCLOSE', `${field} 已发现，跳过`);
             }
         }
 

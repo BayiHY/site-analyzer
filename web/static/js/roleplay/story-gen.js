@@ -20,11 +20,6 @@ App.generateWorldview = async function(userInspiration, options = {}) {
         }));
     }
 
-    // 画面风格：直接使用 state.story.imageStyle（已在 create-character 中设置好）
-    // 不再在此处重复检测灵感，避免与生图风格产生矛盾
-    const visualStyle = state.story?.imageStyle || 'anime';
-    rpLog('info', 'WORLDVIEW', `画面风格: ${visualStyle}`);
-
     let systemPrompt;
     if (factors) {
         systemPrompt = '你是世界观架构师和故事策划。请根据以下世界观因子，创作一个完整的故事骨架。';
@@ -32,12 +27,9 @@ App.generateWorldview = async function(userInspiration, options = {}) {
         systemPrompt = '你是世界观架构师和故事策划。请严格遵循用户提供的灵感方向，创作一个完整的故事骨架。\n\n⚠️ 用户灵感是核心需求，世界观的所有元素（时代背景、权力体系、社会形态、角色关系）都必须源自用户灵感，不得偏离。';
     }
 
-    // 注入画面风格信息到 prompt
-    const styleNote = `\n\n🎨 画面风格：${visualStyle}。所有场景描写、角色外貌、环境氛围都应符合这一视觉风格。`; 
     if (factors) {
         systemPrompt += `\n\n用户提供了灵感方向：${userInspiration}。请将此灵感作为世界观的核心基础，随机因子作为补充细节融入其中。`;
     }
-    systemPrompt += styleNote;
 
     let userPrompt;
     if (factors) {
@@ -64,8 +56,7 @@ storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
 2. 开场场景要有画面感，能立刻吸引玩家
 3. 主线弧光要有起伏，不能平淡
 4. toneKeywords 用3个词概括整体氛围，用中文顿号 、 分隔
-5. worldviewNotes 要包含角色设计的硬性约束
-6. 🎨 画面风格为「${visualStyle}」，所有场景描写、环境氛围都要符合这一视觉风格`;
+5. worldviewNotes 要包含角色设计的硬性约束`;
     } else {
         userPrompt = `请根据用户的灵感方向生成故事骨架：
 
@@ -92,8 +83,7 @@ storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
 2. 开场场景要有画面感，能立刻吸引玩家
 3. 主线弧光要有起伏，不能平淡
 4. toneKeywords 用3个词概括整体氛围，用中文顿号 、 分隔
-5. worldviewNotes 要包含角色设计的硬性约束
-6. 🎨 画面风格为「${visualStyle}」，所有场景描写、环境氛围都要符合这一视觉风格`;
+5. worldviewNotes 要包含角色设计的硬性约束`;
     }
 
     rpLog('info', 'WORLDVIEW', '调用 LLM 生成世界观骨架');

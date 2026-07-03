@@ -23,6 +23,7 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     const maxRetries = 2;
     let retryCount = 0;
     let retryPromptSuffix = '';
+    let prevValidNames = new Set(); // 跟踪已有角色名
 
     do {
         rpLog('info', 'TIMEOUT', `LLM 请求开始: characters, count=${count}, retry=${retryCount}`);
@@ -84,7 +85,19 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
             retryCount++;
             const shortfall = count - actualCount;
             rpLog('warn', 'CHARS', `LLM 仅生成 ${actualCount} 个有效角色（共 ${charList.length} 个块），请求 ${count} 个，差 ${shortfall} 个，重试 (${retryCount}/${maxRetries})`);
-            retryPromptSuffix = `\n\n【强制要求】上次你生成了 ${charList.length} 个数据块，但只有 ${actualCount} 个有效角色（name 字段为空导致无效）。要求 ${count} 个有效角色，请补全剩余 ${shortfall} 个。务必确保每个角色的 name 字段都有非空的名字，严格按照 TSV | 分隔格式输出，第一行必须是表头。`;
+            
+            // 将已生成的有效角色信息传递给 LLM，要求"补全"而非"重写"
+            const existingChars = validChars.map(c => {
+                const genderStr = c.gender === '女' ? '女' : c.gender === '男' ? '男' : '?';
+                return `- 已有角色：${c.name}（${genderStr}，${c.age}岁，${c.appearance?.slice(0,30) || '无'}）`;
+            }).join('\n');
+            
+            retryPromptSuffix = `\n\n【强制要求】上次生成了 ${actualCount} 个有效角色，还需要 ${shortfall} 个。请只生成缺失的 ${shortfall} 个角色，不要覆盖已有角色。\n已有角色列表：\n${existingChars}\n\n新角色必须：\n1. 与已有角色有明确关系（亲友/敌对/师徒等）\n2. 符合世界观设定\n3. 严格按照 TSV | 分隔格式输出，第一行必须是表头\n4. 不要输出已有角色，只输出新增的 ${shortfall} 个`;
+            
+            // 更新已有角色名集合（用于下次重试的去重检测）
+            for (const c of validChars) {
+                prevValidNames.add(c.name);
+            }
         }
     } while (retryCount < maxRetries && (validChars.length > 0 ? validChars.length : charList.length) < count);
 
@@ -101,11 +114,57 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     }
     const finalCharList = validChars.length > 0 ? validChars : charList;
 
+    // ===== 角色名去重：检测重试时是否返回了已有角色 =====
+    const existingNames = new Set(prevValidNames || []);
+    const duplicateNames = [];
+    for (const c of finalCharList) {
+        if (existingNames.has(c.name)) {
+            duplicateNames.push(c.name);
+            rpLog('warn', 'CHARS-DEDUP', `检测到重复角色名 "${c.name}"（已有角色），该行将被丢弃`);
+        }
+    }
+    if (duplicateNames.length > 0) {
+        // 过滤掉重复角色
+        const dedupedList = finalCharList.filter(c => !existingNames.has(c.name));
+        rpLog('warn', 'CHARS-DEDUP', `去重后: ${finalCharList.length} → ${dedupedList.length} 个角色, 丢弃: ${duplicateNames.join(', ')}`);
+    }
+    const charListToUse = duplicateNames.length > 0 && finalCharList.filter(c => !existingNames.has(c.name)).length > 0
+        ? finalCharList.filter(c => !existingNames.has(c.name))
+        : finalCharList;
+
+    // ===== 角色数据一致性校验：检测同名角色字段变化 =====
+    if (existingNames.size > 0) {
+        for (const c of charListToUse) {
+            if (existingNames.has(c.name)) continue; // 已过滤
+            // 检查是否有同名但不同数据（说明 LLM 重写了已有角色）
+            const existingChar = state.characters.find(ec => ec.name === c.name);
+            if (existingChar) {
+                const changes = [];
+                if (String(existingChar.age) !== String(c.age)) changes.push(`age: ${existingChar.age}→${c.age}`);
+                if (String(existingChar.gender) !== String(c.gender)) changes.push(`gender: ${existingChar.gender}→${c.gender}`);
+                if (changes.length > 0) {
+                    rpLog('warn', 'CHARS-FINGERPRINT', `角色 "${c.name}" 字段变化: ${changes.join(', ')}, 保留旧版本`);
+                }
+            }
+        }
+    }
+
     // 诊断：记录角色字段结构
-    const sampleChar = finalCharList[0] || {};
+    const sampleChar = charListToUse[0] || {};
     const rawKeys = Object.keys(sampleChar);
     rpLog('info', 'CHARS', `角色 #0 字段名: ${rawKeys.join(', ')}`);
     rpLog('info', 'CHARS', `角色 #0 数据预览: ${JSON.stringify(sampleChar).slice(0, 300)}`);
+
+    // 检查每个角色的 image* 模块字段完整性
+    for (let i = 0; i < charListToUse.length; i++) {
+        const c = charListToUse[i];
+        const imgFields = ['imageStyle', 'imageFace', 'imageHair', 'imageBody', 'imageClothes', 'imageEnvironment'];
+        const filled = imgFields.filter(f => c[f] && c[f].trim().length > 0);
+        const empty = imgFields.filter(f => !c[f] || c[f].trim().length === 0);
+        if (empty.length > 0) {
+            rpLog('warn', 'CHARS', `角色 #${i} "${c.name}" 缺少 image* 字段: ${empty.join(', ')} (已填: ${filled.join(', ')})`);
+        }
+    }
 
     // 检查是否含有模块化字段或旧版 imagePrompt
     const hasModuleFields = rawKeys.some(k => k.startsWith('imageStyle') || k.startsWith('imageFace'));
@@ -117,7 +176,7 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     }
 
     // ===== 3. 保存角色 =====
-    state.characters = finalCharList.map((c, i) => {
+    state.characters = charListToUse.map((c, i) => {
         const modules = {
             imageStyle: c.imageStyle || '',
             imageFace: c.imageFace || '',
@@ -135,14 +194,15 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
             const gender = c.gender === '男' ? 'male' : c.gender === '女' ? 'female' : 'person';
             const age = c.age || 20;
             const appearance = c.appearance || '';
-            const name = c.name || 'unknown';
-            imagePrompt = `Portrait of ${name}, ${age} year old ${gender}, ${appearance}, professional character concept art, detailed facial features, clean background`;
-            rpLog('info', 'CHARS', `角色 #${i} "${c.name}" 无模块化字段也无 imagePrompt，已生成备用 prompt`);
+            // 移除中文字符，避免污染生图 prompt
+            const safeName = (c.name || 'unknown').replace(/[\u4e00-\u9fff]/g, '').trim() || 'unknown';
+            imagePrompt = `Portrait of ${safeName}, ${age} year old ${gender}, ${appearance}, professional character concept art, detailed facial features, clean background`;
+            rpLog('info', 'CHARS', `角色 #${i} "${c.name}" 无模块化字段也无 imagePrompt，已生成备用 prompt (safeName=${safeName})`);
         } else if (!imagePrompt && hasAnyModule) {
             const gender = c.gender === '男' ? 'male' : c.gender === '女' ? 'female' : 'person';
-            const name = c.name || 'unknown';
-            imagePrompt = `Portrait of ${name}, ${c.age || 20} year old ${gender}, ${modules.imageFace || 'detailed facial features'}, ${modules.imageStyle || 'anime'}`;
-            rpLog('info', 'CHARS', `角色 #${i} "${c.name}" 有模块化字段但无 imagePrompt，已生成兼容 prompt`);
+            const safeName = (c.name || 'unknown').replace(/[\u4e00-\u9fff]/g, '').trim() || 'unknown';
+            imagePrompt = `Portrait of ${safeName}, ${c.age || 20} year old ${gender}, ${modules.imageFace || 'detailed facial features'}, ${modules.imageStyle || 'anime'}`;
+            rpLog('info', 'CHARS', `角色 #${i} "${c.name}" 有模块化字段但无 imagePrompt，已生成兼容 prompt (safeName=${safeName})`);
         }
 
         return {

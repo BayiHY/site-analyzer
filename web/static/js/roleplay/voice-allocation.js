@@ -8,16 +8,30 @@
  */
 export function allocateVoices(characters, TTS_VOICES) {
     const allVoicesByGender = {
-        '女': ['zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural'],
+        '女': ['zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural', 'zh-CN-liaoning-XiaobeiNeural', 'zh-CN-shaanxi-XiaoniNeural'],
         '男': ['zh-CN-YunxiNeural', 'zh-CN-YunjianNeural', 'zh-CN-YunxiaNeural', 'zh-CN-YunyangNeural']
     };
     const usedVoices = new Set();
     const voiceIndexByGender = { '女': 0, '男': 0 };
 
-    // 第一轮：保留 LLM 已分配的声线
+    // 第一轮：保留 LLM 已分配的声线，但必须验证性别匹配
     for (const char of characters) {
         if (char.voice && TTS_VOICES[char.voice]) {
-            usedVoices.add(char.voice);
+            // 检查声线性别是否匹配角色性别
+            const femalePool = allVoicesByGender['女'];
+            const malePool = allVoicesByGender['男'];
+            const isFemaleVoice = femalePool.includes(char.voice);
+            const isMaleVoice = malePool.includes(char.voice);
+            
+            if ((char.gender === '女' && isFemaleVoice) || (char.gender === '男' && isMaleVoice)) {
+                // 性别匹配，保留
+                usedVoices.add(char.voice);
+            } else if (isFemaleVoice || isMaleVoice) {
+                // 性别不匹配，丢弃 LLM 分配的声线，走第二轮自动分配
+                rpLog('warn', 'VOICE', `角色 "${char.name}" (${char.gender}) 被分配了${isFemaleVoice ? '女' : '男'}声声线 ${char.voice}，已丢弃并重新分配`);
+                char.voice = '';
+            }
+            // 如果声线不在已知池中（LLM 编造的），也丢弃
         }
     }
 

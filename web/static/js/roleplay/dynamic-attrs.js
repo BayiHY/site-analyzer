@@ -1,6 +1,23 @@
 // === Section: 动态属性更新 ===
 // 对话后让 LLM 评估角色印象/秘密/当前情绪的变化
 
+// 简易文本相似度：基于公共词元比例（0-1）
+function textSimilarity(a, b) {
+    if (!a || !b) return 0;
+    if (a === b) return 1;
+    // 简单分词：按字符切分取 bigram
+    const bigrams = (s) => {
+        const bs = new Set();
+        for (let i = 0; i < s.length - 1; i++) bs.add(s[i] + s[i+1]);
+        return bs;
+    };
+    const sa = bigrams(a.toLowerCase()), sb = bigrams(b.toLowerCase());
+    if (sa.size === 0 || sb.size === 0) return 0;
+    let intersect = 0;
+    for (const b of sa) if (sb.has(b)) intersect++;
+    return (2 * intersect) / (sa.size + sb.size);
+}
+
 App.updateDynamicAttributes = async function(charName, userMsg, charResponse) {
     const c = state.characters.find(ch => ch.name === charName);
     if (!c) return;
@@ -23,7 +40,9 @@ ${charName}回复：${charResponse}
 
 输出JSON格式：
 {"perception":"","secret":"","currentMood":""}
-// 如果某属性没有变化，返回空字符串""表示保持原值`;
+// 如果某属性没有变化，返回空字符串""表示保持原值
+// 如果语义与当前值几乎相同（相似度>90%），返回空字符串""
+// secret 只在有新线索时才更新，否则永远返回""`;
 
     try {
         const resp = await App.agnesChat([
@@ -36,19 +55,32 @@ ${charName}回复：${charResponse}
             const jsonMatch = resp.match(/\{[\s\S]*\}/);
             changes = JSON.parse(jsonMatch ? jsonMatch[0] : '{}');
         } catch(e) {
+            rpLog('warn', 'ATTR-UPDATE', `JSON 解析失败: ${e.message}`);
             return;
         }
 
         if (!changes || typeof changes !== 'object') return;
 
-        if (changes.perception && changes.perception !== '') {
-            c.perception = changes.perception;
-        }
-        if (changes.secret && changes.secret !== '') {
-            c.secret = changes.secret;
-        }
-        if (changes.currentMood && changes.currentMood !== '') {
-            c.currentMood = changes.currentMood;
+        const attrs = ['perception', 'secret', 'currentMood'];
+        for (const attr of attrs) {
+            const newVal = changes[attr] || '';
+            const oldVal = c[attr] || '';
+
+            // 空字符串 = 保持不变
+            if (newVal === '') {
+                rpLog('info', 'ATTR-DELTA', `${attr}: 保持不变（LLM返回空字符串）`);
+                continue;
+            }
+
+            // 语义去重：如果与新值相似度 > 90%，视为无变化
+            if (oldVal && textSimilarity(oldVal, newVal) > 0.9) {
+                rpLog('info', 'ATTR-DELTA', `${attr}: 变化 "${oldVal}" → "${newVal}", 相似度 ${(textSimilarity(oldVal, newVal)*100).toFixed(0)}%, 实际更新: false`);
+                continue;
+            }
+
+            // 有实质性变化，更新
+            c[attr] = newVal;
+            rpLog('info', 'ATTR-DELTA', `${attr}: "${oldVal}" → "${newVal}" [已更新]`);
         }
 
         await saveState();

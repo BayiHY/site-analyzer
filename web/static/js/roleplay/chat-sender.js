@@ -35,16 +35,15 @@ App.sendMessage = async function() {
         const allChars = state.characters || [];
 
         // ===== 3. 加载提示词模块 =====
-        const [worldviewModule, cardModule, sceneModule, emotionModule, formatModule, metaModule] = await Promise.all([
+        const [worldviewModule, cardModule, sceneModule, emotionModule, formatModule] = await Promise.all([
             import('./system-prompt/worldview.js'),
             import('./system-prompt/character-card.js'),
             import('./system-prompt/scene-rules.js'),
             import('./system-prompt/emotion-guide.js'),
             import('./system-prompt/format-requirements.js'),
-            import('./system-prompt/metadata-requirements.js'),
         ]);
 
-        const systemPrompt = `你是${activeChar.name}，${activeChar.gender ? activeChar.gender + '性' : ''}${activeChar.age ? '，' + activeChar.age + '岁' : ''}。
+        const systemPrompt = `你是沉浸式多人角色扮演游戏专属剧情生成智能体。请严格依据以下全部输入信息进行创作：故事大纲、当前剧情阶段、完整历史对话、所有角色基础信息、各角色对玩家的情感指标、玩家最新行为/对话。
 请使用中文回复。
 
 ${worldviewModule.buildWorldview(state)}
@@ -55,9 +54,7 @@ ${sceneModule.buildSceneRules(allChars, activeChar, state)}
 
 ${emotionModule.buildEmotionGuide(activeChar.name, state)}
 
-${formatModule.buildFormatRequirements()}
-
-${metaModule.buildMetadataRequirements()}`;
+${formatModule.buildFormatRequirements()}`;
 
         const messages = [
             { role: 'system', content: systemPrompt },
@@ -66,7 +63,7 @@ ${metaModule.buildMetadataRequirements()}`;
 
         rpLog('info', 'TIMEOUT', `LLM 请求开始: chat, history_msgs=${messages.length}`);
         const chatStart = Date.now();
-        const response = await App.agnesChat(messages);
+        const response = await App.agnesChat(messages, { route: 'chat' });
         const chatElapsed = Date.now() - chatStart;
         rpLog('info', 'TIMEOUT', `LLM 请求完成: chat, 耗时 ${chatElapsed}ms, output_chars=${(response || '').length}`);
         if (chatElapsed > 60000) {
@@ -75,17 +72,8 @@ ${metaModule.buildMetadataRequirements()}`;
 
         hideTyping();
 
-        // ===== 4. 提取场景元数据 =====
-        const metaModuleRaw = await import('./scene-metadata.js');
-        const meta = metaModuleRaw.extractSceneMetadata(response);
-        if (meta) {
-            rpLog('info', 'META', `解析到场景元数据: presentCharacters=${JSON.stringify(meta.presentCharacters)}, sceneDesc=${meta.sceneDesc?.slice(0, 50)}`);
-        } else {
-            rpLog('warn', 'META', '未解析到场景元数据，将使用正则 fallback');
-        }
-
-        // ===== 5. 解析多角色回复 =====
-        const parsedMessages = await App.parseMultiCharReply(response, state.activeCharIndex, meta);
+        // ===== 4. 解析多角色回复 =====
+        const parsedMessages = await App.parseMultiCharReply(response, state.activeCharIndex);
 
         for (const msg of parsedMessages) {
             state.messages.push(msg);
@@ -96,14 +84,14 @@ ${metaModule.buildMetadataRequirements()}`;
         // 角色消息渲染完成，立即解锁发送按钮
         document.getElementById('send-btn').disabled = false;
 
-        // ===== 6. 后处理：4 项并行执行 =====
+        // ===== 5. 后处理：4 项并行执行 =====
         Promise.allSettled([
             // 后处理 1: 场景图生成 → 见 scene-images.js
             (async () => {
                 try {
-                    const sceneDesc = meta?.sceneDesc || App.parseSceneFromReply(response);
+                    const sceneDesc = App.parseSceneFromReply(response);
                     if (sceneDesc && App.isSceneChanged(activeChar.name, sceneDesc)) {
-                        await App.generateSceneImage(activeChar.name, sceneDesc, activeChar, response, meta);
+                        await App.generateSceneImage(activeChar.name, sceneDesc, activeChar, response, null);
                     }
                 } catch (e) {
                     console.warn('场景图生成失败:', e);
@@ -146,30 +134,26 @@ ${metaModule.buildMetadataRequirements()}`;
 }
 
 // === 多角色回复解析器 ===
-// 编排 json-stripper → scene-extractor → reply-extractor → char-splitter → content-parser
+// 编排 scene-extractor → reply-extractor → char-splitter → content-parser
 // 格式: {场景}角色1:(动作)语言[内心想法]┆角色2:(动作)语言[内心想法]<建议回复1|建议回复2|建议回复3>
 
-App.parseMultiCharReply = async function(rawText, defaultCharIndex, metadata) {
+App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
     const messages = [];
     let text = rawText.trim();
 
-    // 步骤 1: 剥离 JSON 元数据块
-    const jsonStripper = await import('./json-stripper.js');
-    text = jsonStripper.stripJsonBlock(text);
-
-    // 步骤 2: 提取场景
+    // 步骤 1: 提取场景
     const sceneExtractor = await import('./scene-extractor.js');
     const { sceneText, remaining: afterScene } = sceneExtractor.extractScene(text);
 
-    // 步骤 3: 提取建议回复
+    // 步骤 2: 提取建议回复
     const replyExtractor = await import('./reply-extractor.js');
     const { replies: suggestedReplies, remaining: afterReply } = replyExtractor.extractSuggestedReplies(afterScene);
 
-    // 步骤 4: 分割角色段落
+    // 步骤 3: 分割角色段落
     const charSplitter = await import('./char-splitter.js');
     const charParts = charSplitter.splitCharParts(afterReply);
 
-    // 步骤 5: 解析每个角色段落
+    // 步骤 4: 解析每个角色段落
     const contentParser = await import('./content-parser.js');
     for (const part of charParts) {
         const trimmed = part.trim();
@@ -193,6 +177,28 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex, metadata) {
         rpLog('INFO', 'PARSE-CHAR', `角色消息 #${messages.length} (charIdx=${charIdx}): 建议回复=${JSON.stringify(suggestedReplies)}, 动作="${action}", 对话="${dialogue}", 想法="${thought}"`);
     }
 
+    // ===== 格式校验层：检测 LLM 回复是否严重偏离格式 =====
+    const formatValidator = await import('./format-validator.js');
+    const formatResult = formatValidator.validateFormat(rawText, messages);
+    if (formatResult.missingScene || formatResult.missingPrefix || formatResult.missingReplies) {
+        rpLog('warn', 'FORMAT-CHECK', `格式偏离: 场景描述=${formatResult.missingScene ? '缺失' : '有'}, 角色前缀=${formatResult.missingPrefix ? '缺失' : '有'}, 建议回复=${formatResult.missingReplies ? '缺失' : '有'}, 触发重试: ${formatResult.shouldRetry}`);
+    }
+
+    // ===== 场景在场规则校验 =====
+    if (messages.length > 0) {
+        const presenceValidator = await import('./scene-presence-validator.js');
+        const presenceResult = presenceValidator.validateScenePresence(
+            rawText,
+            state.characters[state.activeCharIndex]?.name,
+            state.characters
+        );
+        if (!presenceResult.valid) {
+            rpLog('warn', 'SCENE-RULE', `场景在场规则违反: ${presenceResult.conflicts.join(', ')} 声明不在场但实际出场`);
+            // 标记为需要重试，后续在 sendMessage 中处理
+            messages[0]._sceneRuleViolation = presenceResult;
+        }
+    }
+
     // 附加场景消息
     if (sceneText) {
         const sceneMsg = {
@@ -204,9 +210,6 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex, metadata) {
             isScene: true,
             timestamp: new Date().toISOString()
         };
-        if (metadata) {
-            sceneMsg._sceneMeta = metadata;
-        }
         messages.unshift(sceneMsg);
     }
 

@@ -37,7 +37,7 @@ App.initializeStory = async function(userInspiration, playerGender) {
         if (userInspiration) {
             rpLog('info', 'INIT', `用户灵感: ${userInspiration}`);
             // 支持中文数字和阿拉伯数字：四/4 名/位/个 女/男 ... 角色/女生
-            const chineseNum = '[一二三四五六七八九十百千万]+';
+            const chineseNum = '[一二三四五六七八九十百千万两]+';
             const arabicNum = '\\d+';
             const numPattern = new RegExp(`(${chineseNum}|${arabicNum})\\s*[名位个]?[男女][^|]*?[角色女生]`);
             const numMatch = userInspiration.match(numPattern);
@@ -45,13 +45,13 @@ App.initializeStory = async function(userInspiration, playerGender) {
                 let parsed = parseInt(numMatch[1]);
                 if (isNaN(parsed)) {
                     // 中文数字转阿拉伯数字
-                    const cnMap = {一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,百:100,千:1000,万:10000};
+                    const cnMap = {一:1,二:2,两:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,百:100,千:1000,万:10000};
                     parsed = 0;
                     for (const ch of numMatch[1]) {
                         parsed += cnMap[ch] || 0;
                     }
                 }
-                charCount = Math.max(parsed, 3);
+                charCount = parsed;
                 rpLog('info', 'INIT', `从用户灵感解析角色数量: ${charCount}`);
             }
             // 提取性别倾向
@@ -71,7 +71,9 @@ App.initializeStory = async function(userInspiration, playerGender) {
 
     // 角色生成完成后，并行生成头像
     if (state.apiKeys.image) {
-        rpLog('info', 'IMG', `开始生成 ${state.characters.length} 个角色头像 + 主角头像`);
+        rpLog('info', 'IMG', `━━━ 开始生图阶段: ${state.characters.length} 个角色 + 主角 ━━━`);
+        rpLog('info', 'IMG', `  生图 API Key 已配置`);
+        rpLog('info', 'IMG', `  角色列表: ${state.characters.map(c => `${c.name}(faceImgUrl=${!!c.faceImageUrl}, portraitImgUrl=${!!c.portraitImageUrl})`).join(', ')}`);
         addSystemMessage('🎨 正在生成角色头像...');
 
         try {
@@ -102,15 +104,7 @@ App.initializeStory = async function(userInspiration, playerGender) {
             if (state.story.openingScene) {
                 rpLog('info', 'SCENE', '角色头像全部完成，开始生成初始场景图');
                 addSystemMessage('🖼️ 正在生成场景图...');
-                // 初始场景图：没有 LLM 元数据，传入所有角色作为在场角色
-                const allCharNames = state.characters.map(c => c.name);
-                const initMeta = allCharNames.length > 0 ? {
-                    sceneDesc: state.story.openingScene.slice(0, 200),
-                    presentCharacters: allCharNames,
-                    actions: {},
-                    dialogues: {}
-                } : null;
-                await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene, initMeta);
+                await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene);
                 rpLog('info', 'SCENE', '初始场景图生成完成');
             }
         } catch (imgErr) {
@@ -128,15 +122,15 @@ App.initializeStory = async function(userInspiration, playerGender) {
     if (replyMatch) {
         rpLog('INFO', 'INIT-REPLY', `开场 <> 标签内容: "${replyMatch[1]}"`);
         openingText = openingRaw.slice(0, openingRaw.length - replyMatch[0].length).trim();
-        openingReplies = replyMatch[1].split('|').map(s => {
+        openingReplies = replyMatch[1].split('┇').map(s => {
             let t = s.trim();
-            t = t.replace(/^["「」]/, '').replace(/[\"」]$/, '');
+            t = t.replace(/^["「」]/, '').replace(/["」]$/, '');
             return t;
         }).filter(Boolean);
-        // 兜底：如果 | 分隔结果不足，尝试其他分隔符
+        // 兜底：如果 ┇ 分隔结果不足，尝试 | 分隔符
         if (openingReplies.length < 2) {
-            const fb1 = replyMatch[1].split('>。<').map(s => { let t = s.trim(); t = t.replace(/^["「」]/, '').replace(/["」]$/, ''); return t; }).filter(Boolean);
-            if (fb1.length >= 2) { openingReplies = fb1; rpLog('INFO', 'INIT-REPLY', `| 分隔失败，使用 >。< 兜底`); }
+            const fb1 = replyMatch[1].split('|').map(s => { let t = s.trim(); t = t.replace(/^["「」]/, '').replace(/["」]$/, ''); return t; }).filter(Boolean);
+            if (fb1.length >= 2) { openingReplies = fb1; rpLog('INFO', 'INIT-REPLY', `┇ 分隔失败，使用 | 兜底`); }
             else {
                 const fb2 = replyMatch[1].split('、').map(s => { let t = s.trim(); t = t.replace(/^["「」]/, '').replace(/["」]$/, ''); return t; }).filter(Boolean);
                 if (fb2.length >= 2) { openingReplies = fb2; rpLog('INFO', 'INIT-REPLY', `| 分隔失败，使用顿号兜底`); }

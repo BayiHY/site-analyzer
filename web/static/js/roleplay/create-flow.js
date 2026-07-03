@@ -35,7 +35,7 @@ App.createCharacter = async function() {
     state.emotions = {};
     state.revealed = {};
 
-    // 画面风格优先级：灵感检测 > 用户手动选择 > 默认 anime
+    // 画面风格优先级：用户手动选择 > 灵感检测 > 默认 cel shading
     // 灵感检测使用 LLM 语义识别，不做转译/映射
     const setupSelect = document.getElementById('setup-art-style');
     const userSelectedStyle = setupSelect && setupSelect.value ? setupSelect.value : null;
@@ -51,7 +51,7 @@ App.createCharacter = async function() {
         factors: null,
         userInspiration: '',
         phase: 'idle',
-        imageStyle: userSelectedStyle || 'anime'
+        imageStyle: userSelectedStyle || 'cel shading'
     };
     state.messages = [];
 
@@ -69,22 +69,30 @@ App.createCharacter = async function() {
     // LLM 语义识别画面风格（异步，失败则 fallback 到用户选择）
     let detectedStyle = null;
     try {
-        detectedStyle = await App.extractStyleFromInspiration(storyPrompt);
+        detectedStyle = await App.extractStyleFromInspiration(storyPrompt, userSelectedStyle);
     } catch (e) {
         rpLog('warn', 'STYLE', `LLM 风格识别异常: ${e.message}，使用用户选择`);
     }
     
-    // 优先使用 LLM 检测到的风格（即使不在预设选项中，也直接用作提示词后缀）
+    // 优先级链：用户手动选择 > 灵感检测（仅当 LLM 返回非默认值时） > 默认 cel shading
+    // 关键修复：LLM 返回 'cel shading' 或 'anime' 可能是 fallback 默认值，
+    // 不是真正的灵感检测结果。只有当用户选择了其他风格时，才优先使用用户选择。
     let imageStyle;
-    if (detectedStyle && detectedStyle !== 'anime') {
-        imageStyle = detectedStyle;
-        rpLog('info', 'STYLE', `从灵感中检测到画面风格（最高优先级）: ${detectedStyle}`);
-    } else if (userSelectedStyle) {
+    if (userSelectedStyle) {
+        // 用户手动选择了风格 → 始终优先使用用户选择
         imageStyle = userSelectedStyle;
         rpLog('info', 'STYLE', `使用用户手动选择的画面风格: ${userSelectedStyle}`);
+        // 如果 LLM 检测到了不同的风格，记录警告但不覆盖
+        if (detectedStyle && detectedStyle !== userSelectedStyle && detectedStyle !== 'cel shading' && detectedStyle !== 'anime') {
+            rpLog('warn', 'STYLE', `LLM 检测到风格 "${detectedStyle}" 与用户选择 "${userSelectedStyle}" 不一致，以用户选择为准`);
+        }
+    } else if (detectedStyle && detectedStyle !== 'cel shading' && detectedStyle !== 'anime') {
+        // 没有用户选择，且 LLM 检测到了有意义的风格（不是默认 fallback）
+        imageStyle = detectedStyle;
+        rpLog('info', 'STYLE', `从灵感中检测到画面风格: ${detectedStyle}`);
     } else {
-        imageStyle = 'anime';
-        rpLog('info', 'STYLE', `使用默认画面风格: anime`);
+        imageStyle = 'cel shading';
+        rpLog('info', 'STYLE', `使用默认画面风格: cel shading (用户未选择, LLM检测=${detectedStyle || 'null'})`);
     }
     state.story.imageStyle = imageStyle;
 
@@ -107,7 +115,7 @@ App.generateCharactersAndStart = async function() {
     await saveState();
 
     try {
-        const chars = await App.generateCharacters(3, state.player?.gender, state.story.userInspiration || '', '');
+        const chars = await App.generateCharacters(state.characters.length, state.player?.gender, state.story.userInspiration || '', '');
         addSystemMessage(`✅ 角色生成完成！共 ${chars.length} 个角色。`);
         rpLog('info', 'CHARS', `generateCharactersAndStart chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
@@ -141,15 +149,7 @@ App.generateCharactersAndStart = async function() {
                 if (state.story.openingScene) {
                     rpLog('info', 'SCENE', '角色头像全部完成，开始生成初始场景图');
                     addSystemMessage('🖼️ 正在生成场景图...');
-                    // 初始场景：传入所有角色作为在场角色
-                    const allCharNames = state.characters.map(c => c.name);
-                    const initMeta = allCharNames.length > 0 ? {
-                        sceneDesc: state.story.openingScene.slice(0, 200),
-                        presentCharacters: allCharNames,
-                        actions: {},
-                        dialogues: {}
-                    } : null;
-                    await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene, initMeta);
+                    await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene);
                     rpLog('info', 'SCENE', '初始场景图生成完成');
                 }
             } catch (imgErr) {
@@ -164,7 +164,7 @@ App.generateCharactersAndStart = async function() {
         const replyMatch = openingRaw.match(/<(.+)>$/);
         if (replyMatch) {
             openingText = openingRaw.slice(0, openingRaw.length - replyMatch[0].length).trim();
-            openingReplies = replyMatch[1].split('|').map(s => s.trim()).filter(Boolean);
+            openingReplies = replyMatch[1].split('┇').map(s => s.trim()).filter(Boolean);
         }
         
         const openingMsg = `【${openingText}】`;
@@ -228,8 +228,24 @@ App.regenerateCharacters = async function() {
     state.revealed = {};
     await saveState();
 
+    // 从用户灵感中解析目标角色数，避免硬编码
+    const inspiration = state.story.userInspiration || '';
+    let targetCount = 3; // fallback
+    const cnNums = {'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+    const numMatch = inspiration.match(/([一二两三四五六七八九十\d]+)[名个位]?[男女]/);
+    if (numMatch) {
+        let parsed = parseInt(numMatch[1]);
+        if (isNaN(parsed)) {
+            parsed = 0;
+            for (const ch of numMatch[1]) {
+                parsed += cnNums[ch] || 0;
+            }
+        }
+        targetCount = parsed;
+    }
+
     try {
-        const chars = await App.generateCharacters(3, state.player?.gender, state.story.userInspiration || '', '');
+        const chars = await App.generateCharacters(targetCount, state.player?.gender, inspiration, '');
         addSystemMessage(`✅ 角色重新生成完成！共 ${chars.length} 个角色。`);
         rpLog('info', 'CHARS', `regenerateCharacters 返回 chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
@@ -264,14 +280,7 @@ App.regenerateCharacters = async function() {
                 if (state.story.openingScene) {
                     rpLog('info', 'SCENE', '角色头像全部完成，开始重新生成初始场景图');
                     addSystemMessage('🖼️ 正在重新生成场景图...');
-                    const allCharNames = state.characters.map(c => c.name);
-                    const initMeta = allCharNames.length > 0 ? {
-                        sceneDesc: state.story.openingScene.slice(0, 200),
-                        presentCharacters: allCharNames,
-                        actions: {},
-                        dialogues: {}
-                    } : null;
-                    await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene, initMeta);
+                    await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene);
                     rpLog('info', 'SCENE', '初始场景图重新生成完成');
                 }
             } catch (imgErr) {
@@ -286,7 +295,7 @@ App.regenerateCharacters = async function() {
         const replyMatch = openingRaw.match(/<(.+)>$/);
         if (replyMatch) {
             openingText = openingRaw.slice(0, openingRaw.length - replyMatch[0].length).trim();
-            openingReplies = replyMatch[1].split('|').map(s => s.trim()).filter(Boolean);
+            openingReplies = replyMatch[1].split('┇').map(s => s.trim()).filter(Boolean);
         }
         
         const openingMsg = `【${openingText}】`;

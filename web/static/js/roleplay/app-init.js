@@ -32,43 +32,51 @@ App.getArtStyleDisplayName = function(style) {
 // === LLM 语义识别画面风格 ===
 // 从用户灵感文本中提取画面风格关键词，返回英文提示词
 // 如果 LLM 识别失败或无灵感，返回 null
-App.extractStyleFromInspiration = async function(inspiration) {
+App.extractStyleFromInspiration = async function(inspiration, userSelectedStyle) {
     if (!inspiration || !inspiration.trim()) return null;
+    
+    const fallbackHint = userSelectedStyle
+        ? `⚠️ 重要：如果灵感中没有明确风格指向，请使用用户在开始冒险界面选择的画面风格：「${userSelectedStyle}」，不要自行替换为其他风格。`
+        : `⚠️ 重要：如果灵感中没有明确风格指向，请返回 "cel shading"。`;
     
     const systemPrompt = `你是一个画面风格识别专家。请从用户的故事灵感中识别画面风格。
 
-可用的画面风格选项（返回时使用英文关键词）：
-- cel shading（赛璐璐风、动漫风、二次元、日系）
-- watercolor（水彩风）
-- oil painting（油画风）
-- thick paint（厚涂风、韩漫厚涂）
-- pencil sketch（铅笔素描、手绘）
-- manga（黑白漫画、条漫、韩漫）
-- concept art（概念设计图、角色设计）
-- unreal engine（虚幻引擎写实、照片级）
-- blender cartoon（Blender卡通3D）
-- studio ghibli（吉卜力、宫崎骏风）
-- cyberpunk（赛博朋克、霓虹）
-- chibi（Q版、萌系）
-- pixel art（像素风、复古游戏）
-- ink wash（水墨画、国画）
-- vaporwave（蒸汽波）
-- dark fantasy（暗黑奇幻、哥特）
-- flat design（扁平矢量、极简）
-- line art（线稿、简笔画）
-- anime（通用动漫风，当无法确定时）
+可用的画面风格选项（返回时必须使用下方精确的英文关键词之一，不要自创）：
+- cel shading（赛璐璐风、动漫风、二次元、日系、平涂上色）
+- watercolor（水彩风、湿画法、晕染）
+- oil painting（油画风、厚涂颜料、画布质感）
+- thick paint（厚涂风、韩漫厚涂、数字厚涂）
+- pencil sketch（铅笔素描、手绘线稿、石墨）
+- manga（黑白漫画、条漫、韩漫、网点纸）
+- concept art（概念设计图、角色设计、设定稿）
+- unreal engine（虚幻引擎写实、照片级、PBR材质）
+- blender cartoon（Blender卡通3D、低多边形、3D渲染）
+- studio ghibli（吉卜力、宫崎骏风、手绘动画）
+- cyberpunk（赛博朋克、霓虹灯、反乌托邦）
+- chibi（Q版、萌系、二头身）
+- pixel art（像素风、复古游戏、8-bit）
+- ink wash（水墨画、国画、毛笔晕染）
+- vaporwave（蒸汽波、80年代复古、故障艺术）
+- dark fantasy（暗黑奇幻、哥特、克苏鲁）
+- flat design（扁平矢量、极简、Material Design）
+- line art（线稿、简笔画、单色线条）
+
+${fallbackHint}
 
 要求：
 1. 只返回一个英文风格关键词，不要解释
-2. 如果灵感中没有提到任何画面风格，返回 "anime"
-3. 如果灵感中提到的是中文风格词（如"线稿风格"），转换为对应的英文关键词
-4. 如果无法确定，返回 "anime"
+2. 如果灵感中提到了明确风格，返回对应的精确英文关键词
+3. 如果灵感中提到的是中文风格词，转换为最精确对应的英文关键词
+4. 如果无法确定，使用上面标注的 fallback 风格
 
 示例：
-用户输入："中国，校园，后宫，四个女角色" → anime
+用户输入："中国，校园，后宫，四个女角色" → (返回用户选择的风格或 cel shading)
 用户输入："我想看赛博朋克风格的未来城市" → cyberpunk
 用户输入："线稿风格，校园日常" → line art
-用户输入："厚涂韩漫风格" → thick paint`;
+用户输入："厚涂韩漫风格" → thick paint
+用户输入："2名女角色" → (返回用户选择的风格或 cel shading)
+用户输入："古风，仙侠，水墨" → ink wash
+用户输入："写实，电影感" → unreal engine`;
 
     const userPrompt = `请从以下故事灵感中识别画面风格：\n"${inspiration}"`;
 
@@ -81,10 +89,10 @@ App.extractStyleFromInspiration = async function(inspiration) {
         // 清理 LLM 回复，去除多余空格和引号
         const cleanReply = (reply || '').trim().replace(/["'`]/g, '').replace(/\s+/g, ' ');
         rpLog('info', 'STYLE', `LLM 原始回复: "${cleanReply}"`);
-        return cleanReply || 'anime';
+        return cleanReply || null;
     } catch (err) {
-        rpLog('warn', 'STYLE', `LLM 风格识别失败: ${err.message}，使用默认 anime`);
-        return 'anime';
+        rpLog('warn', 'STYLE', `LLM 风格识别失败: ${err.message}`);
+        return null;
     }
 };
 
