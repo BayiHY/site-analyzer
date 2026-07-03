@@ -149,7 +149,7 @@ storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
     }
 
     // 保护 imageStyle 不被覆盖（已在 createCharacter 中设置为用户选择）
-    const preservedImageStyle = state.story?.imageStyle || 'anime';
+    const preservedImageStyle = state.story?.imageStyle || 'akira toriyama style';
     state.story = {
         title: data.storyTitle || '未命名故事',
         worldview: data.worldviewSummary || '',

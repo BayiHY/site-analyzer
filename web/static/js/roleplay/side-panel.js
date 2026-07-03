@@ -54,11 +54,15 @@ App.togglePanel = function(type) {
             body.innerHTML = `
                 <div class="setting-item">
                     <label>故事标题</label>
-                    <div class="story-field">${App.escapeHtml(story.title || '未命名')}</div>
+                    <div class="story-field story-title-field">
+                        ${App.escapeHtml(story.title || '未命名')}
+                    </div>
                 </div>
                 <div class="setting-item">
                     <label>世界观概要</label>
-                    <div class="story-field story-field-wrap">${App.escapeHtml(story.worldview || '暂无')}</div>
+                    <div class="story-field worldview-field">
+                        ${App.escapeHtml(story.worldview || '暂无')}
+                    </div>
                 </div>
             `;
         } else {
@@ -155,7 +159,7 @@ App.renderSettingsPanel = function() {
         <div class="setting-item" style="opacity:0.7;">
             <label>🎨 画面风格</label>
             <div style="padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.9rem;min-height:36px;display:flex;align-items:center;">
-                ${App.getArtStyleDisplayName(state.story?.imageStyle || state.story?.artStyle || 'cel shading')}
+                ${App.getArtStyleDisplayName(state.story?.imageStyle || state.story?.artStyle || 'akira toriyama style')}
             </div>
             <div class="setting-hint">灵感中自动检测的画面风格，不可修改</div>
         </div>

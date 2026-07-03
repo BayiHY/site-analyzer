@@ -1,37 +1,57 @@
 // === Section: 图片 API 封装 ===
 // 生图 API 调用 + prompt 清洗 + 风格后缀 + 模块化三级降级
 
-// 艺术风格后缀映射
+// 艺术风格后缀映射（41 个细分关键词，4 大板块，无歧义无重叠）
+// 绘图 prompt 使用完整细分词；后端标注标签仍可用 18 个固定词
 App.artStyleSuffixes = {
-    'anime': ', high quality anime style, cel shading, vibrant colors',
-    'watercolor': ', watercolor painting style, soft washes, transparent layers, artistic',
-    'oil painting': ', oil painting style, rich textures, impasto brushstrokes, classical',
-    'digital realism': ', digital painting, photorealistic, highly detailed, cinematic lighting',
-    'pencil sketch': ', pencil sketch style, graphite drawing, crosshatching, monochrome',
-    'comic book': ', comic book style, bold outlines, halftone dots, graphic novel art',
-    'photorealistic': ', photorealistic photography, DSLR, natural lighting, 35mm lens, ultra detailed',
-    '3D render': ', 3D render, Octane render, ray tracing, subsurface scattering, volumetric lighting',
-    'studio ghibli': ', Studio Ghibli style, Hayao Miyazaki inspired, lush backgrounds, whimsical',
-    'cyberpunk': ', cyberpunk style, neon lights, futuristic cityscape, dark atmosphere, glowing accents',
-    'fantasy art': ', fantasy art, ethereal atmosphere, magical elements, epic composition, painterly',
-    'chibi': ', chibi style, cute proportion, big head small body, kawaii, adorable',
-    'pixel art': ', pixel art, 16-bit retro game style, dithering, nostalgic',
-    'ink wash': ', Chinese ink wash painting, sumi-e, traditional brushwork, flowing lines, monochrome',
-    'vaporwave': ', vaporwave aesthetic, pastel colors, retro 80s, glitch art, dreamy atmosphere',
-    'dark fantasy': ', dark fantasy, gothic atmosphere, dramatic shadows, moody, mysterious',
-    'line art': ', clean line art style, crisp outlines, minimal shading, monochrome line drawing',
-    'cel shading': ', cel shading style, flat colors, clean outlines, anime style',
-    'concept art': ', concept art style, detailed character design, professional illustration',
-    'unreal engine': ', unreal engine style, photorealistic, cinematic lighting, highly detailed',
-    'blender cartoon': ', blender 3D cartoon style, smooth rendering, vibrant colors',
-    'thick paint': ', thick paint style, impasto technique, rich texture, expressive brushwork',
-    'flat design': ', flat design style, minimalist, geometric shapes, solid colors',
+    // === 一、日系动画细分 ===
+    'akira toriyama style': ', Akira Toriyama style, bold thick outlines, spiky hair, blocky hard shadows, Dragon Ball aesthetic',
+    'rumiko takahashi style': ', Rumiko Takahashi style, soft rounded lines, low saturation warm retro palette, Inuyasha aesthetic',
+    'studio ghibli hand-drawn cel': ', Studio Ghibli hand-drawn cel animation, watercolor textures, natural lush backgrounds, Hayao Miyazaki aesthetic',
+    '80s toei cel animation': ', 1980s Toei cel animation, extremely high saturation hard cel shading, retro anime aesthetic',
+    '90s jump shonen cel anime': ', 1990s Shonen Jump cel anime, strong dynamic poses, thick black outlines, hot-blooded action aesthetic',
+    '00s josei cel anime': ', 2000s Josei cel anime, soft gradients, macaron pastel color palette, romantic shojo aesthetic',
+    'modern moe cel anime': ', modern moe cel anime, glossy skin highlights, oversized bright eyes, soft outlines, contemporary shounen aesthetic',
+    'y2k anime': ', Y2K anime aesthetic, high saturation fluorescent colors, retro digital filter, early 2000s anime style',
+    'seinen cel anime': ', seinen cel anime, low contrast realistic facial features, muted沉稳 tones, mature aesthetic',
+    'trigger anime style': ', Trigger studio anime style, high contrast distorted lines, explosive special effects, geist aesthetic',
+    'three-tone cel shading': ', three-tone cel shading, minimal three-color flat colors, no gradients, clean unified aesthetic',
+    // === 二、漫画细分 ===
+    'shonen jump manga': ', Shonen Jump manga style, black and white screentones, speed lines, dense dot patterns, bold ink outlines',
+    'shoujo manga': ', shoujo manga style, black and white gradient screentones, highlighted eye makeup,纤细 fine lines',
+    'gekiga manga': ', gekiga manga style, rough charcoal lines, oppressive high contrast black and white, adult dramatic aesthetic',
+    'webtoon korean color manhwa': ', Korean webtoon color manhwa, soft thick paint gradients, elongated beautiful proportions, vertical scroll style',
+    'doujinshi illustration': ', doujinshi illustration style, refined detailed art, atmospheric backgrounds, indie comic aesthetic',
+    'horror manga': ', horror manga style, broken fragmented lines, large areas of solid black, distorted facial features, Japanese horror aesthetic',
+    'one piece manga style': ', One Piece manga style, Eiichiro Oda, exaggerated cartoon proportions, thick bold outlines, adventurous aesthetic',
+    'berserk manga style': ', Berserk manga style, dense crosshatching, heavy dark tones, dark mature fantasy aesthetic',
+    // === 三、3D 卡通细分 ===
+    'blender lowpoly cartoon render': ', Blender low-poly cartoon 3D render, geometric faceted surfaces, flat color shading, voxel aesthetic',
+    'anime toon 3d render': ', anime toon 3D render, cel-shaded 3D, simulating hand-drawn cel animation texture',
+    'pixar soft 3d cartoon': ', Pixar soft 3D cartoon render, rounded smooth surfaces, global soft lighting, family-friendly CG aesthetic',
+    'clay figure render': ', clay figure 3D render, matte plush clay texture, stop-motion figurine aesthetic',
+    'miniature diorama render': ', miniature diorama render, shallow depth of field, physical miniature model texture, tilt-shift aesthetic',
+    'chibi super deformed 3d': ', chibi super-deformed 3D, two-head proportion, oversized head tiny body, simplified structure, cute 3D aesthetic',
+    // === 四、通用美术&潮流细分 ===
+    'transparent watercolor wash': ', transparent watercolor wash, luminous bleeding edges, negative space留白, no heavy pigment buildup',
+    'heavy oil painting texture': ', heavy oil painting texture, thick impasto brushstrokes, canvas grain, classical painting aesthetic',
+    'digital thick paint illustration': ', digital thick paint illustration, layered blending, soft dark-light transitions, digital painting aesthetic',
+    'graphite pencil sketch': ', graphite pencil sketch, paper grain texture, soft hatching grayscale, monochrome drawing',
+    'chinese ink wash painting': ', Chinese ink wash painting, sumi-e brushwork, ink density gradation, negative space, traditional scroll aesthetic',
+    'hard line ink line art': ', hard line ink line art, pure ink outlines, no coloring, single-color crisp contours',
+    'neon cyberpunk illustration': ', neon cyberpunk illustration, cold blue and magenta neon, rainy metal cityscape, futuristic dystopian aesthetic',
+    'vaporwave retro 80s art': ', vaporwave retro 80s art, pink-cyan gradients, retro electronic glitch textures, nostalgic aesthetic',
+    'dark gothic fantasy illustration': ', dark gothic fantasy illustration, deep dark low saturation, vintage ornate carvings, gothic horror aesthetic',
+    'flat vector minimal illustration': ', flat vector minimal illustration, no gradients, solid color geometric shapes, minimalist design',
+    'pixel art 16bit retro game': ', 16-bit pixel art retro game, blocky pixel grid, retro NES/SNES aesthetic',
+    'unreal engine photoreal PBR': ', Unreal Engine photorealistic PBR, physically accurate materials and lighting, cinematic photo-realism',
+    'pop art screen print': ', pop art screen print, solid color flat areas, thick black outlines, high contrast Warhol aesthetic',
 };
 
 // 获取当前艺术风格后缀
 // 注意：灵感检测到的风格即使不在预设选项中，也直接作为后缀使用（不做转译/映射）
 App.getArtStyleSuffix = function() {
-    const style = state.story?.imageStyle || state.story?.artStyle || 'anime';
+    const style = state.story?.imageStyle || state.story?.artStyle || 'akira toriyama style';
     if (App.artStyleSuffixes[style]) {
         return App.artStyleSuffixes[style];
     }
@@ -53,65 +73,47 @@ App.buildModularPrompt = function(character, level) {
     const parts = [];
     const mods = character.__modules__ || {};
 
-    const traceId = `${character.name}-${level}`;
-    rpLog('info', 'IMG-MODULAR', `[TRACE:${traceId}] buildModularPrompt(level=${level})`);
-    rpLog('info', 'IMG-MODULAR', `[TRACE:${traceId}] 所有模块字段: ${JSON.stringify(mods)}`);
-    rpLog('info', 'IMG-MODULAR', `[TRACE:${traceId}] imageStyle="${mods.imageStyle || '(空)'}" | imageFace="${(mods.imageFace||'').slice(0,80)}" | imageHair="${(mods.imageHair||'').slice(0,80)}" | imageBody="${(mods.imageBody||'').slice(0,80)}" | imageClothes="${(mods.imageClothes||'').slice(0,80)}" | imageEnvironment="${(mods.imageEnvironment||'').slice(0,80)}"`);
-    rpLog('info', 'IMG-MODULAR', `[TRACE:${traceId}] 角色基本信息: name=${character.name} age=${character.age} gender=${character.gender} appearance="${(character.appearance||'').slice(0,80)}"`);
+    // 一级/二级：只用 imageFace + imageHair（面部特写）
+    // 零级/一级（全身/半身）：face + hair + body + clothes + environment
+    const include = {
+        imageFace: true,
+        imageHair: true,
+        imageBody: level <= 1 && mods.imageBody,
+        imageClothes: level <= 1 && mods.imageClothes,
+        imageEnvironment: level <= 1 && mods.imageEnvironment
+    };
 
-    // level 2（面部特写）：用 face + hair 精确约束
-    if (level === 2) {
-        if (mods.imageFace) parts.push(mods.imageFace);
-        if (mods.imageHair) parts.push(mods.imageHair);
+    // 不再使用 LLM 填的 mods.imageStyle（经常填错），直接用全局风格
+    if (include.imageFace && mods.imageFace) parts.push(mods.imageFace);
+    if (include.imageHair && mods.imageHair) parts.push(mods.imageHair);
+    if (include.imageBody && mods.imageBody) parts.push(mods.imageBody);
+    if (include.imageClothes && mods.imageClothes) parts.push(mods.imageClothes);
+    if (include.imageEnvironment && mods.imageEnvironment) parts.push(mods.imageEnvironment);
 
-        let base = parts.join(', ');
-        if (!base) base = 'character portrait';
+    let base = parts.join(', ');
+    if (!base) base = 'character portrait';
 
-        rpLog('info', 'IMG-MODULAR', `  level2 parts 拼接: "${base}"`);
-
-        let genderStr = 'male';
-        if (character.gender === '男') genderStr = 'male';
-        else if (character.gender === '女') genderStr = 'female';
-        base += `, ${character.name || 'character'}, ${character.age || 20} years old, ${genderStr}`;
-        
-        // 面部特写基础描述：如果 imageFace 已包含表情/面具/口罩等约束，不再追加固定表情
-        const faceText = (mods.imageFace || '').toLowerCase();
-        const hasFacialConstraint = /mask|bandage|scar|smile|frown|grimace|gas mask|mouth|lip|expression|calm|angry|sad|hurt|blood|bruise|tattoo|piercing|makeup|contour/.test(faceText);
-        const expressionPart = hasFacialConstraint ? '' : 'calm natural expression';
-        base += `, front view, head and neck framing, shoulder contour visible, ${expressionPart}, soft even diffused lighting, character reference sheet style, high detail, high quality, moderate framing, tasteful composition, implicit and non-explicit content`;
-
-        const final = App.appendArtStyle(base.trim());
-        const artStyle = state.story?.imageStyle || 'anime';
-        const suffix = App.getArtStyleSuffix();
-        rpLog('info', 'IMG-MODULAR', `  level2 最终prompt (${final.length}字): ${final}`);
-        rpLog('info', 'IMG-MODULAR', `  使用的风格: "${artStyle}", 后缀: "${suffix.slice(0,80)}"`);
-        return final;
-    }
-
-    // level 0/1（全身/半身）：拼接 body + clothes + environment
-    // 不再只依赖 img2img 参考图，也要在 prompt 中描述服装和体型
+    // 追加角色信息 + 分级 framing 提示词
     let genderStr = 'male';
     if (character.gender === '男') genderStr = 'male';
     else if (character.gender === '女') genderStr = 'female';
+    base += `, ${character.name || 'character'}, ${character.age || 20} years old, ${genderStr}`;
 
-    if (level === 0) {
-        // 全身：性别 + 体型 + 服装 + 环境
-        let base = `${genderStr}, full body shot from head to toe, standing pose`;
-        if (mods.imageBody) base += `, ${mods.imageBody}`;
-        if (mods.imageClothes) base += `, wearing ${mods.imageClothes}`;
-        if (mods.imageEnvironment) base += `, ${mods.imageEnvironment}`;
-        const final = App.appendArtStyle(base.trim());
-        rpLog('info', 'IMG-MODULAR', `  level${level} 完整prompt: ${final}`);
-        return final;
+    if (level === 2) {
+        // 一阶段面部特写：仅用脸型五官发型妆扮，精确约束
+        base += ', front view, head and neck framing, shoulder contour visible, calm natural expression, soft even diffused lighting, character reference sheet style, high detail, high quality, moderate framing, tasteful composition, implicit and non-explicit content';
     } else {
-        // 半身：性别 + 体型 + 服装
-        let base = `${genderStr}, medium shot from waist up, upper body portrait`;
-        if (mods.imageBody) base += `, ${mods.imageBody}`;
-        if (mods.imageClothes) base += `, wearing ${mods.imageClothes}`;
-        const final = App.appendArtStyle(base.trim());
-        rpLog('info', 'IMG-MODULAR', `  level${level} 完整prompt: ${final}`);
-        return final;
+        // 二阶段全身/半身：强调与一阶段面部特写参考图保持一致性
+        // 去掉可能与一致性产生冲突的提示词（如表情、光影、构图等），由参考图承担面部特征
+        base += ', consistent facial features with character reference, matching face shape and hairstyle and makeup, ';
+        if (level === 0) {
+            base += 'full body shot from head to toe, standing pose, complete figure';
+        } else {
+            base += 'medium shot from waist up, upper body portrait';
+        }
     }
+
+    return App.appendArtStyle(base.trim());
 };
 
 // 从角色对象中提取模块化字段
@@ -126,13 +128,9 @@ App.extractModules = function(character) {
     if (character.imageClothes) mods.imageClothes = character.imageClothes;
     if (character.imageEnvironment) mods.imageEnvironment = character.imageEnvironment;
     character.__modules__ = mods;
-    
-    rpLog('info', 'IMG-MODULES', `━━━ extractModules(${character.name}) ━━━`);
-    rpLog('info', 'IMG-MODULES', `  原始字段 keys: ${Object.keys(character).join(', ')}`);
-    rpLog('info', 'IMG-MODULES', `  提取结果: ${JSON.stringify(mods)}`);
-    
     return mods;
 };
+
 // 旧版：清洗 prompt → 追加角色信息 → 追加风格
 App.sanitizeImagePrompt = function(prompt, character) {
     let cleaned = prompt
@@ -159,9 +157,7 @@ App.sanitizeImagePrompt = function(prompt, character) {
         cleaned += `, ${character.name}, ${character.age} years old, ${genderStr}wearing ${character.appearance}`;
     }
 
-    const result = App.appendArtStyle(cleaned.trim());
-    rpLog('info', 'IMG-SANITIZE', `sanitizeImagePrompt: 原始="${prompt.slice(0,200)}" → 清洗后="${result.slice(0,300)}"`);
-    return result;
+    return App.appendArtStyle(cleaned.trim());
 };
 
 // 备用 prompt（最后兜底）
@@ -173,11 +169,7 @@ App.buildBackupPrompt = function(character) {
         if (/男|男人|男子|先生|他/.test(character.appearance)) gender = 'young man';
         else if (/女|女人|女子|女士|她/.test(character.appearance)) gender = 'young woman';
     }
-    // 使用全局风格，不用角色的 imageStyle（可能被污染）
-    const globalStyle = state.story?.imageStyle || 'anime';
-    const result = `Character portrait, ${gender}, ${character.age || 20} years old, friendly expression, soft lighting, detailed character design, professional concept art, ${globalStyle} style`;
-    rpLog('info', 'IMG-BACKUP', `buildBackupPrompt: gender="${gender}", artStyle="${globalStyle}", result="${result.slice(0,300)}"`);
-    return result;
+    return `Character portrait, ${gender}, ${character.age || 20} years old, friendly expression, soft lighting, detailed character design, professional concept art` + App.getArtStyleSuffix();
 };
 
 // 两阶段生图：一阶段面部特写（无降级）→ 二阶段全身/半身（三级降级）
@@ -187,59 +179,37 @@ App.generateCharacterImage = async function(character) {
         throw new Error('无效的角色对象，无法生成图片');
     }
 
-    rpLog('info', 'IMG', `━━━━━━━━━ 开始 ${character.name} 的生图流程 ━━━━━━━━━`);
-    rpLog('info', 'IMG', `  角色完整数据: ${JSON.stringify({
-        name: character.name, age: character.age, gender: character.gender,
-        appearance: character.appearance,
-        imagePrompt: (character.imagePrompt || '').slice(0, 200)
-    })}`);
-
     // 提取模块化字段
     const mods = App.extractModules(character);
 
     // 检查是否有模块化数据
     const hasModules = mods.imageStyle || mods.imageFace || mods.imageHair || mods.imageBody || mods.imageClothes || mods.imageEnvironment;
 
-    rpLog('info', 'IMG', `  模块化数据: hasModules=${hasModules}`);
-    if (hasModules) {
-        rpLog('info', 'IMG', `  imageStyle="${mods.imageStyle}" | imageFace="${(mods.imageFace||'').slice(0,80)}" | imageHair="${(mods.imageHair||'').slice(0,80)}" | imageBody="${(mods.imageBody||'').slice(0,80)}" | imageClothes="${(mods.imageClothes||'').slice(0,80)}" | imageEnvironment="${(mods.imageEnvironment||'').slice(0,80)}"`);
-    } else {
-        rpLog('warn', 'IMG', `  ⚠️ 角色没有任何模块化字段！将走旧版 sanitize 流程`);
-        rpLog('info', 'IMG', `  旧版 imagePrompt: "${(character.imagePrompt||'').slice(0,200)}"`);
-    }
-
     let imageUrl;
 
     if (hasModules) {
         // === 第一步：生成面部特写（一阶段，失败自动用 2.0-flash 重试，最多两次） ===
-        rpLog('info', 'IMG', `━━━ 阶段1: 面部特写生成 ━━━`);
+        rpLog('info', 'IMG', `📷 第一步：生成面部特写: ${character.name}`);
         const facePrompt = App.buildModularPrompt(character, 2); // level 2 = 特写
-        rpLog('info', 'IMG', `  面部特写 Prompt 长度: ${facePrompt.length} 字`);
+        rpLog('debug', 'IMG', `面部特写 Prompt: ${facePrompt.slice(0, 150)}...`);
         
         let faceImageUrl;
         const faceModels = ['agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
                 const model = faceModels[attempt % faceModels.length];
-                rpLog('info', 'IMG', `面部特写尝试 ${attempt + 1}/3 (model=${model}, size=341x341): ${character.name}`);
-                const t0 = Date.now();
+                rpLog('info', 'IMG', `面部特写尝试 ${attempt + 1}/3 (model=${model}): ${character.name}`);
                 faceImageUrl = await App.agnesImageGen(facePrompt, '341x341', model);
-                const elapsed = Date.now() - t0;
-                rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name} (耗时 ${elapsed}ms)`);
-                rpLog('info', 'IMG', `  面部图 URL: ${faceImageUrl.slice(0, 150)}...`);
+                rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
                 character.faceImageUrl = faceImageUrl;
                 await saveState();
                 break;
             } catch (e) {
                 rpLog('warn', 'IMG', `面部特写失败 (尝试 ${attempt + 1}/3): ${e.message}`);
                 if (attempt === 2) {
-                    rpLog('error', 'IMG', `❌ 面部特写全部重试失败: ${character.name}`);
+                    rpLog('error', 'IMG', `面部特写全部重试失败: ${character.name}`);
                 }
             }
-        }
-
-        if (!faceImageUrl) {
-            rpLog('error', 'IMG', `⚠️ 面部特写全部失败，将跳过 img2img 降级链，直接走旧版流程`);
         }
 
         // === 第二步：从面部特写出发，三级降级生成全身/半身 ===
@@ -250,30 +220,20 @@ App.generateCharacterImage = async function(character) {
 
         for (const tier of levels) {
             try {
-                const traceId = `${character.name}-level${tier.level}`;
-                rpLog('info', 'IMG', `[TRACE:${traceId}] 阶段2: 尝试 ${tier.name} (level=${tier.level})`);
+                rpLog('info', 'IMG', `第二步: 尝试 ${tier.name} 生图（基于面部特写）: ${character.name}`);
                 const prompt = App.buildModularPrompt(character, tier.level);
                 
                 // 如果有面部特写，用 img2img 确保面部一致性
                 if (faceImageUrl) {
-                    rpLog('info', 'IMG', `  使用 img2img 模式 (strength=0.35, ref=面部特写)`);
-                    rpLog('info', 'IMG', `  参考图 URL: ${faceImageUrl.slice(0, 150)}...`);
-                    const t0 = Date.now();
                     imageUrl = await App.agnesImageGenWithRefImg(prompt, faceImageUrl);
-                    rpLog('info', 'IMG', `${tier.name} img2img 成功: ${character.name} (耗时 ${Date.now()-t0}ms)`);
                 } else {
-                    rpLog('warn', 'IMG', `  ⚠️ 无面部参考图，降级为文生图模式`);
-                    const t0 = Date.now();
                     imageUrl = await App.agnesImageGen(prompt);
-                    rpLog('info', 'IMG', `${tier.name} 文生图成功: ${character.name} (耗时 ${Date.now()-t0}ms)`);
                 }
                 
                 if (imageUrl) {
-                    rpLog('info', 'IMG', `✅ ${tier.name} 生成成功: ${character.name}`);
-                    rpLog('info', 'IMG', `  全身/半身图 URL: ${imageUrl.slice(0, 150)}...`);
+                    rpLog('info', 'IMG', `${tier.name} 生成成功: ${character.name}`);
                     character.portraitImageUrl = imageUrl;
                     await saveState();
-                    rpLog('info', 'IMG', `━━━━━━━━━ ${character.name} 生图完成 ━━━━━━━━━`);
                     return imageUrl;
                 }
             } catch (e) {
@@ -282,34 +242,27 @@ App.generateCharacterImage = async function(character) {
         }
 
         // 模块化全部失败，走备用
-        rpLog('warn', 'IMG', `⚠️ 模块化全部失败，使用备用 prompt: ${character.name}`);
+        rpLog('warn', 'IMG', `模块化全部失败，使用备用 prompt: ${character.name}`);
     }
 
     // 兜底：旧版 sanitize 流程
-    rpLog('info', 'IMG', `━━━ 兜底: 旧版 sanitize 流程 ━━━`);
     try {
         const oldPrompt = character.imagePrompt || '';
         if (oldPrompt) {
-            rpLog('info', 'IMG', `  旧版 imagePrompt: "${oldPrompt.slice(0, 200)}"`);
             const sanitized = App.sanitizeImagePrompt(oldPrompt, character);
-            rpLog('info', 'IMG', `  清洗后 prompt: "${sanitized.slice(0, 200)}"`);
             imageUrl = await App.agnesImageGen(sanitized);
-            if (imageUrl) {
-                rpLog('info', 'IMG', `✅ 旧版流程成功: ${imageUrl.slice(0, 150)}...`);
-                return imageUrl;
-            }
+            if (imageUrl) return imageUrl;
         }
     } catch (e) {
         rpLog('warn', 'IMG', `旧版 prompt 失败: ${e.message}`);
     }
 
     // 最终兜底：buildBackupPrompt
-    rpLog('info', 'IMG', `━━━ 最终兜底: buildBackupPrompt ━━━`);
+    rpLog('info', 'IMG', '使用最终备用 prompt: ' + character.name);
     const backup = App.buildBackupPrompt(character);
-    rpLog('info', 'IMG', `  Backup prompt: ${backup.slice(0, 200)}...`);
+    rpLog('debug', 'IMG', `Backup prompt: ${backup.slice(0, 120)}...`);
     imageUrl = await App.agnesImageGen(backup);
     if (!imageUrl) throw new Error('所有生图方式均失败');
-    rpLog('info', 'IMG', `━━━━━━━━━ ${character.name} 生图完成（兜底模式） ━━━━━━━━━`);
     return imageUrl;
 };
 
@@ -387,12 +340,9 @@ App.generatePlayerAvatar = async function() {
     const gender = state.player?.gender || '男';
     const pw = gender === '男' ? 'young man' : 'young woman';
     const appearance = gender === '男' ? 'handsome, sharp features' : 'beautiful, delicate features';
-    const artStyle = state.story?.imageStyle || 'anime';
-    const styleSuffix = App.artStyleSuffixes[artStyle] || App.artStyleSuffixes['anime'];
-    // 根据世界观风格动态调整服装描述，避免"现代休闲装"与古风/奇幻世界观冲突
-    const isFantasy = artStyle === 'ink wash' || artStyle === 'watercolor' || artStyle === 'cel shading';
-    const clothing = isFantasy ? 'traditional fantasy attire' : 'modern casual clothing';
-    const prompt = `Portrait of ${pw}, ${appearance}, ${clothing}, professional character concept art, detailed facial features${styleSuffix}`;
+    const artStyle = state.story?.imageStyle || 'akira toriyama style';
+    const styleSuffix = App.artStyleSuffixes[artStyle] || App.artStyleSuffixes['akira toriyama style'];
+    const prompt = `Portrait of ${pw}, ${appearance}, modern casual clothing, professional character concept art, detailed facial features${styleSuffix}`;
 
     console.log(`[主角] 开始生成头像 (性别: ${gender})`);
 
@@ -412,46 +362,7 @@ App.generatePlayerAvatar = async function() {
     }
 };
 
-// 安全词替换表：触发 400 内容安全拦截的高风险词汇
-const SAFETY_REPLACEMENTS = [
-    { pattern: /\btransparent\b/gi, replacements: ['sheer', 'flowing', 'ethereal'], label: 'transparent' },
-    { pattern: /\btattered\b/gi, replacements: ['torn', 'frayed', 'layered'], label: 'tattered' },
-    { pattern: /\bcrystal shards embedded\b/gi, replacements: ['crystal ornaments', 'crystal decorations'], label: 'crystal shards embedded' },
-    { pattern: /\bsemi-nude\b/gi, replacements: ['lightly dressed'], label: 'semi-nude' },
-    { pattern: /\bnude\b/gi, replacements: ['casually dressed'], label: 'nude' },
-    { pattern: /\bpin-up\b/gi, replacements: ['portrait'], label: 'pin-up' },
-    { pattern: /\bflesh-toned\b/gi, replacements: ['light-colored'], label: 'flesh-toned' },
-    { pattern: /\bunderwear\b/gi, replacements: ['clothing'], label: 'underwear' },
-    { pattern: /\blingerie\b/gi, replacements: ['casual wear'], label: 'lingerie' },
-    { pattern: /\bseductive\b/gi, replacements: ['charming'], label: 'seductive' },
-    { pattern: /\bfetish\b/gi, replacements: [''], label: 'fetish' },
-    { pattern: /\badult content\b/gi, replacements: [''], label: 'adult content' },
-    { pattern: /\bexplicit\b/gi, replacements: ['detailed'], label: 'explicit' },
-    { pattern: /\bNSFW\b/gi, replacements: [''], label: 'NSFW' },
-    { pattern: /\bsexy\b/gi, replacements: ['attractive'], label: 'sexy' },
-    { pattern: /\berotic\b/gi, replacements: ['beautiful'], label: 'erotic' },
-    { pattern: /\bsensual\b/gi, replacements: ['attractive'], label: 'sensual' },
-    { pattern: /\bbusty\b/gi, replacements: ['well-proportioned'], label: 'busty' },
-];
-
-// 安全词替换 + 返回替换详情（用于日志）
-function safeReplacePrompt(prompt) {
-    let result = prompt;
-    const replaced = [];
-    for (const rule of SAFETY_REPLACEMENTS) {
-        if (rule.pattern.test(result)) {
-            // 找到第一个可用的替代词
-            for (const replacement of rule.replacements) {
-                result = result.replace(rule.pattern, replacement);
-                replaced.push(`${rule.label} → "${replacement}"`);
-                break;
-            }
-        }
-    }
-    return { prompt: result, replaced };
-}
-
-// 生图 API 调用（带安全词替换 + trace ID）
+// 生图 API 调用
 App.agnesImageGen = async function(prompt, size = '256x341', model) {
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
@@ -461,19 +372,6 @@ App.agnesImageGen = async function(prompt, size = '256x341', model) {
         model = 'agnes-image-2.1-flash';
     }
 
-    rpLog('info', 'IMG-API', `━━━ 文生图请求 ━━━`);
-    rpLog('info', 'IMG-API', `  model: ${model}, size: ${size}`);
-    rpLog('info', 'IMG-API', `  prompt (${prompt.length}字): ${prompt.slice(0, 500)}`);
-
-    // 安全词替换
-    const safeResult = safeReplacePrompt(prompt);
-    if (safeResult.replaced.length > 0) {
-        rpLog('info', 'IMG-SAFETY', `安全词替换: ${safeResult.replaced.join(', ')}`);
-        prompt = safeResult.prompt;
-        rpLog('info', 'IMG-API', `  替换后 prompt: ${prompt.slice(0, 500)}`);
-    }
-
-    const startTime = Date.now();
     const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
         method: 'POST',
         headers: {
@@ -490,8 +388,6 @@ App.agnesImageGen = async function(prompt, size = '256x341', model) {
         signal: AbortSignal.timeout(120000)
     });
 
-    rpLog('info', 'IMG-API', `  请求状态: ${resp.status}, 耗时: ${Date.now()-startTime}ms`);
-
     if (!resp.ok) {
         let errMsg = `生图错误 (${resp.status})`;
         try {
@@ -500,24 +396,21 @@ App.agnesImageGen = async function(prompt, size = '256x341', model) {
         } catch(e) {
             errMsg = `生图错误 (${resp.status}): ${await resp.text()}`;
         }
-        rpLog('error', 'IMG-API', `❌ 生图失败: ${errMsg}`);
-        rpLog('error', 'IMG-API', `  触发失败的 prompt: ${prompt.slice(0, 500)}`);
+        console.error('生图API响应:', errMsg);
         throw new Error(errMsg);
     }
 
     const data = await resp.json();
-    rpLog('info', 'IMG-API', `  API 返回: ${JSON.stringify(data).slice(0, 500)}`);
+    console.log('生图API返回:', JSON.stringify(data).slice(0, 200));
     const imgUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
     if (!imgUrl) {
-        rpLog('error', 'IMG-API', `❌ 返回数据异常，无 URL: ${JSON.stringify(data).slice(0, 500)}`);
+        console.error('生图返回数据异常:', JSON.stringify(data).slice(0, 500));
         throw new Error('未获取到图片 URL，API 返回格式异常');
     }
-    rpLog('info', 'IMG-API', `✅ 生图成功: ${imgUrl.slice(0, 200)}...`);
     return imgUrl;
 };
 
 // === img2img 变体：传入面部参考图，确保面部一致性 ===
-// 注意：面部参考图 URL 可能过期，需要重新下载后用 base64 传入
 App.agnesImageGenWithRefImg = async function(prompt, faceImageUrl, size = '256x341') {
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
@@ -527,13 +420,9 @@ App.agnesImageGenWithRefImg = async function(prompt, faceImageUrl, size = '256x3
         throw new Error('缺少面部参考图 URL');
     }
 
-    rpLog('info', 'IMG-IMG2IMG', `━━━ img2img 请求开始 ━━━`);
-    rpLog('info', 'IMG-IMG2IMG', `  参考图 URL: ${faceImageUrl.slice(0, 200)}...`);
-    rpLog('info', 'IMG-IMG2IMG', `  prompt: ${prompt.slice(0, 300)}`);
-    rpLog('info', 'IMG-IMG2IMG', `  strength: 0.35, size: ${size}`);
+    rpLog('info', 'IMG', `img2img: 使用面部参考图生图`);
 
-    // 尝试先直接用 URL
-    let resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
+    const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -545,52 +434,10 @@ App.agnesImageGenWithRefImg = async function(prompt, faceImageUrl, size = '256x3
             image: [faceImageUrl],
             size: size,
             n: 1,
-            strength: 0.35,
             extra_body: { response_format: 'url' }
         }),
         signal: AbortSignal.timeout(120000)
     });
-
-    rpLog('info', 'IMG-IMG2IMG', `  首次请求状态: ${resp.status}`);
-
-    // 如果 URL 过期（400/404），下载图片后用 base64 重试
-    if (!resp.ok) {
-        rpLog('warn', 'IMG-IMG2IMG', `URL 可能已过期 (${resp.status})，尝试用 base64 重试`);
-        try {
-            const imgResp = await fetch(faceImageUrl);
-            if (imgResp.ok) {
-                const blob = await imgResp.blob();
-                rpLog('info', 'IMG-IMG2IMG', `  参考图下载成功: ${blob.type}, ${blob.size} bytes`);
-                const reader = new FileReader();
-                const base64Promise = new Promise((resolve) => {
-                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                    reader.readAsDataURL(blob);
-                });
-                const base64Data = await base64Promise;
-                
-                rpLog('info', 'IMG-IMG2IMG', `  base64 参考图上传成功 (长度=${base64Data.length})，重新发送 img2img 请求`);
-                resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model: 'agnes-image-2.1-flash',
-                        prompt: prompt,
-                        image: [`data:image/png;base64,${base64Data}`],
-                        size: size,
-                        n: 1,
-                        strength: 0.35,
-                        extra_body: { response_format: 'url' }
-                    }),
-                    signal: AbortSignal.timeout(120000)
-                });
-            }
-        } catch (e) {
-            rpLog('error', 'IMG-IMG2IMG', `base64 重试也失败: ${e.message}`);
-        }
-    }
 
     if (!resp.ok) {
         let errMsg = `img2img 生图错误 (${resp.status})`;
@@ -600,17 +447,15 @@ App.agnesImageGenWithRefImg = async function(prompt, faceImageUrl, size = '256x3
         } catch(e) {
             errMsg = `生图错误 (${resp.status}): ${await resp.text()}`;
         }
-        rpLog('error', 'IMG-IMG2IMG', `❌ 最终请求失败: ${errMsg}`);
+        console.error('img2img API 响应:', errMsg);
         throw new Error(errMsg);
     }
 
     const data = await resp.json();
-    rpLog('info', 'IMG-IMG2IMG', `  API 返回数据: ${JSON.stringify(data).slice(0, 300)}`);
     const imgUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
     if (!imgUrl) {
-        rpLog('error', 'IMG-IMG2IMG', `❌ 返回数据异常，无 URL: ${JSON.stringify(data).slice(0, 500)}`);
+        console.error('img2img 返回数据异常:', JSON.stringify(data).slice(0, 500));
         throw new Error('未获取到图片 URL');
     }
-    rpLog('info', 'IMG-IMG2IMG', `✅ img2img 成功: ${imgUrl.slice(0, 200)}...`);
     return imgUrl;
 };

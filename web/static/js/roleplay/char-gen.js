@@ -201,7 +201,7 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
         } else if (!imagePrompt && hasAnyModule) {
             const gender = c.gender === '男' ? 'male' : c.gender === '女' ? 'female' : 'person';
             const safeName = (c.name || 'unknown').replace(/[\u4e00-\u9fff]/g, '').trim() || 'unknown';
-            imagePrompt = `Portrait of ${safeName}, ${c.age || 20} year old ${gender}, ${modules.imageFace || 'detailed facial features'}, ${modules.imageStyle || 'anime'}`;
+            imagePrompt = `Portrait of ${safeName}, ${c.age || 20} year old ${gender}, ${modules.imageFace || 'detailed facial features'}, ${modules.imageStyle || 'akira toriyama style'}`;
             rpLog('info', 'CHARS', `角色 #${i} "${c.name}" 有模块化字段但无 imagePrompt，已生成兼容 prompt (safeName=${safeName})`);
         }
 

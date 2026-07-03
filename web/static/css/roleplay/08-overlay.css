@@ -169,12 +169,19 @@
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 4px;
-    color: #ffffff;
     font-size: 0.9rem;
+    line-height: 1.5;
 }
-.story-field-wrap {
-    white-space: pre-wrap;
-    line-height: 1.6;
-    font-size: 0.85rem;
+.story-field.story-title-field {
+    color: #ffffff;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+}
+.story-field.worldview-field {
     color: var(--text);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    min-height: 60px;
 }

@@ -13,7 +13,7 @@
  */
 export function buildCharPrompt(count, playerGender, inspiration, genderHint, state) {
     const pg = playerGender || state.player?.gender || '男';
-    const visualStyle = state.story?.imageStyle || 'cel shading';
+    const visualStyle = state.story?.imageStyle || 'akira toriyama style';
     const worldview = state.story.worldview || '未设定';
     const title = state.story.title || '';
     const mainArc = (state.story.mainArc || []).map(a => `・${a.phase}：${a.description}`).join('\\n');

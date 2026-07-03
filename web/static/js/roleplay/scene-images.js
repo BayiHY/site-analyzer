@@ -22,8 +22,7 @@ App.isSceneChanged = function(charName, sceneDesc) {
 App.sceneToImagePrompt = function(sceneDesc, character, worldview, allCharacters, replyText) {
     // 1. 环境描述：从 sceneDesc 中提取纯环境部分，去掉引号内的对话
     let envDesc = sceneDesc
-        .replace(/[""」"""]/g, '')           // 去掉引号
-        .replace(/[^.。！!?]*[""」"""][^.。！!?]*/g, '')  // 去掉引号及之间的内容
+        .replace(/[""”“]/g, '')           // 去掉引号
         .trim();
     let base = `Cinematic scene illustration: ${envDesc}.`;
 
@@ -47,24 +46,9 @@ App.sceneToImagePrompt = function(sceneDesc, character, worldview, allCharacters
         base += '.' + charDesc;
     }
 
-    // 3. 其他在场角色：只从 replyText 中提取实际在场的角色，不把所有角色都加进去
+    // 3. 其他在场角色：名字 + 外貌（不加动作，避免复杂化）
     if (allCharacters && allCharacters.length > 1) {
-        // 提前构建角色名集合
-        const charNameSet = new Set(allCharacters.map(c => c.name));
-
-        // 从 replyText 中解析实际出现的角色名
-        const replyCleaned = replyText ? replyText.replace(/\{[^}]+\}/, '').replace(/<[^>]+>$/, '').trim() : '';
-        const presentNames = new Set();
-        const namePattern = /([^\s|:：]{1,10})[:：](?!\s*\()/g;
-        let nm;
-        while ((nm = namePattern.exec(replyCleaned)) !== null) {
-            const n = nm[1].trim();
-            if (n && /[^\s]/.test(n) && charNameSet.has(n)) {
-                presentNames.add(n);
-            }
-        }
-        // 过滤掉当前角色，只保留其他在场角色
-        const others = allCharacters.filter(c => c.name !== character?.name && presentNames.has(c.name));
+        const others = allCharacters.filter(c => c.name !== character?.name);
         if (others.length > 0) {
             const otherDescs = others.map(c => {
                 let desc = `${c.name}`;
@@ -73,32 +57,52 @@ App.sceneToImagePrompt = function(sceneDesc, character, worldview, allCharacters
             }).join(', ');
             base += ` Other characters present: ${otherDescs}.`;
         }
-        // 记录在场角色判定过程
-        rpLog('info', 'SCENE-BUILD', `场景描述原文包含角色: ${[...presentNames].join(', ') || '无'}, 活跃角色白名单: ${[...charNameSet].join(', ')}, 过滤后其他在场: ${others.map(c=>c.name).join(', ') || '无'}`);
     }
 
     // 4. 背景约束
     base += ' Background: empty or blurred, NO other people clearly visible.';
     base += '. High quality, detailed lighting, atmospheric.';
     const finalPrompt = App.appendArtStyle(base);
-
+    
     rpLog('info', 'SCENE', `📝 场景图 Prompt (${finalPrompt.length}字): ${finalPrompt}`);
     return finalPrompt;
 }
 
-// === 获取场景中出现的角色头像 URL（正则解析） ===
-App.getSceneCharacterFaceUrls = function(replyText, allCharacters) {
-    if (!replyText) {
-        // 没有回复文本（如初始场景图），返回所有有面部图的角色的参考图
+// === 获取场景中出现的所有角色（参考图） ===
+// 优先使用结构化元数据中的 presentCharacters，fallback 到正则解析
+App.getSceneCharacterFaceUrls = function(replyText, allCharacters, metadata) {
+    // 如果有结构化元数据且包含 presentCharacters，直接使用
+    if (metadata && metadata.presentCharacters && metadata.presentCharacters.length > 0) {
         const urls = [];
         for (const char of (allCharacters || [])) {
-            if (char.faceImageUrl) {
+            if (char.faceImageUrl && metadata.presentCharacters.includes(char.name)) {
                 urls.push(char.faceImageUrl);
             }
         }
-        rpLog('info', 'SCENE', `✅ 初始场景参考图: ${urls.length} 张（所有角色）`);
-        return urls;
+        if (urls.length > 0) {
+            rpLog('info', 'SCENE', `✅ 使用结构化元数据: presentCharacters=${JSON.stringify(metadata.presentCharacters)}`);
+            return urls;
+        }
+        rpLog('info', 'SCENE', `⚠️ 结构化元数据 presentCharacters=${JSON.stringify(metadata.presentCharacters)} 但找不到匹配的角色头像，fallback 正则`);
+    } else {
+        rpLog('info', 'SCENE', `⚠️ 无结构化元数据 (metadata=${!!metadata}), fallback 正则解析`);
     }
+    
+    // Fallback: 正则解析
+    return App._getSceneCharacterFaceUrlsRegex(replyText, allCharacters);
+}
+
+// 正则解析版本（旧逻辑，作为 fallback）
+App._getSceneCharacterFaceUrlsRegex = function(replyText, allCharacters) {
+    if (!replyText) {
+        // 无回复文本时只返回当前活跃角色的参考图
+        const activeChar = allCharacters && allCharacters.length > 0 ? allCharacters[0] : null;
+        if (activeChar && activeChar.faceImageUrl) {
+            return [activeChar.faceImageUrl];
+        }
+        return [];
+    }
+    // 提取出场角色名
     const sceneMatch = replyText.match(/\{([^}]+)\}/);
     let cleaned = replyText;
     if (sceneMatch) {
@@ -106,26 +110,28 @@ App.getSceneCharacterFaceUrls = function(replyText, allCharacters) {
     }
     cleaned = cleaned.replace(/<[^>]+>$/, '').trim();
     
-    // 提前构建角色名集合，用于过滤非角色名
-    const charNameSet = new Set((allCharacters || []).map(c => c.name));
-    
     const presentNames = new Set();
+    // 匹配 角色名:(动作) 或 角色名:对话
     const namePattern = /([^\s|:：]{1,10})[:：](?!\s*\()/g;
     let nm;
     while ((nm = namePattern.exec(cleaned)) !== null) {
         const name = nm[1].trim();
-        // 只保留已知的角色名，过滤掉描述性短语如"女性主角"、"高阶监察员"等
-        if (name && /[^\s]/.test(name) && charNameSet.has(name)) {
+        if (name && /[^\s]/.test(name)) {
             presentNames.add(name);
         }
     }
+    // 也匹配无角色名的 (动作) 开头
     const loneAction = cleaned.match(/^\(([^)]+)\)/);
     if (!loneAction || presentNames.size === 0) {
+        // 如果没有解析到命名角色，至少包含当前角色
         if (allCharacters && allCharacters.length > 0) {
             presentNames.add(allCharacters[0].name);
         }
     }
     
+    // 关键验证：只保留在角色列表中实际存在的名字
+    // 过滤掉误匹配的文本片段（如"空气凝固。你面临选择"）
+    const charNameSet = new Set((allCharacters || []).map(c => c.name));
     const validNames = new Set();
     for (const name of presentNames) {
         if (charNameSet.has(name)) {
@@ -136,6 +142,8 @@ App.getSceneCharacterFaceUrls = function(replyText, allCharacters) {
         rpLog('info', 'SCENE', `⚠️ 过滤非角色名: ${[...presentNames].join(', ')} → ${[...validNames].join(', ')}`);
     }
     
+    // 不再 fallback 到全部角色 —— 现场有几个角色就用几个角色的参考
+    // 同时检测主角是否在场景中互动，如果是则加入主角参考图
     const urls = [];
     for (const char of (allCharacters || [])) {
         if (char.faceImageUrl && validNames.has(char.name)) {
@@ -143,6 +151,7 @@ App.getSceneCharacterFaceUrls = function(replyText, allCharacters) {
         }
     }
     
+    // 检测主角是否在场：检查 replyText 中是否有 "你" 或主角名
     if (replyText && state.player && state.player.faceImageUrl) {
         const playerName = state.player.name;
         const playerInScene = replyText.includes('你') || 
@@ -159,7 +168,7 @@ App.getSceneCharacterFaceUrls = function(replyText, allCharacters) {
     return urls;
 }
 
-// === 获取主角头像 URL ===
+// === 获取主角头像 URL（用于场景图 img2img 参考） ===
 App.getPlayerFaceUrl = function() {
     if (state.player && state.player.faceImageUrl) {
         return state.player.faceImageUrl;
@@ -167,7 +176,7 @@ App.getPlayerFaceUrl = function() {
     return null;
 }
 
-// === 获取活跃角色头像 URL ===
+// === 获取活跃角色头像 URL（用于场景图 img2img 参考） ===
 App.getActiveCharacterFaceUrl = function() {
     const activeChar = state.characters[state.activeCharIndex];
     if (activeChar && activeChar.faceImageUrl) {
@@ -176,7 +185,7 @@ App.getActiveCharacterFaceUrl = function() {
     return null;
 }
 
-// === 获取所有有头像的角色 URL 列表 ===
+// === 获取所有有头像的角色 URL 列表（多图参考） ===
 App.getAllCharacterFaceUrls = function() {
     const urls = [];
     for (const char of state.characters) {
@@ -192,6 +201,7 @@ App.applySceneBackground = function(imageUrl) {
     const chatScreen = document.getElementById('chat-screen');
     if (!chatScreen) return;
     if (imageUrl) {
+        // 用 fixed 定位的背景层，不随内容滚动
         let bgLayer = document.getElementById('scene-bg-layer');
         if (!bgLayer) {
             bgLayer = document.createElement('div');
@@ -205,9 +215,7 @@ App.applySceneBackground = function(imageUrl) {
         if (bgLayer) bgLayer.style.backgroundImage = '';
     }
 }
-
-// === 初始场景图生成（角色头像完成后调用） ===
-App.generateInitialSceneImage = async function(openingScene, replyText) {
+App.generateInitialSceneImage = async function(openingScene, replyText, metadata) {
     if (!openingScene) return;
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
@@ -217,18 +225,17 @@ App.generateInitialSceneImage = async function(openingScene, replyText) {
 
     const activeChar = state.characters[state.activeCharIndex];
     const worldview = state.story?.worldview || '';
-
-    // 修复：使用 replyText（实际回复文本）而非 openingScene 来判定在场角色
-    const effectiveReplyText = replyText || openingScene;
-    const prompt = App.sceneToImagePrompt(openingScene, activeChar, worldview, state.characters, effectiveReplyText);
+    const prompt = App.sceneToImagePrompt(openingScene, activeChar, worldview, state.characters, replyText);
 
     try {
         rpLog('info', 'SCENE', '=== 初始场景图生成开始 ===');
         rpLog('info', 'SCENE', `场景描述: ${openingScene.slice(0, 100)}`);
+        rpLog('info', 'SCENE', `世界观: ${(worldview || '').slice(0, 80)}`);
         rpLog('info', 'SCENE', `活跃角色: ${activeChar?.name || '无'}`);
+        rpLog('info', 'SCENE', `角色外貌: ${(activeChar?.appearance || '无').slice(0, 60)}`);
 
-        // 修复：初始场景图使用 openingScene 本身作为 replyText 来判定在场角色
-        const sceneRefs = App.getSceneCharacterFaceUrls(openingScene, state.characters);
+        // 只传入场景中实际出现的角色参考图
+        const sceneRefs = App.getSceneCharacterFaceUrls(replyText || openingScene, state.characters, metadata);
         const requestBody = {
             model: 'agnes-image-2.1-flash',
             prompt: prompt,
@@ -240,12 +247,17 @@ App.generateInitialSceneImage = async function(openingScene, replyText) {
         if (sceneRefs.length > 0) {
             requestBody.extra_body.image = sceneRefs;
             rpLog('info', 'SCENE', `✅ 场景参考图: ${sceneRefs.length} 张（仅在场角色）`);
+            sceneRefs.forEach((url, i) => {
+                rpLog('info', 'SCENE', `  参考图#${i+1}: ${url.slice(0, 120)}`);
+            });
         } else {
             rpLog('warn', 'SCENE', '❌ 暂无角色头像，将使用文生图模式');
         }
 
+        rpLog('info', 'SCENE', `📦 API 请求体: model=${requestBody.model}, size=${requestBody.size}, refs=${sceneRefs.length}`);
+        rpLog('info', 'SCENE', `📝 完整请求体: ${JSON.stringify(requestBody).slice(0, 2000)}`);
+
         rpLog('info', 'TIMEOUT', `生图请求开始: initial_scene`);
-        rpLog('info', 'SCENE', '[TRACE:initial_scene] 生图请求已开始');
         const imgStart = Date.now();
         const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
             method: 'POST',
@@ -263,6 +275,7 @@ App.generateInitialSceneImage = async function(openingScene, replyText) {
         if (!resp.ok) {
             const errText = await resp.text().catch(() => '(无法读取)');
             rpLog('error', 'SCENE', `❌ 初始场景图生成失败: status=${resp.status}`);
+            rpLog('info', 'SCENE', `📋 完整错误响应: ${errText.slice(0, 1000)}`);
             return;
         }
 
@@ -274,6 +287,9 @@ App.generateInitialSceneImage = async function(openingScene, replyText) {
         }
 
         rpLog('info', 'SCENE', `✅ 初始场景图生成成功`);
+        rpLog('debug', 'SCENE', `图片 URL: ${imgUrl.slice(0, 100)}...`);
+
+        // 保存状态并设为背景
         state.currentSceneBg = imgUrl;
         if (!state.sceneHistory) state.sceneHistory = [];
         state.sceneHistory.push({
@@ -283,6 +299,8 @@ App.generateInitialSceneImage = async function(openingScene, replyText) {
             timestamp: new Date().toISOString()
         });
         await saveState();
+
+        // 应用为背景图
         App.applySceneBackground(imgUrl);
 
     } catch (err) {
@@ -290,8 +308,8 @@ App.generateInitialSceneImage = async function(openingScene, replyText) {
     }
 }
 
-// === 聊天中场景变化时生成新场景图 ===
-App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText) {
+// === 聊天中场景变化时生成新场景图（静默更新背景，不插入消息）===
+App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText, metadata) {
     if (!sceneDesc) return;
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
@@ -305,6 +323,7 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText)
         rpLog('info', 'SCENE', '=== 场景图生成开始 ===');
         rpLog('info', 'SCENE', `角色: ${charName}`);
         rpLog('info', 'SCENE', `场景描述: ${sceneDesc.slice(0, 100)}`);
+        rpLog('info', 'SCENE', `角色外貌: ${(charObj?.appearance || '无').slice(0, 60)}`);
 
         const requestBody = {
             model: 'agnes-image-2.1-flash',
@@ -314,13 +333,20 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText)
             extra_body: { response_format: 'url' }
         };
 
-        const sceneRefs = App.getSceneCharacterFaceUrls(replyText, state.characters);
+        // 只传入场景中实际出现的角色参考图
+        const sceneRefs = App.getSceneCharacterFaceUrls(replyText, state.characters, metadata);
         if (sceneRefs.length > 0) {
             requestBody.extra_body.image = sceneRefs;
             rpLog('info', 'SCENE', `✅ 场景参考图: ${sceneRefs.length} 张（仅在场角色）`);
+            sceneRefs.forEach((url, i) => {
+                rpLog('info', 'SCENE', `  参考图#${i+1}: ${url.slice(0, 120)}`);
+            });
         } else {
             rpLog('warn', 'SCENE', '❌ 暂无角色头像，将使用文生图模式');
         }
+
+        rpLog('info', 'SCENE', `📦 API 请求体: model=${requestBody.model}, size=${requestBody.size}, refs=${sceneRefs.length}`);
+        rpLog('info', 'SCENE', `📝 完整请求体: ${JSON.stringify(requestBody).slice(0, 2000)}`);
 
         rpLog('info', 'TIMEOUT', `生图请求开始: chat_scene (${charName})`);
         const imgStart = Date.now();
@@ -340,6 +366,7 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText)
         if (!resp.ok) {
             const errText = await resp.text().catch(() => '(无法读取)');
             rpLog('error', 'SCENE', `❌ 场景图生成失败: status=${resp.status}`);
+            rpLog('info', 'SCENE', `📋 完整错误响应: ${errText.slice(0, 1000)}`);
             return;
         }
 
@@ -351,6 +378,9 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText)
         }
 
         rpLog('info', 'SCENE', `✅ 场景图生成成功`);
+        rpLog('info', 'SCENE', `图片 URL: ${imgUrl.slice(0, 120)}`);
+
+        // 更新状态
         state.currentSceneBg = imgUrl;
         if (!state.sceneHistory) state.sceneHistory = [];
         state.sceneHistory.push({
@@ -360,6 +390,8 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText)
             timestamp: new Date().toISOString()
         });
         await saveState();
+
+        // 更新聊天窗口背景
         App.applySceneBackground(imgUrl);
 
     } catch (err) {
