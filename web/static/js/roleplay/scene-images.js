@@ -245,6 +245,7 @@ App.generateInitialSceneImage = async function(openingScene, replyText) {
         }
 
         rpLog('info', 'TIMEOUT', `生图请求开始: initial_scene`);
+        rpLog('info', 'SCENE', '[TRACE:initial_scene] 生图请求已开始');
         const imgStart = Date.now();
         const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
             method: 'POST',

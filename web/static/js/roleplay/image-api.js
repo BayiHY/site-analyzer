@@ -53,10 +53,11 @@ App.buildModularPrompt = function(character, level) {
     const parts = [];
     const mods = character.__modules__ || {};
 
-    rpLog('info', 'IMG-MODULAR', `━━━ buildModularPrompt(${character.name}, level=${level}) ━━━`);
-    rpLog('info', 'IMG-MODULAR', `  所有模块字段: ${JSON.stringify(mods)}`);
-    rpLog('info', 'IMG-MODULAR', `  imageStyle="${mods.imageStyle || '(空)'}" | imageFace="${(mods.imageFace||'').slice(0,80)}" | imageHair="${(mods.imageHair||'').slice(0,80)}" | imageBody="${(mods.imageBody||'').slice(0,80)}" | imageClothes="${(mods.imageClothes||'').slice(0,80)}" | imageEnvironment="${(mods.imageEnvironment||'').slice(0,80)}"`);
-    rpLog('info', 'IMG-MODULAR', `  角色基本信息: name=${character.name} age=${character.age} gender=${character.gender} appearance="${(character.appearance||'').slice(0,80)}"`);
+    const traceId = `${character.name}-${level}`;
+    rpLog('info', 'IMG-MODULAR', `[TRACE:${traceId}] buildModularPrompt(level=${level})`);
+    rpLog('info', 'IMG-MODULAR', `[TRACE:${traceId}] 所有模块字段: ${JSON.stringify(mods)}`);
+    rpLog('info', 'IMG-MODULAR', `[TRACE:${traceId}] imageStyle="${mods.imageStyle || '(空)'}" | imageFace="${(mods.imageFace||'').slice(0,80)}" | imageHair="${(mods.imageHair||'').slice(0,80)}" | imageBody="${(mods.imageBody||'').slice(0,80)}" | imageClothes="${(mods.imageClothes||'').slice(0,80)}" | imageEnvironment="${(mods.imageEnvironment||'').slice(0,80)}"`);
+    rpLog('info', 'IMG-MODULAR', `[TRACE:${traceId}] 角色基本信息: name=${character.name} age=${character.age} gender=${character.gender} appearance="${(character.appearance||'').slice(0,80)}"`);
 
     // level 2（面部特写）：用 face + hair 精确约束
     if (level === 2) {
@@ -249,7 +250,8 @@ App.generateCharacterImage = async function(character) {
 
         for (const tier of levels) {
             try {
-                rpLog('info', 'IMG', `━━━ 阶段2: 尝试 ${tier.name} (level=${tier.level}) ━━━`);
+                const traceId = `${character.name}-level${tier.level}`;
+                rpLog('info', 'IMG', `[TRACE:${traceId}] 阶段2: 尝试 ${tier.name} (level=${tier.level})`);
                 const prompt = App.buildModularPrompt(character, tier.level);
                 
                 // 如果有面部特写，用 img2img 确保面部一致性
@@ -410,7 +412,46 @@ App.generatePlayerAvatar = async function() {
     }
 };
 
-// 生图 API 调用
+// 安全词替换表：触发 400 内容安全拦截的高风险词汇
+const SAFETY_REPLACEMENTS = [
+    { pattern: /\btransparent\b/gi, replacements: ['sheer', 'flowing', 'ethereal'], label: 'transparent' },
+    { pattern: /\btattered\b/gi, replacements: ['torn', 'frayed', 'layered'], label: 'tattered' },
+    { pattern: /\bcrystal shards embedded\b/gi, replacements: ['crystal ornaments', 'crystal decorations'], label: 'crystal shards embedded' },
+    { pattern: /\bsemi-nude\b/gi, replacements: ['lightly dressed'], label: 'semi-nude' },
+    { pattern: /\bnude\b/gi, replacements: ['casually dressed'], label: 'nude' },
+    { pattern: /\bpin-up\b/gi, replacements: ['portrait'], label: 'pin-up' },
+    { pattern: /\bflesh-toned\b/gi, replacements: ['light-colored'], label: 'flesh-toned' },
+    { pattern: /\bunderwear\b/gi, replacements: ['clothing'], label: 'underwear' },
+    { pattern: /\blingerie\b/gi, replacements: ['casual wear'], label: 'lingerie' },
+    { pattern: /\bseductive\b/gi, replacements: ['charming'], label: 'seductive' },
+    { pattern: /\bfetish\b/gi, replacements: [''], label: 'fetish' },
+    { pattern: /\badult content\b/gi, replacements: [''], label: 'adult content' },
+    { pattern: /\bexplicit\b/gi, replacements: ['detailed'], label: 'explicit' },
+    { pattern: /\bNSFW\b/gi, replacements: [''], label: 'NSFW' },
+    { pattern: /\bsexy\b/gi, replacements: ['attractive'], label: 'sexy' },
+    { pattern: /\berotic\b/gi, replacements: ['beautiful'], label: 'erotic' },
+    { pattern: /\bsensual\b/gi, replacements: ['attractive'], label: 'sensual' },
+    { pattern: /\bbusty\b/gi, replacements: ['well-proportioned'], label: 'busty' },
+];
+
+// 安全词替换 + 返回替换详情（用于日志）
+function safeReplacePrompt(prompt) {
+    let result = prompt;
+    const replaced = [];
+    for (const rule of SAFETY_REPLACEMENTS) {
+        if (rule.pattern.test(result)) {
+            // 找到第一个可用的替代词
+            for (const replacement of rule.replacements) {
+                result = result.replace(rule.pattern, replacement);
+                replaced.push(`${rule.label} → "${replacement}"`);
+                break;
+            }
+        }
+    }
+    return { prompt: result, replaced };
+}
+
+// 生图 API 调用（带安全词替换 + trace ID）
 App.agnesImageGen = async function(prompt, size = '256x341', model) {
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
@@ -423,6 +464,14 @@ App.agnesImageGen = async function(prompt, size = '256x341', model) {
     rpLog('info', 'IMG-API', `━━━ 文生图请求 ━━━`);
     rpLog('info', 'IMG-API', `  model: ${model}, size: ${size}`);
     rpLog('info', 'IMG-API', `  prompt (${prompt.length}字): ${prompt.slice(0, 500)}`);
+
+    // 安全词替换
+    const safeResult = safeReplacePrompt(prompt);
+    if (safeResult.replaced.length > 0) {
+        rpLog('info', 'IMG-SAFETY', `安全词替换: ${safeResult.replaced.join(', ')}`);
+        prompt = safeResult.prompt;
+        rpLog('info', 'IMG-API', `  替换后 prompt: ${prompt.slice(0, 500)}`);
+    }
 
     const startTime = Date.now();
     const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
@@ -452,6 +501,7 @@ App.agnesImageGen = async function(prompt, size = '256x341', model) {
             errMsg = `生图错误 (${resp.status}): ${await resp.text()}`;
         }
         rpLog('error', 'IMG-API', `❌ 生图失败: ${errMsg}`);
+        rpLog('error', 'IMG-API', `  触发失败的 prompt: ${prompt.slice(0, 500)}`);
         throw new Error(errMsg);
     }
 

@@ -113,6 +113,40 @@ App.initializeStory = async function(userInspiration, playerGender) {
         }
     }
 
+    // ===== 角色名一致性修复：将 openingScene 中的旧角色名替换为实际生成的角色名 =====
+    // 根因：世界观生成时 LLM 自由决定角色名（如"夜鸢""烬"），角色生成时 LLM 又自由决定（如"凛""绯"）
+    // 解决：用实际角色名替换 openingScene 中出现的所有旧名
+    const oldNamesInOpening = extractNamesFromText(state.story.openingScene || '');
+    const actualNames = state.characters.map(c => c.name);
+    
+    if (oldNamesInOpening.length > 0 && actualNames.length > 0) {
+        rpLog('INFO', 'WORLDVIEW-SYNC', `开场场景旧角色名: [${oldNamesInOpening.join(', ')}], 实际角色名: [${actualNames.join(', ')}]`);
+        
+        // 检查一致性
+        const inconsistent = oldNamesInOpening.filter(n => !actualNames.includes(n));
+        if (inconsistent.length > 0) {
+            rpLog('warn', 'WORLDVIEW-SYNC', `⚠️ 角色名不一致: 开场场景使用了 [${inconsistent.join(', ')}] 但实际角色是 [${actualNames.join(', ')}]`);
+            
+            // 尝试智能映射：如果名字数量相同，按顺序替换
+            if (oldNamesInOpening.length === actualNames.length && oldNamesInOpening.length <= 5) {
+                let syncedScene = state.story.openingScene;
+                for (let i = 0; i < oldNamesInOpening.length; i++) {
+                    const oldName = oldNamesInOpening[i];
+                    const newName = actualNames[i % actualNames.length];
+                    // 用正则全局替换，避免部分匹配（用单词边界）
+                    const escapedOld = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    syncedScene = syncedScene.replace(new RegExp(escapedOld, 'g'), newName);
+                }
+                state.story.openingScene = syncedScene;
+                rpLog('info', 'WORLDVIEW-SYNC', `✅ 开场场景角色名已同步: ${oldNamesInOpening.join(', ')} → ${actualNames.join(', ')}`);
+            } else {
+                rpLog('warn', 'WORLDVIEW-SYNC', `⚠️ 名字数量不匹配 (${oldNamesInOpening.length} vs ${actualNames.length})，无法自动映射，将在 content-parser.js 中用模糊匹配兜底`);
+            }
+        } else {
+            rpLog('info', 'WORLDVIEW-SYNC', `✅ 角色名一致，无需同步`);
+        }
+    }
+    
     // 解析序章：从 openingScene 中提取 <建议回复> 并渲染为多角色消息格式
     const openingRaw = state.story.openingScene || '';
     rpLog('INFO', 'INIT-REPLY', `开场场景原始文本 (长度=${openingRaw.length}): "${openingRaw.substring(0, 150)}..."`);
@@ -154,4 +188,28 @@ App.initializeStory = async function(userInspiration, playerGender) {
 
     rpLog('info', 'INIT', '初始化完成，进入聊天阶段');
     updateGenerationControls();
+}
+
+// ===== 辅助函数：从文本中提取可能的角色名 =====
+// 策略：匹配 "名字 + 动词/标点" 的模式
+function extractNamesFromText(text) {
+    if (!text) return [];
+    const names = new Set();
+    // 匹配 "名字蹲在/名字冷冷/名字看着" 等模式
+    const patterns = [
+        /([^\s你]{2,4})(?:蹲在|冷冷|看着|说道|问道|回答|站|走|坐|靠|望|说|道|问|笑|皱眉|叹息|轻哼|低语|喃喃|嘟囔|开口|出声|转头|转身|迈步|停下|靠近|后退|伸手|握紧|松开|举起|放下|抱起|推开|拉开|关上|打开|点亮|熄灭|收起|拿出|掏出|翻找|查看|检查|打量|凝视|注视|盯着|瞥了一眼|扫过|环顾|低头|仰头|侧身|正身|弯腰|直起身)/g,
+        // 匹配 "名字 + 冒号" 模式（对话前缀）
+        /([^\s你]{2,4})(?:[:：]\s*[「"])/g,
+    ];
+    for (const pattern of patterns) {
+        let m;
+        while ((m = pattern.exec(text)) !== null) {
+            const name = m[1].trim();
+            if (name && name.length >= 2 && name.length <= 4 && /[\u4e00-\u9fa5a-zA-Z]/.test(name)) {
+                names.add(name);
+            }
+            pattern.lastIndex = 0;
+        }
+    }
+    return [...names];
 }
