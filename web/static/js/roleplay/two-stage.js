@@ -104,8 +104,10 @@ App.initializeStory = async function(userInspiration, playerGender) {
             if (state.story.openingScene) {
                 rpLog('info', 'SCENE', '角色头像全部完成，开始生成初始场景图');
                 addSystemMessage('🖼️ 正在生成场景图...');
+                rpLog('info', 'TIMING', `场景图生成前 openingScene 长度: ${state.story.openingScene.length}`);
                 await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene);
                 rpLog('info', 'SCENE', '初始场景图生成完成');
+                rpLog('info', 'TIMING', '✅ 场景图生成完成，耗时已记录');
             }
         } catch (imgErr) {
             rpLog('error', 'IMG', '头像/场景图生成失败: ' + imgErr.message);
@@ -116,7 +118,9 @@ App.initializeStory = async function(userInspiration, playerGender) {
     // ===== 角色名一致性修复：将 openingScene 中的旧角色名替换为实际生成的角色名 =====
     // 根因：世界观生成时 LLM 自由决定角色名（如"夜鸢""烬"），角色生成时 LLM 又自由决定（如"凛""绯"）
     // 解决：用实际角色名替换 openingScene 中出现的所有旧名
+    rpLog('info', 'TIMING', '=== 开始角色名同步 ===');
     const oldNamesInOpening = extractNamesFromText(state.story.openingScene || '');
+    rpLog('info', 'TIMING', `extractNamesFromText 完成: 找到 ${oldNamesInOpening.length} 个旧名`);
     const actualNames = state.characters.map(c => c.name);
     
     if (oldNamesInOpening.length > 0 && actualNames.length > 0) {
@@ -146,13 +150,16 @@ App.initializeStory = async function(userInspiration, playerGender) {
             rpLog('info', 'WORLDVIEW-SYNC', `✅ 角色名一致，无需同步`);
         }
     }
+    rpLog('info', 'TIMING', '✅ 角色名同步完成');
     
     // 解析序章：从 openingScene 中提取 <建议回复> 并渲染为多角色消息格式
+    rpLog('info', 'TIMING', '=== 开始解析序章 ===');
     const openingRaw = state.story.openingScene || '';
     rpLog('INFO', 'INIT-REPLY', `开场场景原始文本 (长度=${openingRaw.length}): "${openingRaw.substring(0, 150)}..."`);
     let openingText = openingRaw;
     let openingReplies = [];
-    const replyMatch = openingRaw.match(/<(.*?)>$/);
+    rpLog('info', 'TIMING', '开始匹配建议回复标签...');
+    const replyMatch = openingRaw.match(/<([^>]*)>\s*$/);
     if (replyMatch) {
         rpLog('INFO', 'INIT-REPLY', `开场 <> 标签内容: "${replyMatch[1]}"`);
         openingText = openingRaw.slice(0, openingRaw.length - replyMatch[0].length).trim();
@@ -174,6 +181,7 @@ App.initializeStory = async function(userInspiration, playerGender) {
     } else {
         rpLog('WARN', 'INIT-REPLY', '开场场景中未发现 <> 标签，无建议回复');
     }
+    rpLog('info', 'TIMING', '✅ 序章解析完成');
     
     state.messages.push({
         id: 'msg_' + Date.now(),
@@ -183,7 +191,9 @@ App.initializeStory = async function(userInspiration, playerGender) {
         timestamp: new Date().toISOString(),
         suggestedReplies: openingReplies
     });
+    rpLog('info', 'TIMING', '=== 开始渲染序章消息 ===');
     renderMessage(state.messages[state.messages.length - 1]);
+    rpLog('info', 'TIMING', '✅ 序章消息渲染完成');
     saveMessages().catch(() => {});
 
     rpLog('info', 'INIT', '初始化完成，进入聊天阶段');
@@ -192,23 +202,36 @@ App.initializeStory = async function(userInspiration, playerGender) {
 
 // ===== 辅助函数：从文本中提取可能的角色名 =====
 // 策略：匹配 "名字 + 动词/标点" 的模式
+// 修复：避免灾难性回溯正则，使用简单的字符串搜索替代
 function extractNamesFromText(text) {
-    if (!text) return [];
+    if (!text || text.length > 10000) return []; // 超长文本直接跳过
     const names = new Set();
-    // 匹配 "名字蹲在/名字冷冷/名字看着" 等模式
-    const patterns = [
-        /([^\s你]{2,4})(?:蹲在|冷冷|看着|说道|问道|回答|站|走|坐|靠|望|说|道|问|笑|皱眉|叹息|轻哼|低语|喃喃|嘟囔|开口|出声|转头|转身|迈步|停下|靠近|后退|伸手|握紧|松开|举起|放下|抱起|推开|拉开|关上|打开|点亮|熄灭|收起|拿出|掏出|翻找|查看|检查|打量|凝视|注视|盯着|瞥了一眼|扫过|环顾|低头|仰头|侧身|正身|弯腰|直起身)/g,
-        // 匹配 "名字 + 冒号" 模式（对话前缀）
-        /([^\s你]{2,4})(?:[:：]\s*[「"])/g,
-    ];
-    for (const pattern of patterns) {
-        let m;
-        while ((m = pattern.exec(text)) !== null) {
-            const name = m[1].trim();
-            if (name && name.length >= 2 && name.length <= 4 && /[\u4e00-\u9fa5a-zA-Z]/.test(name)) {
-                names.add(name);
+    
+    // 策略：先找出所有 2-4 字符的中文/英文词，再检查后面是否跟动词或冒号
+    // 用简单的字符串扫描代替复杂正则，避免回溯
+    const verbs = new Set(['蹲在','冷冷','看着','说道','问道','回答','站','走','坐','靠','望',
+        '说','道','问','笑','皱眉','叹息','轻哼','低语','喃喃','嘟囔','开口','出声',
+        '转头','转身','迈步','停下','靠近','后退','伸手','握紧','松开','举起','放下',
+        '抱起','推开','拉开','关上','打开','点亮','熄灭','收起','拿出','掏出','翻找',
+        '查看','检查','打量','凝视','注视','盯着','瞥了一眼','扫过','环顾','低头',
+        '仰头','侧身','正身','弯腰','直起身']);
+    
+    const len = text.length;
+    for (let i = 0; i < len - 1; i++) {
+        // 只匹配中文字符或英文字母组成的词
+        const chunk = text.slice(i, Math.min(i + 4, len + 1));
+        if (chunk.length < 2) continue;
+        if (!/[\u4e00-\u9fa5a-zA-Z]/.test(chunk)) continue;
+        // 检查后面是否紧跟动词或冒号
+        const after = text.slice(i + chunk.length, i + chunk.length + 20);
+        if (after.match(/^[:：]/)) {
+            names.add(chunk.trim());
+        }
+        for (const v of verbs) {
+            if (after.startsWith(v)) {
+                names.add(chunk.trim());
+                break;
             }
-            pattern.lastIndex = 0;
         }
     }
     return [...names];

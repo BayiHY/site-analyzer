@@ -212,6 +212,10 @@ App.sendInlineReply = async function(text, btn) {
 
 // 原有交互格式解析（兼容旧消息）
 App.formatInteraction = function(text) {
+    if (!text || text.length > 20000) {
+        // 超长文本直接返回转义后的纯文本，避免 indexOf 循环过慢
+        return App.escHtml(text);
+    }
     let html = '';
     let remaining = text;
 
