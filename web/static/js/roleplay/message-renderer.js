@@ -204,6 +204,9 @@ App.formatInteraction = function(text) {
         }
     }
     
+    // 去除 「」 包裹的对话内容
+    text = text.replace(/「([^」]*)」/g, '$1');
+    
     let html = '';
     let remaining = text;
 

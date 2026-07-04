@@ -26,7 +26,7 @@ export function parseContent(trimmed, charName, defaultCharIndex, suggestedRepli
 
     let action = '';
     let thought = '';
-    let remaining = trimmed;
+    let remaining = trimmed.replace(/「([^」]*)」/g, '$1').trim();
 
     // 第一步：如果文本以 (动作) 开头，提取第一个动作
     const firstActionMatch = remaining.match(/^\(([^)]+)\)(.*)/s);
@@ -65,13 +65,19 @@ export function parseContent(trimmed, charName, defaultCharIndex, suggestedRepli
         }
 
         if (!bestMatch) {
-            dialogueParts.push(scanRemaining.slice(scanPos));
+            let segment = scanRemaining.slice(scanPos);
+            // 去除 「」 包裹
+            segment = segment.replace(/「([^」]*)」/g, '$1');
+            segment = segment.trim();
+            if (segment) dialogueParts.push(segment);
             break;
         }
 
         // 收集标记前的纯文本作为对话
         if (bestMatch.pos > scanPos) {
-            const segment = scanRemaining.slice(scanPos, bestMatch.pos).trim();
+            let segment = scanRemaining.slice(scanPos, bestMatch.pos).trim();
+            // 去除 「」 包裹
+            segment = segment.replace(/「([^」]*)」/g, '$1');
             if (segment) dialogueParts.push(segment);
         }
 
