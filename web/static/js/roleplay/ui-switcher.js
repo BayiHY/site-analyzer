@@ -29,16 +29,11 @@ App.showSetupScreen = function() {
 }
 
 App.showTyping = function() {
-    const activeChar = state.characters[state.activeCharIndex];
-    const avatarText = activeChar ? activeChar.name.charAt(0) : '🎭';
     const container = document.getElementById('chat-messages');
     const div = document.createElement('div');
     div.className = 'msg char';
     div.id = 'typing-indicator';
-    div.innerHTML = `
-        <div class="avatar">${avatarText}</div>
-        <div class="bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>
-    `;
+    div.innerHTML = `<div class="bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
