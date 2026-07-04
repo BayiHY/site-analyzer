@@ -76,8 +76,6 @@ ${formatModule.buildFormatRequirements()}`;
             rpLog('error', 'TIMEOUT', `⚠️ 超时警告: chat 请求耗时 ${chatElapsed}ms`);
         }
 
-        hideTyping();
-
         // ===== 4. 解析多角色回复 =====
         const parsedMessages = await App.parseMultiCharReply(response, state.activeCharIndex);
 
@@ -102,6 +100,7 @@ ${formatModule.buildFormatRequirements()}`;
                 renderMessage(msg);
             }
             await saveMessages();
+            hideTyping();
             document.getElementById('send-btn').disabled = false;
             rpLog('info', 'PARSE-RETRY', `✅ 重试成功`);
         } else {
@@ -112,6 +111,7 @@ ${formatModule.buildFormatRequirements()}`;
             await saveMessages();
 
             // 角色消息渲染完成，立即解锁发送按钮
+            hideTyping();
             document.getElementById('send-btn').disabled = false;
         }
 
@@ -170,8 +170,8 @@ ${formatModule.buildFormatRequirements()}`;
         });
 
     } catch (err) {
-        hideTyping();
         addSystemMessage(`回复失败: ${err.message || '未知错误'}`);
+        hideTyping();
         document.getElementById('send-btn').disabled = false;
     }
 }
