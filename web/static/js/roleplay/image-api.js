@@ -198,7 +198,7 @@ App.generateCharacterImage = async function(character) {
             try {
                 const model = faceModels[attempt % faceModels.length];
                 rpLog('info', 'IMG', `面部特写尝试 ${attempt + 1}/3 (model=${model}): ${character.name}`);
-                faceImageUrl = await App.agnesImageGen(facePrompt, '341x341', model);
+                faceImageUrl = await App.agnesImageGen(facePrompt, '256x341', model);
                 rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
                 character.faceImageUrl = faceImageUrl;
                 await saveState();
