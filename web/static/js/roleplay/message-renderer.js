@@ -185,6 +185,17 @@ App.formatInteraction = function(text) {
     if (!text || text.length > 20000) {
         return App.escHtml(text);
     }
+    
+    // 检测角色名前缀：冒号前的连续汉字（到空格/换行/其他非汉字符号截断）
+    let charLabel = '';
+    let labelText = '';
+    const charPrefixMatch = text.match(/^([\u4e00-\u9fff]+?)[:：]\s*/);
+    if (charPrefixMatch) {
+        charLabel = charPrefixMatch[1];
+        labelText = charPrefixMatch[1];
+        text = text.slice(charPrefixMatch[0].length);
+    }
+    
     let html = '';
     let remaining = text;
 
@@ -218,7 +229,7 @@ App.formatInteraction = function(text) {
         pos = bestMatch.end;
     }
 
-    return parts.map(p => {
+    const bodyHtml = parts.map(p => {
         switch (p.type) {
             case 'scene': return `<span class="format-scene">${App.escHtml(p.content)}</span>`;
             case 'action': return `<span class="format-action">${App.escHtml(p.content)}</span>`;
@@ -230,6 +241,13 @@ App.formatInteraction = function(text) {
             default: return App.escHtml(p.content);
         }
     }).join('');
+    
+    // 如果有角色名前缀，包装成 label
+    if (charLabel) {
+        return `<span class="char-label">${App.escHtml(labelText)}</span> ${bodyHtml}`;
+    }
+    
+    return bodyHtml;
 }
 
 App.escHtml = function(str) {
