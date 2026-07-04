@@ -6,6 +6,10 @@ App.sendMessage = async function() {
     const text = input.value.trim();
     if (!text) return;
 
+    // 发送任何消息前清理底部选项胶囊，避免旧选项残留
+    const replyOpts = document.getElementById('reply-options');
+    if (replyOpts) replyOpts.innerHTML = '';
+
     input.value = '';
     input.style.height = 'auto';
 

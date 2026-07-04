@@ -229,7 +229,9 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
 
     // ===== 4. 声线去重 =====
     const voiceModule = await import('./voice-allocation.js');
-    voiceModule.allocateVoices(state.characters, TTS_VOICES);
+    // TTS_VOICES 从全局 App 对象获取（tts-engine.js 已挂载到 window.App）
+    const ttsVoices = (typeof window !== 'undefined' && window._TTS_VOICES) || {};
+    voiceModule.allocateVoices(state.characters);
 
     // 仅在有 imagePrompt 字段时才记录诊断
     state.characters.forEach((c, i) => {

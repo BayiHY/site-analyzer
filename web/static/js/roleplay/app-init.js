@@ -229,6 +229,10 @@ App.resetStory = async function() {
     localStorage.removeItem('rp_state_fallback');
     localStorage.removeItem('rp_messages_fallback');
     
+    // 清空选项气泡
+    const replyOpts = document.getElementById('reply-options');
+    if (replyOpts) replyOpts.innerHTML = '';
+
     document.getElementById('char-setup-screen').style.display = 'flex';
     document.getElementById('chat-screen').style.display = 'none';
     

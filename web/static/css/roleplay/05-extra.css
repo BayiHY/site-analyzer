@@ -83,9 +83,57 @@
 .setting-item input:focus { border-color: var(--primary); outline: none; }
 .setting-hint { font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; }
 
+
+/* ===== TTS 重播按钮 ===== */
+.tts-replay-btn {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    color: var(--primary);
+    padding: 2px 8px;
+    border: 1px solid var(--primary);
+    border-radius: 10px;
+    transition: all 0.2s;
+    user-select: none;
+}
+.tts-replay-btn:hover {
+    background: var(--primary);
+    color: #fff;
+}
 /* 响应式 */
 @media (max-width: 600px) {
     .setup-card { padding: 20px; }
     .side-panel { width: 100%; right: -100%; }
     .msg { max-width: 95%; }
+}
+
+/* ===== TTS 播放状态指示器 ===== */
+.tts-play-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--primary);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s;
+}
+.tts-play-indicator:hover {
+    opacity: 0.8;
+}
+.tts-play-indicator .tts-status-icon {
+    font-size: 0.85rem;
+}
+.tts-play-indicator .tts-status-text {
+    white-space: nowrap;
+}
+/* 播放中动画 */
+@keyframes ttsPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+.tts-playing .tts-status-icon {
+    animation: ttsPulse 1s ease-in-out infinite;
 }

@@ -233,10 +233,9 @@ App.sendReplyOption = async function(text, btnElement) {
     // 清空选项区域
     if (container) container.innerHTML = '';
 
-    // 模拟正常发送
+    // 填充输入框并发送
     const input = document.getElementById('chat-input');
     if (input) input.value = text;
 
-    // 直接调用 sendMessage
     await App.sendMessage();
 };

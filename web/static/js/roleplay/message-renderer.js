@@ -1,5 +1,6 @@
 // === Section: 消息渲染 ===
-// 消息 DOM 创建 + 多角色格式解析（场景、动作、对话、内心想法、建议回复）
+// 消息 DOM 创建 + 多角色格式解析（场景、动作、对话、内心想法）
+// 建议回复选项统一渲染到底部 .reply-options 容器
 
 App.renderMessage = function(msg) {
     rpLog('INFO', 'RENDER', `渲染消息: id=${msg.id}, role=${msg.role}, type=${msg.type}, suggestedReplies=${JSON.stringify(msg.suggestedReplies || [])}`);
@@ -25,7 +26,6 @@ App.renderMessage = function(msg) {
 
     if (msg.role === 'char' && msg.charIndex != null && state.characters[msg.charIndex]) {
         const c = state.characters[msg.charIndex];
-        // 对话头像优先用 portraitImageUrl（全身/半身立绘），fallback 到 faceImageUrl（面部特写）
         let avatarUrl = c.portraitImageUrl || c.faceImageUrl;
         if (avatarUrl) {
             const img = document.createElement('img');
@@ -44,7 +44,6 @@ App.renderMessage = function(msg) {
         avatar.dataset.faceUrl = c.faceImageUrl || '';
         avatar.dataset.portraitUrl = c.portraitImageUrl || '';
         avatar.onclick = function() {
-            // 点击放大：优先 portrait，fallback 到 face
             let showUrl = c.portraitImageUrl || c.faceImageUrl;
             if (showUrl) {
                 document.getElementById('img-overlay-img').src = showUrl;
@@ -52,7 +51,6 @@ App.renderMessage = function(msg) {
             }
         };
     } else if (msg.role === 'user') {
-        // 玩家头像
         let playerFace = state.player?.faceImageUrl;
         if (playerFace) {
             const img = document.createElement('img');
@@ -105,21 +103,12 @@ App.renderMessage = function(msg) {
         bubble.style.cssText = 'background:transparent;border:none;font-size:0.75rem;color:var(--text-dim);text-align:center;padding:4px 0;';
         bubble.textContent = msg.content;
     } else if (msg.type === 'multi_char') {
-        // 多角色消息：解析 (动作)对话[内心想法]<建议回复>
         bubble.innerHTML = App.formatMultiCharMessage(msg);
     } else if (msg.suggestedReplies && msg.suggestedReplies.length > 0) {
-        // 普通文本但有建议回复（如序章开场）：渲染内容 + 胶囊按钮
+        // 普通文本但有建议回复（如序章开场）：渲染内容，选项放到底部容器
         const textHtml = App.formatInteraction(msg.content);
         bubble.innerHTML = textHtml;
-        // 追加建议回复胶囊
-        bubble.innerHTML += '<div class="inline-replies">';
-        msg.suggestedReplies.forEach((reply, i) => {
-            const escaped = App.escHtml(reply).replace(/'/g, "\\'");
-            bubble.innerHTML += `<button class="inline-reply-btn" onclick="App.sendInlineReply('${escaped}', this)">${App.escHtml(reply)}</button>`;
-        });
-        bubble.innerHTML += '</div>';
     } else {
-        // 普通消息：尝试解析交互格式
         bubble.innerHTML = App.formatInteraction(msg.content);
     }
 
@@ -128,54 +117,45 @@ App.renderMessage = function(msg) {
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 
-    // 异步生成语音（不阻塞 UI 渲染）
+    // 如果有建议回复，渲染到底部独立容器
+    if (msg.suggestedReplies && msg.suggestedReplies.length > 0) {
+        App.renderReplyOptions(msg.suggestedReplies, msg.id);
+    }
+
+    // 异步生成语音
     if (msg.role === 'char') {
         setTimeout(() => App.attachAudioToBubble(div, msg), 100);
     }
 }
 
-// 格式化多角色消息：(动作)对话[内心想法]<建议回复>
+// 格式化多角色消息：(动作)对话[内心想法]
+// 建议回复选项通过 msg.suggestedReplies 统一渲染到底部容器
 App.formatMultiCharMessage = function(msg) {
     const action = msg.action || '';
     const dialogue = msg.dialogue || '';
     const thought = msg.thought || '';
-    const suggestedReplies = msg.suggestedReplies || [];
     const charName = msg.charName || '';
 
-    rpLog('INFO', 'FORMAT-MULTI', `多角色消息格式化: charName="${charName}", action="${action}", dialogue="${dialogue}", thought="${thought}", suggestedReplies=${JSON.stringify(suggestedReplies)}`);
+    rpLog('INFO', 'FORMAT-MULTI', `多角色消息格式化: charName="${charName}", action="${action}", dialogue="${dialogue}", thought="${thought}"`);
 
     let html = '';
 
-    // 角色名标签（多角色时有）
     if (charName) {
         html += `<span class="char-label">${App.escHtml(charName)}</span> `;
     }
 
-    // 动作
     if (action) {
-        // action 已包含外层括号，直接转义即可
         html += `<span class="format-action">${App.escHtml(action)}</span>`;
     }
 
-    // 对话
     if (dialogue) {
         html += `<span class="format-speak">${App.escHtml(dialogue)}</span>`;
     }
 
-    // 内心想法：渲染为可折叠按钮
     if (thought) {
         const thoughtId = 'thought_' + msg.id;
         html += ` <button class="thought-btn" data-thought-id="${thoughtId}" onclick="App.toggleThought('${thoughtId}', this)">💭 内心想法</button>`;
         html += `<div class="thought-content" id="${thoughtId}" style="display:none;">${App.escHtml(thought)}</div>`;
-    }
-
-    // 建议回复选项：内联显示
-    if (suggestedReplies.length > 0) {
-        html += '<div class="inline-replies">';
-        suggestedReplies.forEach((reply, i) => {
-            html += `<button class="inline-reply-btn" onclick="App.sendInlineReply('${App.escHtml(reply).replace(/'/g, "\\'")}', this)">${App.escHtml(reply)}</button>`;
-        });
-        html += '</div>';
     }
 
     return html;
@@ -190,30 +170,19 @@ App.toggleThought = function(id, btn) {
     btn.textContent = isVisible ? '💭 内心想法' : '💬 收起想法';
 }
 
-// 发送内联建议回复
-App.sendInlineReply = async function(text, btn) {
-    // 禁用所有内联按钮
-    const container = btn.parentElement;
-    if (container) {
-        container.querySelectorAll('.inline-reply-btn').forEach(b => {
-            b.disabled = true;
-            b.style.opacity = '0.5';
-        });
-    }
-
-    // 填充输入框并发送
+// 发送底部容器的建议回复
+App.sendReplyOption = async function(text) {
+    // 清空输入框旧内容
     const input = document.getElementById('chat-input');
-    if (input) {
-        input.value = text;
-        input.dispatchEvent(new Event('input')); // 触发高度自适应
-    }
+    if (input) input.value = text;
+
+    // 直接调用 sendMessage
     await App.sendMessage();
 }
 
 // 原有交互格式解析（兼容旧消息）
 App.formatInteraction = function(text) {
     if (!text || text.length > 20000) {
-        // 超长文本直接返回转义后的纯文本，避免 indexOf 循环过慢
         return App.escHtml(text);
     }
     let html = '';
@@ -255,29 +224,9 @@ App.formatInteraction = function(text) {
             case 'action': return `<span class="format-action">${App.escHtml(p.content)}</span>`;
             case 'thought': return `<span class="format-thought">${App.escHtml(p.content)}</span>`;
             case 'suggested_replies':
-                let replies = p.content.split('|').map(s => {
-                    let t = s.trim();
-                    t = t.replace(/^["「」]/, '').replace(/[\"」]$/, '');
-                    return t;
-                }).filter(Boolean);
-                // 兜底：如果 | 分隔结果不足，尝试其他分隔符
-                if (replies.length < 2) {
-                    const fb1 = p.content.split('>。<').map(s => { let t = s.trim(); t = t.replace(/^["「」]/, '').replace(/["」]$/, ''); return t; }).filter(Boolean);
-                    if (fb1.length >= 2) replies = fb1;
-                    else {
-                        const fb2 = p.content.split('、').map(s => { let t = s.trim(); t = t.replace(/^["「」]/, '').replace(/["」]$/, ''); return t; }).filter(Boolean);
-                        if (fb2.length >= 2) replies = fb2;
-                    }
-                }
-                rpLog('INFO', 'FORMAT-INTERACTION', `<> 建议回复解析: ${JSON.stringify(replies)}`);
-                if (replies.length === 0) return App.escHtml(p.content);
-                let replyHtml = '<div class="inline-replies">';
-                replies.forEach((reply, i) => {
-                    const escaped = App.escHtml(reply).replace(/'/g, "\\'");
-                    replyHtml += `<button class="inline-reply-btn" onclick="App.sendInlineReply('${escaped}', this)">${App.escHtml(reply)}</button>`;
-                });
-                replyHtml += '</div>';
-                return replyHtml;
+                // <> 标签不再内联渲染按钮，选项由底部 .reply-options 容器统一渲染
+                // 如果 msg.suggestedReplies 为空（旧消息兼容），则显示为纯文本
+                return `<span class="format-suggested-replies">${App.escHtml(p.content)}</span>`;
             default: return App.escHtml(p.content);
         }
     }).join('');

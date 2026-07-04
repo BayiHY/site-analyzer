@@ -13,8 +13,8 @@ function parseDelimited(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) return null;
 
-    // 固定 16 列定义（去掉 imageStyle，画面风格由系统全局统一注入）
-    const FIXED_HEADERS = ['name','age','gender','appearance','personality','background','relationship','motivation','secret','speechStyle','voice','imageFace','imageHair','imageBody','imageClothes','imageEnvironment'];
+    // 固定 18 列定义（含 ttsPitch/ttsRate）
+    const FIXED_HEADERS = ['name','age','gender','appearance','personality','background','relationship','motivation','secret','speechStyle','voice','ttsPitch','ttsRate','imageFace','imageHair','imageBody','imageClothes','imageEnvironment'];
     const EXPECTED_COLS = FIXED_HEADERS.length;
     const HEADER_PIPE_COUNT = EXPECTED_COLS - 1;
 
@@ -77,6 +77,7 @@ function parseSingleCharRow(rawLine, expectedCols, headers) {
         obj[h.trim()] = (paddedVals[idx] || '').trim();
     });
     
+    rpLog('info', 'PARSE-CHECK', `${obj.name}: 进入 fixColumnMisalignment 前 ttsPitch=${obj.ttsPitch || '(空)'} ttsRate=${obj.ttsRate || '(空)'}`);
     fixColumnMisalignment(obj);
     return obj;
 }
@@ -133,26 +134,52 @@ function alignWithAnchor(vals, headers) {
     }
     
     if (anchorIdx >= 0) {
-        // 找到了锚点：anchorIdx 位置的 vals 对应某个 header
-        // 从锚点往左：vals[0..anchorIdx-1] 对应 headers[0..anchorIdx-1]
-        // 从锚点往右：vals[anchorIdx+1..] 对应 headers[anchorIdx+1..]
-        // 如果 vals.length < targetLen，说明锚点左边或右边有缺失
-        // 由于我们是从右往左找的锚点，锚点右边的 vals 是连续的
-        // 所以缺失的字段在锚点左边
+        const voiceHeaderIdx = headers.findIndex(h => h === 'voice');
+        const beforeCount = anchorIdx;
+        const afterCount = vals.length - anchorIdx - 1;
+        const expectedBefore = voiceHeaderIdx;
+        const expectedAfter = targetLen - voiceHeaderIdx - 1;
         
-        // 计算锚点在 headers 中的位置：应该是 anchorIdx + missing
-        // （因为左边缺了 missing 个字段）
-        const anchorHeaderIdx = anchorIdx + missing;
+        const beforeMissing = Math.max(0, expectedBefore - beforeCount);
+        const afterMissing = Math.max(0, expectedAfter - afterCount);
         
-        // 构建 paddedVals：左边补 missing 个空字符串
-        paddedVals = [];
-        for (let i = 0; i < missing; i++) {
-            paddedVals.push('');
+        if (beforeMissing > 0 || afterMissing > 0) {
+            const before = vals.slice(0, anchorIdx);
+            const after = vals.slice(anchorIdx + 1);
+            
+            let afterPadded;
+            if (afterMissing > 0) {
+                // ttsPitch/ttsRate 智能填充：用 Hz/% 后缀区分
+                const ttsSlots = ['', ''];  // [ttsPitch, ttsRate]
+                let ai = 0;
+                for (let ti = 0; ti < 2 && ai < after.length; ti++) {
+                    if (ti === 0) {
+                        // ttsPitch: 期望 Hz 值
+                        if (/^[-+]?\d+Hz$/.test(after[ai].trim())) {
+                            ttsSlots[0] = after[ai];
+                            ai++;
+                        }
+                    } else {
+                        // ttsRate: 期望 % 值
+                        if (/^[-+]?\d+%$/.test(after[ai].trim())) {
+                            ttsSlots[1] = after[ai];
+                            ai++;
+                        }
+                    }
+                }
+                afterPadded = [...ttsSlots, ...after.slice(ai)];
+            } else {
+                afterPadded = [...after];
+            }
+            
+            rpLog('info', 'PARSE', `  智能对齐：缺 before=${beforeMissing} after=${afterMissing}，Neural@${anchorIdx}`);
+            return [...before, ...Array(beforeMissing).fill(''), vals[anchorIdx], ...afterPadded];
         }
-        paddedVals = paddedVals.concat(vals);
         
-        rpLog('info', 'PARSE', `  智能对齐：在 ${anchorIdx} 找到 ${anchorIdx + missing >= 0 && anchorHeaderIdx < headers.length ? headers[anchorHeaderIdx] : '锚点'}，左侧补齐 ${missing} 列`);
-        return paddedVals;
+        // 缺失在左边
+        const paddedVals = [];
+        for (let i = 0; i < missing; i++) paddedVals.push('');
+        return paddedVals.concat(vals);
     }
     
     // 找不到锚点 → 右对齐补齐（LLM 更可能省略末尾字段如 imageEnvironment）
@@ -293,7 +320,9 @@ function fixColumnMisalignment(row) {
         imageBody: row.imageBody,
         imageClothes: row.imageClothes,
         imageEnvironment: row.imageEnvironment,
-        voice: row.voice
+        voice: row.voice,
+        ttsPitch: row.ttsPitch,
+        ttsRate: row.ttsRate
     })}`);
 
     return row;

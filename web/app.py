@@ -1097,6 +1097,13 @@ def tts_api():
     rate = data.get('rate', '+0%')
     volume = data.get('volume', '+0%')
     pitch = data.get('pitch', '+0Hz')
+    
+    # 兼容旧版前端传入的 ttsRate/ttsPitch/ttsVolume（基底参数）
+    if 'ttsRate' in data: rate = data['ttsRate']
+    if 'ttsPitch' in data: pitch = data['ttsPitch']
+    if 'ttsVolume' in data: volume = data['ttsVolume']
+    
+    app.logger.info(f'[TTS REQUEST] voice={voice} pitch={pitch} rate={rate} vol={volume} text="{text[:50]}..."')
 
     try:
         mp3_bytes = _generate_mp3(text, voice, rate, volume, pitch)

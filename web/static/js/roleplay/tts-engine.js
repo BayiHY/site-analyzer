@@ -4,25 +4,14 @@
 
 // ===== TTS 音色配置 =====
 const TTS_VOICES = {
-    // 普通话 - 女声（Edge TTS 实际可用的只有2个）
-    'zh-CN-XiaoxiaoNeural': { name: '晓晓', gender: '女', style: '温暖', desc: '温柔型女主、治愈系' },
-    'zh-CN-XiaoyiNeural':   { name: '晓伊', gender: '女', style: '活泼', desc: '元气少女、邻家妹妹' },
-    // 普通话 - 男声
-    'zh-CN-YunjianNeural':  { name: '云健', gender: '男', style: '激情', desc: '热血男主、运动系' },
-    'zh-CN-YunxiNeural':    { name: '云希', gender: '男', style: '阳光', desc: '阳光少年、暖男' },
-    'zh-CN-YunxiaNeural':   { name: '云夏', gender: '男', style: '可爱', desc: '正太、呆萌系' },
-    'zh-CN-YunyangNeural':  { name: '云扬', gender: '男', style: '专业', desc: '医生、律师、上司' },
-    // 港台
-    'zh-HK-HiuGaaiNeural':  { name: '希佳', gender: '女', style: '友善', desc: '粤语' },
-    'zh-HK-HiuMaanNeural':  { name: '希曼', gender: '女', style: '友善', desc: '粤语' },
-    'zh-HK-WanLungNeural':  { name: '万龙', gender: '男', style: '友善', desc: '粤语' },
-    'zh-TW-HsiaoChenNeural':{ name: '小臻', gender: '女', style: '友善', desc: '国语' },
-    'zh-TW-HsiaoYuNeural':  { name: '小雨', gender: '女', style: '友善', desc: '国语' },
-    'zh-TW-YunJheNeural':   { name: '云哲', gender: '男', style: '友善', desc: '国语' }
+    // 普通话 - 女声（统一使用 Xiaoyi，通过 pitch/rate 区分角色）
+    'zh-CN-XiaoyiNeural':   { name: '晓伊', gender: '女', style: '通用女声', desc: '唯一女声，参数区分角色' },
+    // 普通话 - 男声（统一使用 Yunxi，通过 pitch/rate 区分角色）
+    'zh-CN-YunxiNeural':    { name: '云希', gender: '男', style: '通用男声', desc: '唯一男声，参数区分角色' },
 };
 
-// 默认音色（女角色默认晓晓，男角色默认云希）
-const DEFAULT_VOICE_BY_GENDER = { '女': 'zh-CN-XiaoxiaoNeural', '男': 'zh-CN-YunxiNeural' };
+// 默认音色
+const DEFAULT_VOICE_BY_GENDER = { '女': 'zh-CN-XiaoyiNeural', '男': 'zh-CN-YunxiNeural' };
 
 // ===== Cache API 初始化 =====
 const TTS_CACHE_NAME = 'roleplay-tts-v1';
@@ -83,121 +72,120 @@ const EMOTION_PARAM_GUIDE = {
     playful:     { rate: '+10%', pitch: '+10Hz', volume: '0%' }
 };
 
-// LLM 推理 TTS 参数的 prompt
-function buildTTSPrompt(msg, character) {
-    const action = msg.action || '';
-    const dialogue = msg.dialogue || msg.content || '';
-    const thought = msg.thought || '';
-    const charName = character?.name || '';
-    const charPersonality = character?.personality || '';
-    const charSpeechStyle = character?.speechStyle || '';
-    const charVoice = character?.voice || 'zh-CN-XiaoxiaoNeural';
-    const charGender = character?.gender || '女';
-    
-    return `你是一个语音表演指导。根据角色的动作、内心独白和对话内容，推断最适合的 Edge TTS 参数。
-
-【角色信息】
-- 名字：${charName}
-- 性别：${charGender}
-- 性格：${charPersonality}
-- 说话风格：${charSpeechStyle}
-- 音色：${charVoice}
-
-【当前消息】
-- 动作：${action || '无'}
-- 对话：${dialogue}
-- 内心想法：${thought || '无'}
-
-【Edge TTS 参数范围】
-rate（语速）：-50% 到 +100%，步长 10%。正常 = 0%，快 = +10%~+50%，慢 = -10%~-50%
-pitch（音高）：-50Hz 到 +100Hz，步长 10Hz。正常 = 0Hz，高 = +10Hz~+50Hz，低 = -10Hz~-50Hz
-volume（音量）：-100% 到 +100%，步长 10%。正常 = 0%，大声 = +20%~+60%，小声 = -20%~-80%
-
-【情绪参考映射】
-愤怒/激动: rate +20%, pitch +20Hz, volume +30%
-温柔/平静: rate -10%, pitch 0Hz, volume -10%
-悲伤/低沉: rate -20%, pitch -20Hz, volume -20%
-犹豫/紧张: rate -20%, pitch 0Hz, volume -20%
-自信/威严: rate 0%, pitch +10Hz, volume +10%
-开心/轻松: rate +10%, pitch +10Hz, volume +10%
-耳语: rate -20%, pitch -10Hz, volume -50%
-
-【推理要求】
-1. 综合动作、内心想法、对话内容判断角色的情绪状态
-2. 考虑角色性格和说话风格作为基准
-3. 根据情绪微调三个参数
-4. 参数值必须在上述范围内，且是步长的整数倍
-
-请以 JSON 格式返回，只返回 JSON，不要其他文字：
-{"emotion":"情绪标签","rate":"参数值","pitch":"参数值","volume":"参数值","reason":"一句话解释"}`;
+// ===== TTS 数值解析辅助 =====
+function parseParamValue(val, unit) {
+    if (!val) return 0;
+    const num = parseFloat(val.replace(unit, ''));
+    return isNaN(num) ? 0 : num;
 }
 
-// ===== LLM 推理 TTS 参数（带 IndexedDB 缓存）=====
-const TTS_PARAMS_DB = 'tts-params-db';
-const TTS_PARAMS_STORE = 'params';
-
-App._getTtsParamsDb = async function() {
-    return new Promise((resolve, reject) => {
-        const req = indexedDB.open(TTS_PARAMS_DB, 1);
-        req.onupgradeneeded = (e) => {
-            e.target.result.createObjectStore(TTS_PARAMS_STORE, { keyPath: 'key' });
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => resolve(null);
-    });
+function formatParamValue(num, unit) {
+    const prefix = num >= 0 ? '+' : '';
+    return `${prefix}${num}${unit}`;
 }
 
-App.inferTTSParams = async function(msg, character) {
-    // 1. 先查 IndexedDB 缓存
-    const db = await App._getTtsParamsDb();
-    if (db) {
-        const cacheKey = App.ttsParamsCacheKey(msg, character);
-        return new Promise((resolve) => {
-            const tx = db.transaction(TTS_PARAMS_STORE, 'readonly');
-            const req = tx.objectStore(TTS_PARAMS_STORE).get(cacheKey);
-            req.onsuccess = () => {
-                if (req.result) {
-                    rpLog('TTS', 'PARAM-CACHE-HIT', `命中参数缓存: ${msg.dialogue?.substring(0, 20) || msg.content?.substring(0, 20)}`);
-                    resolve(req.result.value);
-                } else {
-                    resolve(null);
-                }
-            };
-            req.onerror = () => resolve(null);
-        });
+// ===== 角色基底参数读取 =====
+function getCharacterBaseParams(character) {
+    if (!character) {
+        rpLog('TTS:', `DIAG 无角色数据 char=null → 默认基底 pitch=0 rate=0`);
+        return { pitch: 0, rate: 0, volume: 0 };
     }
+    const rawPitch = character.ttsPitch || '+0Hz';
+    const rawRate = character.ttsRate || '+0%';
+    const rawVol = character.ttsVolume || '+0%';
+    const result = {
+        pitch: parseParamValue(rawPitch, 'Hz'),
+        rate: parseParamValue(rawRate, '%'),
+        volume: parseParamValue(rawVol, '%')
+    };
+    rpLog('TTS:', `BASE ${character.name}: rawPitch=${rawPitch} rawRate=${rawRate} → parsed pitch=${result.pitch}Hz rate=${result.rate}%`);
+    return result;
+}
+
+// ===== 情绪 → 参数偏移映射 =====
+const EMOTION_OFFSETS = {
+    angry:       { pitch: +8, rate: +15, volume: +20 },
+    excited:     { pitch: +5, rate: +20, volume: +15 },
+    shouting:    { pitch: +10, rate: +10, volume: +30 },
+    gentle:      { pitch: -3, rate: -8, volume: -10 },
+    calm:        { pitch: 0, rate: 0, volume: 0 },
+    whisper:     { pitch: 0, rate: -10, volume: -30 },
+    sad:         { pitch: -5, rate: -10, volume: -10 },
+    depressed:   { pitch: -8, rate: -15, volume: -15 },
+    crying:      { pitch: -3, rate: -5, volume: -15 },
+    hesitant:    { pitch: 0, rate: -10, volume: -10 },
+    nervous:     { pitch: +3, rate: +10, volume: -5 },
+    scared:      { pitch: +5, rate: +15, volume: -10 },
+    confident:   { pitch: +3, rate: 0, volume: +5 },
+    serious:     { pitch: -3, rate: -5, volume: 0 },
+    commanding:  { pitch: -5, rate: 0, volume: +15 },
+    happy:       { pitch: +3, rate: +5, volume: +5 },
+    cheerful:    { pitch: +5, rate: +10, volume: +10 },
+    playful:     { pitch: +5, rate: +8, volume: 0 },
+    anxious:     { pitch: +3, rate: +10, volume: -5 },
+    threatening: { pitch: -8, rate: -5, volume: +10 },
+    surprised:   { pitch: +8, rate: +15, volume: +15 },
+    indifferent: { pitch: 0, rate: -5, volume: -10 },
+};
+
+// ===== 根据消息内容推断情绪偏移 =====
+function inferEmotionOffset(msg) {
+    const dialogue = (msg.dialogue || msg.content || '').toLowerCase();
+    const action = (msg.action || '').toLowerCase();
+    const combined = dialogue + ' ' + action;
     
-    // 2. 缓存未命中，调 LLM 推理
-    try {
-        const prompt = buildTTSPrompt(msg, character);
-        const reply = await App.agnesChat([{ role: 'user', content: prompt }]);
-        
-        // 提取 JSON
-        const jsonMatch = reply.match(/\{[^}]+\}/);
-        if (!jsonMatch) return null;
-        
-        const params = JSON.parse(jsonMatch[0]);
-        
-        // 3. 存入 IndexedDB 缓存
-        if (db) {
-            const cacheKey = App.ttsParamsCacheKey(msg, character);
-            const tx = db.transaction(TTS_PARAMS_STORE, 'readwrite');
-            tx.objectStore(TTS_PARAMS_STORE).put({ key: cacheKey, value: params });
+    // 关键词匹配情绪
+    const emotionKeywords = {
+        angry: ['怒', '恨', '杀', '滚', '该死', '可恶', '愤怒', '生气', '咬牙', '怒吼'],
+        shouting: ['吼', '喊', '咆哮', '大叫', '嘶吼', '怒吼'],
+        scared: ['怕', '恐惧', '害怕', '颤抖', '惊恐', '冷汗', '后退', '逃跑'],
+        sad: ['哭', '泪', '悲', '痛', '绝望', '心碎', '哽咽', '低头'],
+        happy: ['笑', '开心', '高兴', '喜悦', '欢呼', '灿烂'],
+        whisper: ['轻声', '耳语', '低语', '悄悄', '喃喃'],
+        nervous: ['紧张', '不安', '犹豫', '手心出汗', '结巴', '吞吞吐吐'],
+        confident: ['自信', '傲慢', '不屑', '冷笑', '挑眉', '嘴角上扬'],
+        gentle: ['温柔', '轻声', '抚慰', '安慰', '抚摸', '拥抱'],
+        serious: ['严肃', '认真', '正色', '郑重', '沉声'],
+        commanding: ['命令', '下令', '不容置疑', '立刻', '马上'],
+        surprised: ['惊', '愣', '诧异', '没想到', '瞪大', '瞳孔收缩'],
+        playful: ['调皮', '坏笑', '眨眼', '嬉闹', '逗弄'],
+        depressed: ['消沉', '颓废', '麻木', '空洞', '失去希望'],
+        hesitant: ['迟疑', '犹豫', '欲言又止', '停顿'],
+    };
+    
+    let bestEmotion = 'calm';
+    let bestScore = 0;
+    
+    for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
+        const score = keywords.filter(kw => combined.includes(kw)).length;
+        if (score > bestScore) {
+            bestScore = score;
+            bestEmotion = emotion;
         }
-        
-        return params;
-    } catch (e) {
-        rpLog('TTS', 'WARN', `LLM 推理 TTS 参数失败: ${e.message}`);
-        return null;
     }
+    
+    const offset = EMOTION_OFFSETS[bestEmotion] || { pitch: 0, rate: 0, volume: 0 };
+    rpLog('TTS:', `EMOTION "${combined.substring(0, 40)}..." → ${bestEmotion} offset=pitch+${offset.pitch} rate+${offset.rate}`);
+    return offset;
 }
 
-App.ttsParamsCacheKey = function(msg, character) {
-    // 用对话文本 + 角色名 + 音色作为缓存 key
-    const dialogue = msg.dialogue || msg.content || '';
-    const charName = character?.name || '';
-    const voice = character?.voice || '';
-    return `${charName}:${voice}:${dialogue.substring(0, 50)}`;
+// ===== 计算最终 TTS 参数（基底 + 情绪偏移）=====
+App.computeFinalParams = function(character, msg) {
+    const base = getCharacterBaseParams(character);
+    const offset = inferEmotionOffset(msg);
+    
+    // 合并并限制范围（pitch ±15Hz，rate ±35%）
+    let finalPitch = Math.max(-15, Math.min(15, base.pitch + offset.pitch));
+    let finalRate = Math.max(-35, Math.min(35, base.rate + offset.rate));
+    let finalVolume = Math.max(-100, Math.min(100, base.volume + offset.volume));
+    
+    const result = {
+        pitch: formatParamValue(Math.round(finalPitch / 5) * 5, 'Hz'),
+        rate: formatParamValue(Math.round(finalRate / 5) * 5, '%'),
+        volume: formatParamValue(Math.round(finalVolume / 5) * 5, '%')
+    };
+    rpLog('TTS:', `FINAL ${character?.name || '?'}: base[${base.pitch}Hz/${base.rate}%] + offset[${offset.pitch}/${offset.rate}%] → pitch=${result.pitch} rate=${result.rate} vol=${result.volume}`);
+    return result;
 }
 
 // ===== 生成语音（带情绪参数）=====
@@ -220,7 +208,7 @@ App.generateTTS = async function(text, voice, rate='+0%', volume='+0%', pitch='+
     }
 
     // 2. 调后端生成
-    rpLog('TTS', 'GENERATING', `生成语音: ${text.substring(0, 30)}... voice=${voice} rate=${rate} pitch=${pitch} vol=${volume}`);
+    rpLog('TTS:', `GEN text="${text.substring(0, 30)}..." voice=${voice} pitch=${pitch} rate=${rate} vol=${volume}`);
     try {
         const resp = await fetch('/api/tts', {
             method: 'POST',
@@ -292,6 +280,7 @@ App.attachAudioToBubble = async function(msgEl, msg) {
     // 获取角色音色
     const charIdx = msg.charIndex;
     const char = charIdx != null ? state.characters[charIdx] : null;
+    rpLog('TTS:', `CHAR charIndex=${charIdx} charName=${char ? char.name : 'NULL'} keys=${char ? Object.keys(char).join(',') : 'N/A'}`);
     const voice = App.autoMatchVoice(char);
     
     // 异步 LLM 推理 TTS 参数（不阻塞 UI）
@@ -307,12 +296,8 @@ App.attachAudioToBubble = async function(msgEl, msg) {
         loading.style.cssText = 'margin-top:8px;font-size:0.75rem;color:var(--text-dim);display:flex;align-items:center;gap:4px;';
         bubble.appendChild(loading);
         
-        let params = null;
-        try {
-            params = await App.inferTTSParams(msg, char);
-        } catch (e) {
-            rpLog('TTS', 'WARN', `LLM 推理失败，使用默认参数: ${e.message}`);
-        }
+        // 直接用角色基底参数 + 情绪偏移计算 TTS 参数
+        let params = App.computeFinalParams(char, msg);
         
         let rate = params?.rate || '+0%';
         let pitch = params?.pitch || '+0Hz';
@@ -323,9 +308,7 @@ App.attachAudioToBubble = async function(msgEl, msg) {
         if (pitch && !pitch.startsWith('+') && !pitch.startsWith('-')) pitch = '+' + pitch.replace('Hz', '') + 'Hz';
         if (volume && !volume.startsWith('+') && !volume.startsWith('-')) volume = '+' + volume.replace('%', '') + '%';
         
-        if (params?.reason) {
-            rpLog('TTS', 'PARAMS', `情绪: ${params.emotion}, rate=${rate}, pitch=${pitch}, vol=${volume} (${params.reason})`);
-        }
+        rpLog('TTS:', `SEND voice=${voice} pitch=${pitch} rate=${rate} vol=${volume} text="${text.substring(0, 40)}..."`);
         
         try {
             const audioUrl = await App.generateTTS(text, voice, rate, volume, pitch);
@@ -384,11 +367,10 @@ App.renderVoiceSelector = function(selectEl, selectedVoice, onChange) {
     // 清空现有选项
     selectEl.innerHTML = '';
     
-    // 分组添加选项
+    // 音色选择器 UI — 只保留 Xiaoyi 和 Yunxi
     const groups = {
-        '普通话 - 女声': ['zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural'],
-        '普通话 - 男声': ['zh-CN-YunjianNeural', 'zh-CN-YunxiNeural', 'zh-CN-YunxiaNeural', 'zh-CN-YunyangNeural'],
-        '港台': ['zh-HK-HiuGaaiNeural', 'zh-HK-HiuMaanNeural', 'zh-HK-WanLungNeural', 'zh-TW-HsiaoChenNeural', 'zh-TW-HsiaoYuNeural', 'zh-TW-YunJheNeural']
+        '女声': ['zh-CN-XiaoyiNeural'],
+        '男声': ['zh-CN-YunxiNeural'],
     };
     
     for (const [groupName, voices] of Object.entries(groups)) {

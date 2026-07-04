@@ -122,8 +122,9 @@ ${genderHint ? `【性别倾向】${genderHint}` : ''}
 
 输出格式要求（TSV 表格格式，用 | 分隔字段）：
 ⚠️ 第一行不要输出表头！直接输出角色数据行。
-字段顺序固定为 16 列：name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
+字段顺序固定为 18 列：name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|ttsPitch|ttsRate|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
 ⚠️ 所有 5 个 image* 字段必须全部填写，不得省略任何一个！
+⚠️ ttsPitch 和 ttsRate 必须在 voice 之后、imageFace 之前填写！
 
 字段说明：
 - name: 角色名（2-4个字，有特色）
@@ -136,10 +137,31 @@ ${genderHint ? `【性别倾向】${genderHint}` : ''}
 - motivation: 核心动机/欲望（20字以内）
 - secret: 隐藏的秘密（30字以内）
 - speechStyle: 说话风格（20字以内）
-- voice: Edge TTS 语音名称（必须从以下列表选取）
-  【女声】zh-CN-XiaoxiaoNeural（温柔知性）、zh-CN-XiaoyiNeural（活泼甜美）、zh-CN-liaoning-XiaobeiNeural（东北俏皮）、zh-CN-shaanxi-XiaoniNeural（西北温婉）
-  【男声】zh-CN-YunxiNeural（沉稳磁性）、zh-CN-YunjianNeural（阳光开朗）、zh-CN-YunxiaNeural（温和儒雅）、zh-CN-YunyangNeural（成熟稳重）
-  根据角色性别和性格自动匹配声线。同一故事不同角色尽量用不同音色。
+- voice: Edge TTS 语音名称（女声默认 zh-CN-XiaoyiNeural，男声默认 zh-CN-YunxiNeural）
+- ttsPitch: 音色基底音高（格式如 -15Hz、-8Hz、0Hz、+5Hz、+15Hz，控制角色音色高低）
+- ttsRate: 语速基底（格式如 -10%、-5%、0%、+5%、+10%、+15%，配合 pitch 塑造性格底色）
+  设计原则：
+  • pitch 决定音色基础（高低），rate 辅助塑造性格（快=急躁/活泼，慢=沉稳/阴柔）
+  • pitch 控制在 -15Hz ~ +15Hz 范围内，超出会失真不自然
+  • 每个角色的 ttsPitch/ttsRate 必须根据其具体属性（年龄、职业、性格、身份、说话方式）量身定制
+  • 角色间必须差异化：列出所有角色后，先分配音色再输出，确保同性别角色 pitch 值不完全相同
+  • 可以有各类音色参数参考，但是根据角色实际属性微调，避免每个故事都是刻板音色
+
+  【7 个女角色 pitch 参考方案】（不要照抄，根据角色实际属性调整）
+  清冷师姐: pitch=-15Hz, rate=-5%  → 低沉柔和，说话慢，气质清冷
+  温柔医女: pitch=-8Hz, rate=0%    → 略低沉，语速正常，温和亲切
+  邻家妹妹: pitch=0Hz, rate=+5%    → 标准音色，轻微加快，阳光自然
+  傲娇大小姐: pitch=+5Hz, rate=+10% → 略抬高语速加快，带点小脾气
+  甜美萝莉: pitch=+10Hz, rate=+5%  → 偏清脆，语速轻快，奶声奶气
+  古灵精怪: pitch=+12Hz, rate=+15% → 较高音速最快，蹦蹦跳跳感
+  腹黑反派: pitch=+15Hz, rate=-10% → 高音调但放慢语速，反差感
+
+  【男声参考方案】
+  沉稳大叔: pitch=-10Hz, rate=-5%  → 低沉有力
+  阳光少年: pitch=-3Hz, rate=+5%   → 轻快活力
+  阴柔反派: pitch=+8Hz, rate=-10%  → 高音调慢语速，蛇蝎男
+  威严领袖: pitch=-12Hz, rate=0%   → 低沉稳重
+  热血战士: pitch=+5Hz, rate=+15%  → 高音快节奏
 - imageFace: 五官脸型（英文）
 - imageHair: 发型发色（英文）
 - imageBody: 体型体态（英文）
@@ -148,13 +170,14 @@ ${genderHint ? `【性别倾向】${genderHint}` : ''}
 所有 image* 字段全部用英文，适合 AI 绘画。
 
 示例（不要照抄内容，只照格式）：
-阿德拉|28|女|苍白瘦削，左眼黄铜义眼|冷静理智，极度缺乏安全感|曾是贵族家替补厨师，因被诬陷遭驱逐|起初视主角为棋子，后转为生死搭档|复仇并查明父亲失踪真相|义眼中封印着低阶怨灵|冷嘲热讽，用烹饪术语隐喻人生险恶|zh-CN-XiaoxiaoNeural|pale skin, left eye is a brass gear prosthetic, sharp cheekbones|long black hair in a neat bob cut, minimal makeup|slender and slightly hunched frame|white apron over dark Victorian dress, brass goggles on head|dimly lit kitchen with steam and warm amber glow
-巴尔扎|45|男|魁梧如熊，右臂机械锅铲义肢|暴躁冲动，护短|前地下拳手，被深渊灶台改造为活体搅拌机|雇佣兵兼守护者，认为主角是少数不把他当怪物看的人|保护主角，终结自己作为器具的命运|机械义肢内部连接着未成熟的灵体心脏|粗鲁直白，常伴有吞咽口水的声音|zh-CN-YunxiNeural|broad square jaw, scar across nose, thick eyebrows|short buzz cut, sweat-dampened hair|massive muscular build, right arm is a mechanical spatula|torn tank top revealing mechanical parts, leather combat pants|gritty underground arena with sparks and smoke
+阿德拉|28|女|苍白瘦削，左眼黄铜义眼|冷静理智，极度缺乏安全感|曾是贵族家替补厨师，因被诬陷遭驱逐|起初视主角为棋子，后转为生死搭档|复仇并查明父亲失踪真相|义眼中封印着低阶怨灵|冷嘲热讽，用烹饪术语隐喻人生险恶|zh-CN-XiaoyiNeural|-8Hz|0%|pale skin, left eye is a brass gear prosthetic, sharp cheekbones|long black hair in a neat bob cut, minimal makeup|slender and slightly hunched frame|white apron over dark Victorian dress, brass goggles on head|dimly lit kitchen with steam and warm amber glow
+巴尔扎|45|男|魁梧如熊，右臂机械锅铲义肢|暴躁冲动，护短|前地下拳手，被深渊灶台改造为活体搅拌机|雇佣兵兼守护者，认为主角是少数不把他当怪物看的人|保护主角，终结自己作为器具的命运|机械义肢内部连接着未成熟的灵体心脏|粗鲁直白，常伴有吞咽口水的声音|zh-CN-YunxiNeural|-10Hz|-5%|broad square jaw, scar across nose, thick eyebrows|short buzz cut, sweat-dampened hair|massive muscular build, right arm is a mechanical spatula|torn tank top revealing mechanical parts, leather combat pants|gritty underground arena with sparks and smoke
 
 要求：
 1. 角色之间要有关系网（亲友、敌对、师徒、竞争对手等）
 2. 每个角色必须有鲜明的个性和缺陷
 3. 角色设计必须符合世界观设定，不能出现违和感
 4. 生图字段全部用英文，适合 AI 绘画
-5. 避免脸谱化和套路化`;
+5. 避免脸谱化和套路化
+6. ⚠️ ttsPitch/ttsRate 必须差异化！同性别角色不能全部相同。输出前先检查一遍。`;
 }
