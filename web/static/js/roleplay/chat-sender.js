@@ -81,14 +81,39 @@ ${formatModule.buildFormatRequirements()}`;
         // ===== 4. 解析多角色回复 =====
         const parsedMessages = await App.parseMultiCharReply(response, state.activeCharIndex);
 
-        for (const msg of parsedMessages) {
-            state.messages.push(msg);
-            renderMessage(msg);
-        }
-        await saveMessages();
+        // ===== 4.5 检查解析层重试信号（2026-07-04 新增） =====
+        const needsRetry = parsedMessages.some(m => m._needsRetry);
+        if (needsRetry) {
+            const firstRetryMsg = parsedMessages.find(m => m._needsRetry);
+            const retryReason = firstRetryMsg?._retryReason || '未知原因';
+            rpLog('error', 'PARSE-RETRY', `⚠️ 解析层要求重试: ${retryReason}，丢弃当前回复并重新请求`);
+            // 丢弃已渲染的消息（如果已经渲染了）
+            // 重新请求 LLM
+            rpLog('info', 'PARSE-RETRY', '重新构建历史并请求 LLM...');
+            const retryMessages = [
+                { role: 'system', content: systemPrompt },
+                ...historyMessages,
+                { role: 'user', content: text + '\n\n【强制要求】上一次回复格式严重偏离，请严格按照以下格式回复：\n场景描述（纯文本，不要加标签行）\n:角色1:(动作/神态)「对话内容」[内心想法]\n:角色2:(动作/神态)「对话内容」[内心想法]\n<回复1┇回复2┇回复3>' }
+            ];
+            const retryResponse = await App.agnesChatWithFallback(retryMessages, { route: 'chat' });
+            const retryParsed = await App.parseMultiCharReply(retryResponse, state.activeCharIndex);
+            for (const msg of retryParsed) {
+                state.messages.push(msg);
+                renderMessage(msg);
+            }
+            await saveMessages();
+            document.getElementById('send-btn').disabled = false;
+            rpLog('info', 'PARSE-RETRY', `✅ 重试成功`);
+        } else {
+            for (const msg of parsedMessages) {
+                state.messages.push(msg);
+                renderMessage(msg);
+            }
+            await saveMessages();
 
-        // 角色消息渲染完成，立即解锁发送按钮
-        document.getElementById('send-btn').disabled = false;
+            // 角色消息渲染完成，立即解锁发送按钮
+            document.getElementById('send-btn').disabled = false;
+        }
 
         // ===== 5. 后处理：4 项并行执行 =====
         rpLog('info', 'TIMEOUT', '后处理开始: 4 项并行');
@@ -170,9 +195,10 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
         const sceneExtractor = await import('./scene-extractor.js');
         const { sceneText, remaining: afterScene } = sceneExtractor.extractScene(text);
 
-        // 步骤 2: 提取建议回复
+        // 步骤 2: 提取建议回复（2026-07-04 增强：返回 needsRetry 信号）
         const replyExtractor = await import('./reply-extractor.js');
-        const { replies: suggestedReplies, remaining: afterReply } = replyExtractor.extractSuggestedReplies(afterScene);
+        const replyResult = replyExtractor.extractSuggestedReplies(afterScene);
+        const { replies: suggestedReplies, remaining: afterReply, needsRetry: replyNeedsRetry, retryReason: replyRetryReason } = replyResult;
 
         // 步骤 3: 分割角色段落
         const charSplitter = await import('./char-splitter.js');
@@ -209,6 +235,13 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
             rpLog('warn', 'FORMAT-CHECK', `格式偏离: 场景描述=${formatResult.missingScene ? '缺失' : '有'}, 角色前缀=${formatResult.missingPrefix ? '缺失' : '有'}, 建议回复=${formatResult.missingReplies ? '缺失' : '有'}, 触发重试: ${formatResult.shouldRetry}`);
         }
 
+        // ===== 角色身份一致性校验（2026-07-04 新增） =====
+        const identityValidator = await import('./identity-validator.js');
+        const identityResult = identityValidator.validateIdentityConsistency(messages, state.characters);
+        if (!identityResult.valid) {
+            rpLog('warn', 'IDENTITY-CHECK', `身份校验失败: ${identityResult.conflicts.map(c => `${c.charName}: ${c.reason}`).join('; ')}`);
+        }
+
         // ===== 场景在场规则校验 =====
         if (messages.length > 0) {
             const presenceValidator = await import('./scene-presence-validator.js');
@@ -221,6 +254,21 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
                 rpLog('warn', 'SCENE-RULE', `场景在场规则违反: ${presenceResult.conflicts.join(', ')} 声明不在场但实际出场`);
                 // 标记为需要重试，后续在 sendMessage 中处理
                 messages[0]._sceneRuleViolation = presenceResult;
+            }
+        }
+
+        // ===== 综合重试信号（2026-07-04 增强） =====
+        let overallNeedsRetry = formatResult.shouldRetry || replyNeedsRetry || identityResult.conflicts.length > 2;
+        if (overallNeedsRetry) {
+            const reasons = [];
+            if (formatResult.shouldRetry) reasons.push(`格式偏离[${formatResult.details.join(',')}]`);
+            if (replyNeedsRetry) reasons.push(`回复质量[${replyRetryReason}]`);
+            if (identityResult.conflicts.length > 2) reasons.push(`身份冲突[${identityResult.conflicts.length}条]`);
+            rpLog('error', 'PARSE-RETRY', `⚠️ 解析层触发重试信号: ${reasons.join('; ')}`);
+            // 在第一条消息上标记重试原因，供 sendMessage 捕获
+            if (messages.length > 0) {
+                messages[0]._needsRetry = true;
+                messages[0]._retryReason = reasons.join('; ');
             }
         }
 

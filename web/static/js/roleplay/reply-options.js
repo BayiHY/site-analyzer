@@ -200,9 +200,25 @@ App.getDefaultReplyOptions = function(activeChar, charMsg, userMsg) {
 App.renderReplyOptions = function(options, msgId) {
     rpLog('INFO', 'REPLY-OPTS', `渲染 ${options?.length || 0} 个选项`);
     const container = document.getElementById('reply-options');
-    if (!container || !options || options.length < 2) {
-        rpLog('WARN', 'REPLY-OPTS', `跳过渲染: container=${!!container}, optionsLen=${options?.length}`);
+    if (!container) {
+        rpLog('WARN', 'REPLY-OPTS', `跳过渲染: container不存在`);
         return;
+    }
+    // 修复：至少 1 个有效选项就渲染，不要求 >= 2
+    if (!options || options.length < 1) {
+        rpLog('WARN', 'REPLY-OPTS', `跳过渲染: optionsLen=${options?.length}`);
+        return;
+    }
+    // 如果只有 1 个选项，补充通用选项使其至少有 2 个
+    if (options.length === 1) {
+        const fallbacks = ['保持沉默观察', '换个话题试试', '查看角色信息'];
+        const existing = options[0].toLowerCase();
+        for (const fb of fallbacks) {
+            if (!existing.includes(fb)) {
+                options.push(fb);
+                break;
+            }
+        }
     }
 
     container.innerHTML = '';
@@ -215,9 +231,9 @@ App.renderReplyOptions = function(options, msgId) {
     });
 
     // 持久化：保存到 state 和 IndexedDB
-    state.lastReplyOptions = { options: options, msgId: msgId };
+    state.lastReplyOptions = { options: [...options], msgId: msgId };
     saveState().catch(() => {});
-    rpLog('INFO', 'REPLY-OPTS', `选项已持久化`);
+    rpLog('INFO', 'REPLY-OPTS', `选项已持久化 (${options.length} 条)`);
 };
 
 App.sendReplyOption = async function(text, btnElement) {

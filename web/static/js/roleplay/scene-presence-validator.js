@@ -27,7 +27,8 @@ export function validateScenePresence(replyText, activeCharName, allCharacters) 
     // 2. 从 replyText 中提取实际出现的角色名
     const actuallyPresent = [];
     const charNameSet = new Set(allCharacters.map(c => c.name));
-    const namePattern = /([^\s|:：]{1,10})[:：](?!\s*\()/g;
+    // 匹配 :角色名: 或 角色名: 后面跟着 ( 或 「
+    const namePattern = /(?::|^)([\u4e00-\u9fa5a-zA-Z0-9_\u2022\u00B7·]{1,12})(?::)\s*[\(\u300c]/g;
     let nm;
     while ((nm = namePattern.exec(replyText)) !== null) {
         const n = nm[1].trim();

@@ -33,9 +33,19 @@ App.shouldRetryOnError = function(err) {
         return { shouldRetry: true, reason: '服务端错误' };
     }
     
+    // 404 Not Found — 模型不存在/路由错误，需要降级重试
+    if (msg.includes('not found') || msg.includes('404') || msg.includes('notfound') || msg.includes('openaipredictionnotfoundexception')) {
+        return { shouldRetry: true, reason: '模型不存在/路由错误' };
+    }
+    
     // 模型不存在/切换
     if (msg.includes('model not found') || msg.includes('does not exist') || msg.includes('invalid model')) {
         return { shouldRetry: true, reason: '模型不可用' };
+    }
+    
+    // 400 客户端错误 — 部分可重试（如参数格式问题）
+    if (msg.includes('400') || msg.includes('bad request')) {
+        return { shouldRetry: true, reason: '请求参数错误' };
     }
     
     // 内容过滤（不算重试，直接抛错）

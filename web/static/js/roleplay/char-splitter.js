@@ -1,71 +1,104 @@
-// === 角色分割器 ===
-// 按 :角色名: 格式分割多角色对话
+// === Section: 角色分割器 ===
+// 按 :角色名: 或 角色名: 格式分割多角色对话
+// 2026-07-04 增强：兼容单冒号和双冒号两种格式，提升单角色场景鲁棒性
+
+/**
+ * 检测一行是否是角色行
+ * 支持两种格式：
+ *   :角色名:(动作)...  （双冒号，推荐格式）
+ *   角色名:(动作)...   （单冒号，旧格式兼容）
+ */
+function isCharLine(line) {
+    const trimmed = line.trim();
+    // 双冒号格式：:名字:(  — 名字可以是中文/英文/数字/下划线/点/圆点
+    if (/^:[\u4e00-\u9fa5a-zA-Z0-9_\u2022\u00B7·]{1,12}:\s*[\(\u300c]/.test(trimmed)) {
+        return 'double_colon';
+    }
+    // 单冒号格式：名字:(  — 前面不能有冒号（排除双冒号）
+    if (!trimmed.startsWith(':') && /^[\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_\u2022\u00B7·]{0,11}:\s*[\(\u300c]/.test(trimmed)) {
+        return 'single_colon';
+    }
+    return false;
+}
+
+/**
+ * 从行中提取角色名和内容
+ * @param {string} line - 原始行文本
+ * @returns {{charName: string, content: string, format: 'double'|'single'|null}}
+ */
+function extractCharLine(line) {
+    const trimmed = line.trim();
+    
+    // 优先尝试双冒号格式 :角色名:(动作)...
+    const doubleMatch = trimmed.match(/^:([\u4e00-\u9fa5a-zA-Z0-9_\u2022\u00B7·]{1,12}):\s*(.+)$/);
+    if (doubleMatch && /[\(\u300c]/.test(doubleMatch[2].trimStart())) {
+        return { charName: doubleMatch[1].trim(), content: doubleMatch[2].trim(), format: 'double' };
+    }
+    
+    // 尝试单冒号格式 角色名:(动作)...
+    const singleMatch = trimmed.match(/^([\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_\u2022\u00B7·]{0,11}):\s*(.+)$/);
+    if (singleMatch && /[\(\u300c]/.test(singleMatch[2].trimStart())) {
+        // 确保不是数字开头（年龄列）
+        if (!/^\d/.test(singleMatch[1])) {
+            return { charName: singleMatch[1].trim(), content: singleMatch[2].trim(), format: 'single' };
+        }
+    }
+    
+    return { charName: null, content: null, format: null };
+}
 
 /**
  * 分割角色对话段
- * @param {string} text - 去除场景和建议回复后的对话文本
- * @returns {string[]} 各角色对话段数组
+ * 优先使用 :角色名: 格式分割，兼容 角色名: 格式
+ * 如果都没有检测到，返回原文本作为单段
  */
 export function splitCharParts(text) {
-    let charParts = [];
+    const charParts = [];
+    const lines = text.split('\n');
     
-    // 新格式：每行以 :角色名: 开头
-    // 匹配模式：行首的 :角色名:（前后冒号夹角色名）
-    const charLinePattern = /^:(.+?):(.+)$/gm;
-    let match;
-    
-    while ((match = charLinePattern.exec(text)) !== null) {
-        const charName = match[1].trim();
-        const content = match[2].trim();
-        if (content) {
-            charParts.push(`${charName}:${content}`);
+    // 第一轮：尝试双冒号格式 :角色名:
+    let foundDoubleColon = false;
+    for (const line of lines) {
+        const result = extractCharLine(line);
+        if (result.format === 'double') {
+            foundDoubleColon = true;
+            charParts.push({ charName: result.charName, content: result.content, format: 'double' });
         }
     }
     
-    // 兜底：如果没有匹配到 :角色名: 格式，尝试 ┆ 分隔
-    if (charParts.length === 0) {
-        charParts = text.split('┆').filter(s => s.trim());
-        
-        // 如果 ┆ 分割后只有 1 段，尝试用 "名字:" 模式拆分多角色
-        if (charParts.length === 1) {
-            const singleText = charParts[0].trim();
-            // 匹配模式：可选前导空白 + 汉字/字母 + 冒号(:或：)，后面跟着角色内容
-            const nameColonPattern = /(?:^|\n|\s+)([\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_•·]{0,10})([:：])(?=\s)/g;
-            const nameMatches = [];
-            let m;
-            while ((m = nameColonPattern.exec(singleText)) !== null) {
-                // 确保冒号前面不是 (动作 开头的标记
-                const beforeColon = singleText.substring(Math.max(0, m.index - 5), m.index);
-                if (!beforeColon.includes('(')) {
-                    const colonEnd = m.index + m[0].length;
-                    const nameStart = m.index + (m[0].length - m[1].length - m[2].length);
-                    nameMatches.push({ index: nameStart, name: m[1].trim(), colonEnd: colonEnd });
-                }
-            }
-
-            if (nameMatches.length >= 1) {
-                const splitParts = [];
-                // 第一段：第一个命名角色之前的所有内容（无名角色）
-                const firstSeg = singleText.substring(0, nameMatches[0].index).trim();
-                if (firstSeg) splitParts.push(firstSeg);
-                // 后续段落：每个命名角色的 "名字: 内容"
-                for (let i = 0; i < nameMatches.length; i++) {
-                    const nm = nameMatches[i];
-                    const nextStart = (i + 1 < nameMatches.length) ? nameMatches[i + 1].index : singleText.length;
-                    const seg = singleText.substring(nm.index, nextStart).trim();
-                    if (seg) splitParts.push(seg);
-                }
-                charParts = splitParts.filter(s => s);
-                if (typeof rpLog !== 'undefined') {
-                    rpLog('INFO', 'PARSE-CHAR', `使用 "名字:" 模式兜底拆分为 ${charParts.length} 段: ${charParts.map(p => p.slice(0, 40)).join(' | ')}`);
-                }
-            }
+    if (foundDoubleColon && charParts.length > 0) {
+        if (typeof rpLog !== 'undefined') {
+            rpLog('INFO', 'PARSE-CHAR', `双冒号格式拆分为 ${charParts.length} 段`);
+        }
+        return charParts.map(p => `${p.charName}:${p.content}`);
+    }
+    
+    // 第二轮：尝试单冒号格式 角色名:
+    charParts.length = 0;
+    let foundSingleColon = false;
+    for (const line of lines) {
+        const result = extractCharLine(line);
+        if (result.format === 'single') {
+            foundSingleColon = true;
+            charParts.push({ charName: result.charName, content: result.content, format: 'single' });
         }
     }
     
-    if (charParts.length > 0 && typeof rpLog !== 'undefined') {
-        rpLog('INFO', 'PARSE-CHAR', `使用 ":角色名:" 格式拆分为 ${charParts.length} 段: ${charParts.map(p => p.slice(0, 40)).join(' | ')}`);
+    if (foundSingleColon && charParts.length > 0) {
+        if (typeof rpLog !== 'undefined') {
+            rpLog('INFO', 'PARSE-CHAR', `单冒号格式拆分为 ${charParts.length} 段`);
+        }
+        return charParts.map(p => `${p.charName}:${p.content}`);
     }
-
-    return charParts;
+    
+    // 兜底：返回原文本作为单段
+    const trimmed = text.trim();
+    if (trimmed) {
+        if (typeof rpLog !== 'undefined') {
+            rpLog('WARN', 'PARSE-CHAR', '未检测到角色行格式，返回原文本作为单段');
+        }
+        return [trimmed];
+    }
+    
+    return [];
 }

@@ -1,9 +1,6 @@
-// === Section: 消息渲染 ===
-// 消息 DOM 创建 + 多角色格式解析（场景、动作、对话、内心想法）
-// 建议回复选项统一渲染到底部 .reply-options 容器
-
+// === 消息渲染 ===
 App.renderMessage = function(msg) {
-    rpLog('INFO', 'RENDER', `渲染消息: id=${msg.id}, role=${msg.role}, type=${msg.type}, suggestedReplies=${JSON.stringify(msg.suggestedReplies || [])}`);
+    rpLog('INFO', 'RENDER', `渲染消息: id=${msg.id}, role=${msg.role}, type=${msg.type}`);
     const container = document.getElementById('chat-messages');
     const div = document.createElement('div');
     div.className = `msg ${msg.role}`;
@@ -105,7 +102,6 @@ App.renderMessage = function(msg) {
     } else if (msg.type === 'multi_char') {
         bubble.innerHTML = App.formatMultiCharMessage(msg);
     } else if (msg.suggestedReplies && msg.suggestedReplies.length > 0) {
-        // 普通文本但有建议回复（如序章开场）：渲染内容，选项放到底部容器
         const textHtml = App.formatInteraction(msg.content);
         bubble.innerHTML = textHtml;
     } else {
@@ -122,14 +118,13 @@ App.renderMessage = function(msg) {
         App.renderReplyOptions(msg.suggestedReplies, msg.id);
     }
 
-    // 异步生成语音（刷新后不自动重播已播放过的消息）
+    // 异步生成语音
     if (msg.role === 'char' && msg._played !== true) {
         setTimeout(() => App.attachAudioToBubble(div, msg), 100);
     }
 }
 
 // 格式化多角色消息：(动作)对话[内心想法]
-// 建议回复选项通过 msg.suggestedReplies 统一渲染到底部容器
 App.formatMultiCharMessage = function(msg) {
     const action = msg.action || '';
     const dialogue = msg.dialogue || '';
@@ -172,11 +167,8 @@ App.toggleThought = function(id, btn) {
 
 // 发送底部容器的建议回复
 App.sendReplyOption = async function(text) {
-    // 清空输入框旧内容
     const input = document.getElementById('chat-input');
     if (input) input.value = text;
-
-    // 直接调用 sendMessage
     await App.sendMessage();
 }
 
@@ -186,7 +178,7 @@ App.formatInteraction = function(text) {
         return App.escHtml(text);
     }
     
-    // 检测角色名前缀：:角色名: 或 角色名:（兼容新旧格式）
+    // 检测角色名前缀：:角色名: 或 角色名:
     let charLabel = '';
     let labelText = '';
     const charPrefixMatch = text.match(/^:([\u4e00-\u9fff\u4e00-\u9fa5a-zA-Z0-9_•·]+?):\s*/);
@@ -195,7 +187,6 @@ App.formatInteraction = function(text) {
         labelText = charPrefixMatch[1];
         text = text.slice(charPrefixMatch[0].length);
     } else {
-        // 旧格式：冒号前的连续汉字
         const oldCharPrefixMatch = text.match(/^([\u4e00-\u9fff]+?)[:：]\s*/);
         if (oldCharPrefixMatch) {
             charLabel = oldCharPrefixMatch[1];
@@ -209,7 +200,6 @@ App.formatInteraction = function(text) {
     
     let html = '';
     let remaining = text;
-
     let parts = [];
     let pos = 0;
 
@@ -246,14 +236,11 @@ App.formatInteraction = function(text) {
             case 'action': return `<span class="format-action">${App.escHtml(p.content)}</span>`;
             case 'thought': return `<span class="format-thought">${App.escHtml(p.content)}</span>`;
             case 'suggested_replies':
-                // <> 标签不再内联渲染按钮，选项由底部 .reply-options 容器统一渲染
-                // 如果 msg.suggestedReplies 为空（旧消息兼容），则显示为纯文本
                 return `<span class="format-suggested-replies">${App.escHtml(p.content)}</span>`;
             default: return App.escHtml(p.content);
         }
     }).join('');
     
-    // 如果有角色名前缀，包装成 label
     if (charLabel) {
         return `<span class="char-label">${App.escHtml(labelText)}</span> ${bodyHtml}`;
     }
