@@ -186,47 +186,20 @@ App.initializeStory = async function(userInspiration, playerGender) {
     }
     rpLog('info', 'TIMING', '✅ 角色名同步完成');
     
-    // 解析序章：从 openingScene 中提取 <建议回复> 并渲染为多角色消息格式
+    // 解析序章：复用 parseMultiCharReply 的完整解析管线（场景提取→建议回复→角色分割→内容解析）
     rpLog('info', 'TIMING', '=== 开始解析序章 ===');
     const openingRaw = state.story.openingScene || '';
     rpLog('INFO', 'INIT-REPLY', `开场场景原始文本 (长度=${openingRaw.length}): "${openingRaw.substring(0, 150)}..."`);
-    let openingText = openingRaw;
-    let openingReplies = [];
-    rpLog('info', 'TIMING', '开始匹配建议回复标签...');
-    const replyMatch = openingRaw.match(/<([^>]*)>\s*$/);
-    if (replyMatch) {
-        rpLog('INFO', 'INIT-REPLY', `开场 <> 标签内容: "${replyMatch[1]}"`);
-        openingText = openingRaw.slice(0, openingRaw.length - replyMatch[0].length).trim();
-        openingReplies = replyMatch[1].split('┇').map(s => {
-            let t = s.trim();
-            t = t.replace(/^["「」]/, '').replace(/["」]$/, '');
-            return t;
-        }).filter(Boolean);
-        // 兜底：如果 ┇ 分隔结果不足，尝试 | 分隔符
-        if (openingReplies.length < 2) {
-            const fb1 = replyMatch[1].split('|').map(s => { let t = s.trim(); t = t.replace(/^["「」]/, '').replace(/["」]$/, ''); return t; }).filter(Boolean);
-            if (fb1.length >= 2) { openingReplies = fb1; rpLog('INFO', 'INIT-REPLY', `┇ 分隔失败，使用 | 兜底`); }
-            else {
-                const fb2 = replyMatch[1].split('、').map(s => { let t = s.trim(); t = t.replace(/^["「」]/, '').replace(/["」]$/, ''); return t; }).filter(Boolean);
-                if (fb2.length >= 2) { openingReplies = fb2; rpLog('INFO', 'INIT-REPLY', `| 分隔失败，使用顿号兜底`); }
-            }
-        }
-        rpLog('INFO', 'INIT-REPLY', `解析出 ${openingReplies.length} 条开场建议回复: ${JSON.stringify(openingReplies)}`);
-    } else {
-        rpLog('WARN', 'INIT-REPLY', '开场场景中未发现 <> 标签，无建议回复');
-    }
-    rpLog('info', 'TIMING', '✅ 序章解析完成');
     
-    state.messages.push({
-        id: 'msg_' + Date.now(),
-        role: 'system',
-        type: 'text',
-        content: openingText,
-        timestamp: new Date().toISOString(),
-        suggestedReplies: openingReplies
-    });
-    rpLog('info', 'TIMING', '=== 开始渲染序章消息 ===');
-    renderMessage(state.messages[state.messages.length - 1]);
+    // 直接调用 parseMultiCharReply，复用角色回复的完整解析和渲染逻辑
+    const parsedMessages = await App.parseMultiCharReply(openingRaw, 0);
+    rpLog('INFO', 'INIT-REPLY', `序章解析出 ${parsedMessages.length} 条消息`);
+    
+    // 将所有解析出的消息加入 state.messages 并逐个渲染
+    for (const msg of parsedMessages) {
+        state.messages.push(msg);
+        renderMessage(msg);
+    }
     rpLog('info', 'TIMING', '✅ 序章消息渲染完成');
     saveMessages().catch(() => {});
 
