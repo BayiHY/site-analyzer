@@ -122,8 +122,8 @@ App.renderMessage = function(msg) {
         App.renderReplyOptions(msg.suggestedReplies, msg.id);
     }
 
-    // 异步生成语音
-    if (msg.role === 'char') {
+    // 异步生成语音（刷新后不自动重播已播放过的消息）
+    if (msg.role === 'char' && msg._played !== true) {
         setTimeout(() => App.attachAudioToBubble(div, msg), 100);
     }
 }
@@ -186,14 +186,22 @@ App.formatInteraction = function(text) {
         return App.escHtml(text);
     }
     
-    // 检测角色名前缀：冒号前的连续汉字（到空格/换行/其他非汉字符号截断）
+    // 检测角色名前缀：:角色名: 或 角色名:（兼容新旧格式）
     let charLabel = '';
     let labelText = '';
-    const charPrefixMatch = text.match(/^([\u4e00-\u9fff]+?)[:：]\s*/);
+    const charPrefixMatch = text.match(/^:([\u4e00-\u9fff\u4e00-\u9fa5a-zA-Z0-9_•·]+?):\s*/);
     if (charPrefixMatch) {
         charLabel = charPrefixMatch[1];
         labelText = charPrefixMatch[1];
         text = text.slice(charPrefixMatch[0].length);
+    } else {
+        // 旧格式：冒号前的连续汉字
+        const oldCharPrefixMatch = text.match(/^([\u4e00-\u9fff]+?)[:：]\s*/);
+        if (oldCharPrefixMatch) {
+            charLabel = oldCharPrefixMatch[1];
+            labelText = oldCharPrefixMatch[1];
+            text = text.slice(oldCharPrefixMatch[0].length);
+        }
     }
     
     let html = '';

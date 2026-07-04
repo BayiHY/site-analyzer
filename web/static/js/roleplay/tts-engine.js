@@ -2,6 +2,38 @@
 // 基于 Blob URL + Cache API 的纯前端 TTS 集成
 // 后端代理 /api/tts 返回 MP3 字节流，前端缓存到 Cache API
 
+// ===== 全局音频管理器：同时只播放一个音频 =====
+let _currentAudio = null;       // 当前正在播放的 Audio 对象
+let _playingMsgId = null;       // 正在播放的消息 ID（用于刷新后不重复播放）
+
+App.stopAllAudio = function() {
+    if (_currentAudio) {
+        _currentAudio.pause();
+        _currentAudio.currentTime = 0;
+        URL.revokeObjectURL(_currentAudio.src);
+        _currentAudio = null;
+    }
+    _playingMsgId = null;
+};
+
+App.playAudio = function(audioEl, msgId) {
+    // 播放新音频前，停止上一个
+    App.stopAllAudio();
+    _playingMsgId = msgId;
+    _currentAudio = audioEl;
+    
+    audioEl.addEventListener('ended', function() {
+        _currentAudio = null;
+        _playingMsgId = null;
+    }, { once: true });
+    
+    audioEl.play().catch(e => {
+        rpLog('TTS:', `AUTO-PLAY blocked: ${e.message} (msgId=${msgId})`);
+        _currentAudio = null;
+        _playingMsgId = null;
+    });
+};
+
 // ===== TTS 音色配置 =====
 const TTS_VOICES = {
     // 普通话 - 女声（统一使用 Xiaoyi，通过 pitch/rate 区分角色）
@@ -326,9 +358,24 @@ App.attachAudioToBubble = async function(msgEl, msg) {
                 
                 bubble.appendChild(audio);
                 
+                // 自动播放
+                App.playAudio(audio, msg.id);
+                
+                // 标记已播放，刷新后不重复
+                msg._played = true;
+                
+                // 持久化已播放的消息 ID 到 sessionStorage（页面关闭后清除）
+                try {
+                    const playedIds = JSON.parse(sessionStorage.getItem('rp_played_msg_ids') || '[]');
+                    if (!playedIds.includes(msg.id)) {
+                        playedIds.push(msg.id);
+                        sessionStorage.setItem('rp_played_msg_ids', JSON.stringify(playedIds));
+                    }
+                } catch(e) {}
+                
                 // 注意：不持久化 blob URL，仅保存在内存中
                 // msg._audioUrl 和 msg._audioBlobUrl 不会被 saveMessages() 持久化
-                rpLog('TTS', 'PLAYING', `气泡音频已嵌入: ${char?.name || '角色'}`);
+                rpLog('TTS:', `AUTO-PLAY msgId=${msg.id} char=${char?.name || '?'}`);
             } else {
                 // 生成失败：替换为错误提示
                 loading.className = 'tts-error';

@@ -10,11 +10,18 @@
  * @returns {{charName: string|null, charIdx: number, action: string, dialogue: string, thought: string, formattedContent: string}}
  */
 export function parseContent(trimmed, charName, defaultCharIndex, suggestedReplies) {
-    // 检查是否有 "角色名:" 前缀
-    const prefixMatch = trimmed.match(/^([^:：]+)[:：]\s*(.+)/);
+    // 检查是否有 ":角色名:" 前缀（新格式，前后冒号夹角色名）
+    let prefixMatch = trimmed.match(/^:([^:：]+):(.+)/);
     if (prefixMatch) {
         charName = prefixMatch[1].trim();
         trimmed = prefixMatch[2].trim();
+    } else {
+        // 旧格式：检查是否有 "角色名:" 前缀
+        prefixMatch = trimmed.match(/^([^:：]+)[:：]\s*(.+)/);
+        if (prefixMatch) {
+            charName = prefixMatch[1].trim();
+            trimmed = prefixMatch[2].trim();
+        }
     }
 
     let action = '';

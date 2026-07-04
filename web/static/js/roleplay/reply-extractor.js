@@ -52,7 +52,7 @@ function validateOptionPerspective(option) {
 export function extractSuggestedReplies(text) {
     let suggestedReplies = [];
 
-    const replyMatch = text.match(/<([^>]*)>\|?\s*$/);
+    const replyMatch = text.match(/<([^>]*)>\s*$/);
     if (replyMatch) {
         if (typeof rpLog !== 'undefined') {
             rpLog('INFO', 'PARSE-REPLY', `原始文本含 <> 标签: "${replyMatch[0]}"`);

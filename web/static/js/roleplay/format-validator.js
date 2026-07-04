@@ -22,18 +22,19 @@ export function validateFormat(rawText, parsedMessages) {
         details.push('场景描述缺失');
     }
 
-    // 2. 检查角色名前缀（应该有 角色名: 或 角色名：）
-    const hasNamePrefix = /[\u4e00-\u9fa5a-zA-Z]{2,10}[:：]\s*[\(\(]/.test(rawText) ||
-                          /[\u4e00-\u9fa5a-zA-Z]{2,10}[:：][^\(\)]/.test(rawText);
+    // 2. 检查角色名前缀（应该有 :角色名: 格式）
+    const hasNamePrefix = /:[\u4e00-\u9fa5a-zA-Z]{2,10}:(?=\s*[\\(])/g.test(rawText) ||
+                          /:[\u4e00-\u9fa5a-zA-Z]{2,10}:/g.test(rawText);
     if (!hasNamePrefix && parsedMessages.length > 0) {
         missingPrefix = true;
         details.push('角色名前缀缺失');
     }
 
-    // 3. 检查是否有多角色分隔符 ┆
-    const hasSeparator = rawText.includes('┆');
-    if (!hasSeparator && parsedMessages.filter(m => m.type === 'multi_char').length > 1) {
-        details.push('多角色消息但无分隔符');
+    // 3. 检查是否包含建议回复 <>
+    const hasReplies = /<[^>]+>/.test(rawText);
+    if (!hasReplies && parsedMessages.length > 0) {
+        missingReplies = true;
+        details.push('建议回复缺失');
     }
 
     // 4. 检查是否包含动作描写（应该有 (动作) 格式）

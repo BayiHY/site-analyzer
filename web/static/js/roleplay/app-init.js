@@ -255,7 +255,16 @@ App.restoreApiKeysToInputs = function() {
 App.renderMessages = function() {
     const container = document.getElementById('chat-messages');
     container.innerHTML = '';
-    state.messages.forEach(msg => renderMessage(msg));
+    state.messages.forEach(msg => {
+        // 从 sessionStorage 读取已播放的消息 ID 列表
+        try {
+            const playedIds = JSON.parse(sessionStorage.getItem('rp_played_msg_ids') || '[]');
+            if (playedIds.includes(msg.id)) {
+                msg._played = true;
+            }
+        } catch(e) {}
+        renderMessage(msg);
+    });
     container.scrollTop = container.scrollHeight;
 }
 
