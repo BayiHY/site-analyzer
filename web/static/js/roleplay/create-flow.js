@@ -139,15 +139,33 @@ App.generateCharactersAndStart = async function() {
                     return null;
                 });
 
+                // 序章生成任务（基于角色数据生成）
+                const openingTask = App.generateOpeningScene().then(scene => {
+                    if (scene) {
+                        state.story.openingScene = scene;
+                        rpLog('info', 'OPENING', '序章生成完成，已存入 state.story.openingScene');
+                    }
+                    return scene;
+                }).catch(err => {
+                    rpLog('warn', 'OPENING', '序章生成失败: ' + err.message);
+                    return '';
+                });
+
                 // 先完成角色头像
                 await Promise.all(imgTasks);
                 const playerOk = await playerAvatarTask;
                 addSystemMessage(`✅ 角色头像生成完成 (${chars.length}/${chars.length} 角色 + ${playerOk ? '1' : '0'} 主角)`);
                 rpLog('info', 'IMG', `角色头像生成完成: ${chars.length}/${chars.length} 角色, 主角:${playerOk}`);
 
-                // 角色头像全部完成后，再生成初始场景图
+                // 等待序章完成
+                const openingScene = await openingTask;
+                if (openingScene) {
+                    rpLog('info', 'OPENING', '序章生成完成');
+                }
+
+                // 角色头像全部完成 + 序章完成 → 生成初始场景图
                 if (state.story.openingScene) {
-                    rpLog('info', 'SCENE', '角色头像全部完成，开始生成初始场景图');
+                    rpLog('info', 'SCENE', '角色头像全部完成 + 序章完成，开始生成初始场景图');
                     addSystemMessage('🖼️ 正在生成场景图...');
                     await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene);
                     rpLog('info', 'SCENE', '初始场景图生成完成');
@@ -155,6 +173,17 @@ App.generateCharactersAndStart = async function() {
             } catch (imgErr) {
                 rpLog('error', 'IMG', '头像/场景图生成失败: ' + imgErr.message);
                 addSystemMessage(`⚠️ 头像/场景图生成失败: ${imgErr.message}`);
+            }
+        } else if (!state.apiKeys.image) {
+            // 没有生图 API Key，也生成序章
+            try {
+                const openingScene = await App.generateOpeningScene();
+                if (openingScene) {
+                    state.story.openingScene = openingScene;
+                    rpLog('info', 'OPENING', '序章生成完成（无生图），已存入 state.story.openingScene');
+                }
+            } catch (err) {
+                rpLog('warn', 'OPENING', '序章生成失败: ' + err.message);
             }
         }
 
@@ -270,15 +299,33 @@ App.regenerateCharacters = async function() {
                     return null;
                 });
 
+                // 序章生成任务（基于新角色数据重新生成）
+                const openingTask = App.generateOpeningScene().then(scene => {
+                    if (scene) {
+                        state.story.openingScene = scene;
+                        rpLog('info', 'OPENING', '序章重新生成完成，已存入 state.story.openingScene');
+                    }
+                    return scene;
+                }).catch(err => {
+                    rpLog('warn', 'OPENING', '序章重新生成失败: ' + err.message);
+                    return '';
+                });
+
                 // 先完成角色头像
                 await Promise.all(imgTasks);
                 const playerOk = await playerAvatarTask;
                 addSystemMessage(`✅ 角色头像重新生成完成 (${chars.length}/${chars.length} 角色 + ${playerOk ? '1' : '0'} 主角)`);
                 rpLog('info', 'IMG', `角色头像重新生成完成: ${chars.length}/${chars.length} 角色, 主角:${playerOk}`);
 
-                // 角色头像全部完成后，再生成初始场景图
+                // 等待序章完成
+                const openingScene = await openingTask;
+                if (openingScene) {
+                    rpLog('info', 'OPENING', '序章重新生成完成');
+                }
+
+                // 角色头像全部完成 + 序章完成 → 生成初始场景图
                 if (state.story.openingScene) {
-                    rpLog('info', 'SCENE', '角色头像全部完成，开始重新生成初始场景图');
+                    rpLog('info', 'SCENE', '角色头像全部完成 + 序章完成，开始重新生成初始场景图');
                     addSystemMessage('🖼️ 正在重新生成场景图...');
                     await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene);
                     rpLog('info', 'SCENE', '初始场景图重新生成完成');
@@ -286,6 +333,17 @@ App.regenerateCharacters = async function() {
             } catch (imgErr) {
                 rpLog('error', 'IMG', '头像生成失败: ' + imgErr.message);
                 addSystemMessage(`头像生成失败: ${imgErr.message}`);
+            }
+        } else if (!state.apiKeys.image) {
+            // 没有生图 API Key，也重新生成序章
+            try {
+                const openingScene = await App.generateOpeningScene();
+                if (openingScene) {
+                    state.story.openingScene = openingScene;
+                    rpLog('info', 'OPENING', '序章重新生成完成（无生图），已存入 state.story.openingScene');
+                }
+            } catch (err) {
+                rpLog('warn', 'OPENING', '序章重新生成失败: ' + err.message);
             }
         }
 

@@ -361,100 +361,112 @@ App.generatePlayerAvatar = async function() {
     }
 };
 
-// 生图 API 调用
-App.agnesImageGen = async function(prompt, size = '256x341', model) {
+// === 统一生图入口 ===
+// 所有生图调用都应通过此方法，自动处理模型降级
+// 降级策略：agnes-image-2.1-flash → 超时/失败 → agnes-image-2.0-flash
+// 支持文生图（t2i）和图生图（img2img）两种模式
+App.agnesImageGenerate = async function(options) {
+    const {
+        prompt,           // 文本提示词（必填）
+        refImages = [],   // 参考图 URL 数组（可选，非空则走 img2img 模式）
+        size = '256x341', // 图片尺寸
+        model = 'agnes-image-2.1-flash', // 首选模型
+        timeoutMs = 120000, // 超时时间（毫秒）
+        label = 'image'     // 日志标签
+    } = options;
+
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
         throw new Error('未配置生图 API Key');
     }
-    if (!model) {
-        model = 'agnes-image-2.1-flash';
-    }
 
-    const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: model,
-            prompt: prompt,
-            size: size,
-            n: 1,
-            extra_body: { response_format: 'url' }
-        }),
-        signal: AbortSignal.timeout(120000)
-    });
+    // 模型降级列表
+    const modelFallbacks = [model, 'agnes-image-2.0-flash'];
+    let lastError = null;
 
-    if (!resp.ok) {
-        let errMsg = `生图错误 (${resp.status})`;
-        try {
-            const errData = await resp.json();
-            errMsg = errData.error?.message || errData.message || errMsg;
-        } catch(e) {
-            errMsg = `生图错误 (${resp.status}): ${await resp.text()}`;
+    for (let attempt = 0; attempt < modelFallbacks.length; attempt++) {
+        const currentModel = modelFallbacks[attempt];
+        if (attempt > 0) {
+            rpLog('warn', 'IMG', `⬇️ ${label} 降级到 ${currentModel} (尝试 ${attempt + 1}/${modelFallbacks.length})`);
         }
-        console.error('生图API响应:', errMsg);
-        throw new Error(errMsg);
+
+        try {
+            const requestBody = {
+                model: currentModel,
+                prompt: prompt,
+                size: size,
+                n: 1,
+                extra_body: { response_format: 'url' }
+            };
+
+            // img2img 模式：加入参考图
+            if (refImages && refImages.length > 0) {
+                requestBody.extra_body.image = refImages;
+            }
+
+            rpLog('info', 'TIMEOUT', `生图请求开始: ${label}${attempt > 0 ? ' (降级)' : ''}`);
+            const imgStart = Date.now();
+
+            const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify(requestBody),
+                signal: AbortSignal.timeout(timeoutMs)
+            });
+
+            const imgElapsed = Date.now() - imgStart;
+            rpLog('info', 'TIMEOUT', `生图请求完成: ${label}, 耗时 ${imgElapsed}ms, status=${resp.status}`);
+
+            if (!resp.ok) {
+                let errMsg = `生图错误 (${resp.status})`;
+                try {
+                    const errData = await resp.json();
+                    errMsg = errData.error?.message || errData.message || errMsg;
+                } catch(e) {
+                    errMsg = `生图错误 (${resp.status}): ${await resp.text()}`;
+                }
+                rpLog('warn', 'IMG', `${label} 失败 (${currentModel}): ${errMsg}`);
+                lastError = new Error(errMsg);
+                continue; // 尝试降级模型
+            }
+
+            const data = await resp.json();
+            const imgUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
+            if (!imgUrl) {
+                rpLog('warn', 'IMG', `${label} 返回数据异常 (${currentModel})`);
+                lastError = new Error('未获取到图片 URL，API 返回格式异常');
+                continue;
+            }
+
+            rpLog('info', 'IMG', `✅ ${label} 成功 (${currentModel}): ${imgUrl.slice(0, 80)}`);
+            return imgUrl;
+
+        } catch (err) {
+            // 超时或其他网络错误
+            rpLog('warn', 'IMG', `${label} 异常 (${currentModel}): ${err.message}`);
+            lastError = err;
+            continue; // 尝试降级模型
+        }
     }
 
-    const data = await resp.json();
-    console.log('生图API返回:', JSON.stringify(data).slice(0, 200));
-    const imgUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
-    if (!imgUrl) {
-        console.error('生图返回数据异常:', JSON.stringify(data).slice(0, 500));
-        throw new Error('未获取到图片 URL，API 返回格式异常');
-    }
-    return imgUrl;
+    // 所有模型都失败了
+    rpLog('error', 'IMG', `❌ ${label} 全部失败: ${lastError?.message}`);
+    throw lastError;
 };
 
-// === img2img 变体：传入面部参考图，确保面部一致性 ===
-App.agnesImageGenWithRefImg = async function(prompt, faceImageUrl, size = '256x341') {
-    const apiKey = state.apiKeys.image;
-    if (!apiKey) {
-        throw new Error('未配置生图 API Key');
-    }
-    if (!faceImageUrl) {
-        throw new Error('缺少面部参考图 URL');
-    }
-
-    rpLog('info', 'IMG', `img2img: 使用面部参考图生图`);
-
-    const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'agnes-image-2.1-flash',
-            prompt: prompt,
-            image: [faceImageUrl],
-            size: size,
-            n: 1,
-            extra_body: { response_format: 'url' }
-        }),
-        signal: AbortSignal.timeout(120000)
+// 生图 API 调用（旧接口，内部调用统一入口）
+App.agnesImageGen = async function(prompt, size = '256x341', model) {
+    return App.agnesImageGenerate({
+        prompt, size, model, label: 't2i'
     });
+};
 
-    if (!resp.ok) {
-        let errMsg = `img2img 生图错误 (${resp.status})`;
-        try {
-            const errData = await resp.json();
-            errMsg = errData.error?.message || errData.message || errMsg;
-        } catch(e) {
-            errMsg = `生图错误 (${resp.status}): ${await resp.text()}`;
-        }
-        console.error('img2img API 响应:', errMsg);
-        throw new Error(errMsg);
-    }
-
-    const data = await resp.json();
-    const imgUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
-    if (!imgUrl) {
-        console.error('img2img 返回数据异常:', JSON.stringify(data).slice(0, 500));
-        throw new Error('未获取到图片 URL');
-    }
-    return imgUrl;
+// img2img 变体（旧接口，内部调用统一入口）
+App.agnesImageGenWithRefImg = async function(prompt, faceImageUrl, size = '256x341') {
+    return App.agnesImageGenerate({
+        prompt, size, refImages: [faceImageUrl], label: 'img2img'
+    });
 };

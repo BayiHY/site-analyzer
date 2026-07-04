@@ -41,22 +41,20 @@ ${factorPrompt}
 
 输出为 TSV 表格格式，单行数据，用 | 分隔字段：
 
-storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
+storyTitle|worldviewSummary|mainArc|toneKeywords|worldviewNotes
 
 具体字段：
 - storyTitle: 故事标题（简洁有力，8字以内）
 - worldviewSummary: 世界观概要（100-200字，描述这个世界的核心特色、社会形态和运转规则）
-- openingScene: 开场场景描写（150-250字，具体且有画面感，让玩家有代入感。必须包含：①环境氛围描写 ②至少一个NPC角色在场并有台词或动作
 - mainArc: 起：故事起始。承：事件触发。转：冲突升级。合：高潮对决。余韵：结局后新平衡。
 - toneKeywords: 3个词概括整体氛围，用 、 分隔
 - worldviewNotes: 给后续角色生成的额外设定约束（50字以内）
 
 要求：
 1. 世界观要自洽、有细节、有独特性
-2. 开场场景要有画面感，能立刻吸引玩家
-3. 主线弧光要有起伏，不能平淡
-4. toneKeywords 用3个词概括整体氛围，用中文顿号 、 分隔
-5. worldviewNotes 要包含角色设计的硬性约束`;
+2. 主线弧光要有起伏，不能平淡
+3. toneKeywords 用3个词概括整体氛围，用中文顿号 、 分隔
+4. worldviewNotes 要包含角色设计的硬性约束`;
     } else {
         userPrompt = `请根据用户的灵感方向生成故事骨架：
 
@@ -68,22 +66,20 @@ storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
 
 输出为 TSV 表格格式，单行数据，用 | 分隔字段：
 
-storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
+storyTitle|worldviewSummary|mainArc|toneKeywords|worldviewNotes
 
 具体字段：
 - storyTitle: 故事标题（简洁有力，8字以内）
 - worldviewSummary: 世界观概要（100-200字，描述这个世界的核心特色、社会形态和运转规则）
-- openingScene: 开场场景描写（150-250字，具体且有画面感，让玩家有代入感。必须包含：①环境氛围描写 ②至少一个NPC角色在场并有台词或动作
 - mainArc: 起：故事起始。承：事件触发。转：冲突升级。合：高潮对决。余韵：结局后新平衡。
 - toneKeywords: 3个词概括整体氛围，用 、 分隔
 - worldviewNotes: 给后续角色生成的额外设定约束（50字以内）
 
 要求：
 1. 世界观要自洽、有细节、有独特性
-2. 开场场景要有画面感，能立刻吸引玩家
-3. 主线弧光要有起伏，不能平淡
-4. toneKeywords 用3个词概括整体氛围，用中文顿号 、 分隔
-5. worldviewNotes 要包含角色设计的硬性约束`;
+2. 主线弧光要有起伏，不能平淡
+3. toneKeywords 用3个词概括整体氛围，用中文顿号 、 分隔
+4. worldviewNotes 要包含角色设计的硬性约束`;
     }
 
     rpLog('info', 'WORLDVIEW', '调用 LLM 生成世界观骨架');
@@ -154,7 +150,7 @@ storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes
         title: data.storyTitle || '未命名故事',
         worldview: data.worldviewSummary || '',
         mainArc: Array.isArray(data.mainArc) ? data.mainArc : [],
-        openingScene: data.openingScene || '',
+        openingScene: '', // 将在角色生成后由 generateOpeningScene 填充
         toneKeywords: Array.isArray(data.toneKeywords) ? data.toneKeywords : [],
         worldviewNotes: data.worldviewNotes || '',
         factors: factors,
@@ -181,7 +177,7 @@ App.parseWorldviewKeyValue = function(text) {
     const result = {};
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     
-    // 字段名映射：支持英文 key 和中文 key
+    // 字段名映射：支持英文 key 和中文 key（已移除 openingScene）
     const fieldMap = {
         'storytitle': 'storyTitle',
         '故事标题': 'storyTitle',
@@ -190,9 +186,6 @@ App.parseWorldviewKeyValue = function(text) {
         '世界观概要': 'worldviewSummary',
         '世界观': 'worldviewSummary',
         '设定概要': 'worldviewSummary',
-        'openingscene': 'openingScene',
-        '开场场景': 'openingScene',
-        '开场': 'openingScene',
         'mainarc': 'mainArc',
         '主线剧情': 'mainArc',
         '主要弧光': 'mainArc',
@@ -238,20 +231,19 @@ App.parseWorldviewDelimited = function(text) {
     if (parts.length === 0) return result;
 
     // 检测并移除前缀标签（如 "storyTitle|" 这种）
-    const labelPattern = /^(?:storyTitle|worldviewSummary|openingScene|mainArc|toneKeywords|worldviewNotes|故事标题|世界观概要|开场场景|开场|主线剧情|主要弧光|tone(?:ic)? ?keywords?|氛围关键词|世界观备注|世界观笔记)$/iu;
+    const labelPattern = /^(?:storyTitle|worldviewSummary|mainArc|toneKeywords|worldviewNotes|故事标题|世界观概要|主线剧情|主要弧光|tone(?:ic)? ?keywords?|氛围关键词|世界观备注|世界观笔记)$/iu;
     if (parts[0].length <= 20 && labelPattern.test(parts[0])) {
         parts = parts.slice(1);
     }
     if (parts.length === 0) return result;
 
-    // 严格按 TSV 列顺序映射（6 个字段）
-    // storyTitle | worldviewSummary | openingScene | mainArc | toneKeywords | worldviewNotes
+    // 严格按 TSV 列顺序映射（5 个字段，已移除 openingScene）
+    // storyTitle | worldviewSummary | mainArc | toneKeywords | worldviewNotes
     if (parts.length >= 1) result.storyTitle = parts[0];
     if (parts.length >= 2) result.worldviewSummary = parts[1];
-    if (parts.length >= 3) result.openingScene = parts[2];
-    if (parts.length >= 4) result.mainArc = parts[3];
-    if (parts.length >= 5) result.toneKeywords = parts[4];
-    if (parts.length >= 6) result.worldviewNotes = parts[5];
+    if (parts.length >= 3) result.mainArc = parts[2];
+    if (parts.length >= 4) result.toneKeywords = parts[3];
+    if (parts.length >= 5) result.worldviewNotes = parts[4];
 
     // 如果 mainArc 包含阶段标记（起/承/转/合），将其识别为主线
     if (!result.mainArc) {

@@ -28,7 +28,7 @@ function parseDelimited(text) {
     let currentBlock = '';
     for (const line of dataLines) {
         const pipeCount = (line.match(/\|/g) || []).length;
-        const isNewChar = /^[\u4e00-\u9fff]{2,4}\|/.test(line);
+        const isNewChar = /^[\u4e00-\u9fff]{1,4}\|/.test(line);
         const isDigitStart = /^\d+\|/.test(line);
 
         if (currentBlock && (isNewChar || isDigitStart || pipeCount >= HEADER_PIPE_COUNT)) {

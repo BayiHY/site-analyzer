@@ -69,7 +69,7 @@ App.initializeStory = async function(userInspiration, playerGender) {
         throw err;
     }
 
-    // 角色生成完成后，并行生成头像
+    // 角色生成完成后，并行生成头像 + 序章
     if (state.apiKeys.image) {
         rpLog('info', 'IMG', `━━━ 开始生图阶段: ${state.characters.length} 个角色 + 主角 ━━━`);
         rpLog('info', 'IMG', `  生图 API Key 已配置`);
@@ -94,24 +94,58 @@ App.initializeStory = async function(userInspiration, playerGender) {
                 return null;
             });
 
+            // 序章生成任务（基于角色数据生成，与头像并行）
+            const openingTask = App.generateOpeningScene().then(scene => {
+                if (scene) {
+                    state.story.openingScene = scene;
+                    rpLog('info', 'OPENING', '序章生成完成，已存入 state.story.openingScene');
+                }
+                return scene;
+            }).catch(err => {
+                rpLog('warn', 'OPENING', '序章生成失败: ' + err.message);
+                return '';
+            });
+
             // 等待所有角色头像完成
             await Promise.all(imgTasks);
             const playerOk = await playerAvatarTask;
             addSystemMessage(`✅ 角色头像生成完成 (${state.characters.length}/${state.characters.length} 角色 + ${playerOk ? '1' : '0'} 主角)`);
             rpLog('info', 'IMG', `角色头像生成完成: ${state.characters.length}/${state.characters.length} 角色, 主角:${playerOk}`);
 
-            // 角色头像全部完成后，再生成初始场景图
+            // 等待序章完成
+            const openingScene = await openingTask;
+            if (openingScene) {
+                rpLog('info', 'OPENING', '序章生成完成，开始渲染序章消息');
+            } else {
+                rpLog('warn', 'OPENING', '序章生成返回空，使用空序章');
+            }
+
+            // 角色头像全部完成 + 序章生成完成 → 生成初始场景图
             if (state.story.openingScene) {
-                rpLog('info', 'SCENE', '角色头像全部完成，开始生成初始场景图');
+                rpLog('info', 'SCENE', '角色头像全部完成 + 序章完成，开始生成初始场景图');
                 addSystemMessage('🖼️ 正在生成场景图...');
                 rpLog('info', 'TIMING', `场景图生成前 openingScene 长度: ${state.story.openingScene.length}`);
-                await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene);
+                
+                // 从序章中提取结构化回复文本（用于角色名解析）
+                const replyText = state.story.openingScene;
+                await App.generateInitialSceneImage(state.story.openingScene, replyText);
                 rpLog('info', 'SCENE', '初始场景图生成完成');
                 rpLog('info', 'TIMING', '✅ 场景图生成完成，耗时已记录');
             }
         } catch (imgErr) {
             rpLog('error', 'IMG', '头像/场景图生成失败: ' + imgErr.message);
             addSystemMessage(`⚠️ 头像/场景图生成失败: ${imgErr.message}`);
+        }
+    } else {
+        // 没有生图 API Key，也生成序章
+        try {
+            const openingScene = await App.generateOpeningScene();
+            if (openingScene) {
+                state.story.openingScene = openingScene;
+                rpLog('info', 'OPENING', '序章生成完成（无生图），已存入 state.story.openingScene');
+            }
+        } catch (err) {
+            rpLog('warn', 'OPENING', '序章生成失败: ' + err.message);
         }
     }
 
@@ -201,38 +235,83 @@ App.initializeStory = async function(userInspiration, playerGender) {
 }
 
 // ===== 辅助函数：从文本中提取可能的角色名 =====
-// 策略：匹配 "名字 + 动词/标点" 的模式
-// 修复：避免灾难性回溯正则，使用简单的字符串搜索替代
+// 策略：匹配 "名字 + 冒号/动作" 的模式
+// 修复：只匹配 2-3 个纯中文字符序列，前面必须是词边界，后面紧跟冒号或动词
 function extractNamesFromText(text) {
-    if (!text || text.length > 10000) return []; // 超长文本直接跳过
+    if (!text || text.length > 10000) return [];
     const names = new Set();
     
-    // 策略：先找出所有 2-4 字符的中文/英文词，再检查后面是否跟动词或冒号
-    // 用简单的字符串扫描代替复杂正则，避免回溯
-    const verbs = new Set(['蹲在','冷冷','看着','说道','问道','回答','站','走','坐','靠','望',
-        '说','道','问','笑','皱眉','叹息','轻哼','低语','喃喃','嘟囔','开口','出声',
-        '转头','转身','迈步','停下','靠近','后退','伸手','握紧','松开','举起','放下',
-        '抱起','推开','拉开','关上','打开','点亮','熄灭','收起','拿出','掏出','翻找',
-        '查看','检查','打量','凝视','注视','盯着','瞥了一眼','扫过','环顾','低头',
-        '仰头','侧身','正身','弯腰','直起身']);
+    // 单字动词列表（用于 startsWith 匹配）
+    const verbs = ['蹲', '看', '说', '道', '问', '笑', '叹', '哼', '嘟',
+        '转', '走', '站', '坐', '靠', '望', '皱', '低', '喃', '停',
+        '伸', '握', '举', '放', '抱', '推', '拉', '关', '打', '亮',
+        '灭', '收', '拿', '掏', '翻', '查', '检', '凝', '盯', '扫',
+        '环', '弯', '直', '侧', '正', '答', '应', '喊', '叫'];
     
-    const len = text.length;
-    for (let i = 0; i < len - 1; i++) {
-        // 只匹配中文字符或英文字母组成的词
-        const chunk = text.slice(i, Math.min(i + 4, len + 1));
-        if (chunk.length < 2) continue;
-        if (!/[\u4e00-\u9fa5a-zA-Z]/.test(chunk)) continue;
-        // 检查后面是否紧跟动词或冒号
-        const after = text.slice(i + chunk.length, i + chunk.length + 20);
-        if (after.match(/^[:：]/)) {
-            names.add(chunk.trim());
+    // 常见非名字前缀/代词（出现在候选名前 1-2 字符时排除）
+    const nonNamePrefixes = new Set(['在这', '那里', '这里', '她们', '他们', '我们',
+        '你的', '我的', '他的', '她的', '它的', '这个', '那个', '什么', '怎么',
+        '觉得', '知道', '认为', '感觉', '突然', '慢慢', '轻轻', '静静',
+        '微微', '忽然', '已经', '正在', '可以', '能够', '应该', '必须',
+        '好像', '似乎', '依然', '仍然', '继续', '开始', '结束', '变得']);
+    
+    // 查找所有连续的纯中文字符段
+    const segmentPattern = /([\u4e00-\u9fa5]+)/g;
+    let segMatch;
+    
+    while ((segMatch = segmentPattern.exec(text)) !== null) {
+        const segment = segMatch[1];
+        const segStart = segMatch.index;
+        
+        // 段前面不能是中文/英文字符（确保段边界正确）
+        if (segStart > 0) {
+            const prevChar = text[segStart - 1];
+            if (/[\u4e00-\u9fa5a-zA-Z]/.test(prevChar)) {
+                continue;
+            }
         }
-        for (const v of verbs) {
-            if (after.startsWith(v)) {
-                names.add(chunk.trim());
+        
+        // 尝试从段首提取 2-3 字符的名字
+        // 策略：逐次取 2-3 字符，检查后面是否紧跟冒号/动词
+        for (let len = 2; len <= 3 && len <= segment.length; len++) {
+            const candidate = segment.slice(0, len);
+            const fullAfter = text.slice(segStart + len, segStart + len + 20);
+            
+            // 如果候选名第 3 个字符是"的/地/得"，说明是修饰结构，不是名字
+            if (len === 3 && '的地得'.includes(candidate[2])) {
+                continue;
+            }
+            
+            // 候选名字后面必须是：冒号、动词、或非中文字符
+            if (fullAfter.length > 0 && /[a-zA-Z]/.test(fullAfter[0])) {
+                names.add(candidate);
+                break;
+            }
+            if (fullAfter.match(/^[:：]/)) {
+                names.add(candidate);
+                break;
+            }
+            if (fullAfter.length > 0 && !/[\u4e00-\u9fa5]/.test(fullAfter[0])) {
+                names.add(candidate);
+                break;
+            }
+            if (verbs.some(v => fullAfter.startsWith(v))) {
+                names.add(candidate);
                 break;
             }
         }
     }
-    return [...names];
+    
+    // 过滤：排除明显不是名字的候选（前面紧跟非名字前缀）
+    const filtered = [];
+    for (const name of names) {
+        // 排除单字代词开头的组合（如"她微"）
+        if (/^[她他它你们我]/.test(name)) {
+            continue;
+        }
+        // 排除常见副词/形容词开头的组合
+        filtered.push(name);
+    }
+    
+    return filtered;
 }

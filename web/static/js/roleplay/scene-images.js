@@ -236,16 +236,7 @@ App.generateInitialSceneImage = async function(openingScene, replyText, metadata
 
         // 只传入场景中实际出现的角色参考图
         const sceneRefs = App.getSceneCharacterFaceUrls(replyText || openingScene, state.characters, metadata);
-        const requestBody = {
-            model: 'agnes-image-2.1-flash',
-            prompt: prompt,
-            size: '256x341',
-            n: 1,
-            extra_body: { response_format: 'url' }
-        };
-
         if (sceneRefs.length > 0) {
-            requestBody.extra_body.image = sceneRefs;
             rpLog('info', 'SCENE', `✅ 场景参考图: ${sceneRefs.length} 张（仅在场角色）`);
             sceneRefs.forEach((url, i) => {
                 rpLog('info', 'SCENE', `  参考图#${i+1}: ${url.slice(0, 120)}`);
@@ -254,40 +245,14 @@ App.generateInitialSceneImage = async function(openingScene, replyText, metadata
             rpLog('warn', 'SCENE', '❌ 暂无角色头像，将使用文生图模式');
         }
 
-        rpLog('info', 'SCENE', `📦 API 请求体: model=${requestBody.model}, size=${requestBody.size}, refs=${sceneRefs.length}`);
-        rpLog('info', 'SCENE', `📝 完整请求体: ${JSON.stringify(requestBody).slice(0, 2000)}`);
-
-        rpLog('info', 'TIMEOUT', `生图请求开始: initial_scene`);
-        const imgStart = Date.now();
-        const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(120000)
+        // 统一生图入口（自动模型降级）
+        const imgUrl = await App.agnesImageGenerate({
+            prompt,
+            refImages: sceneRefs,
+            size: '256x341',
+            model: 'agnes-image-2.1-flash',
+            label: 'initial_scene'
         });
-
-        const imgElapsed = Date.now() - imgStart;
-        rpLog('info', 'TIMEOUT', `生图请求完成: initial_scene, 耗时 ${imgElapsed}ms, status=${resp.status}`);
-
-        if (!resp.ok) {
-            const errText = await resp.text().catch(() => '(无法读取)');
-            rpLog('error', 'SCENE', `❌ 初始场景图生成失败: status=${resp.status}`);
-            rpLog('info', 'SCENE', `📋 完整错误响应: ${errText.slice(0, 1000)}`);
-            return;
-        }
-
-        const data = await resp.json();
-        const imgUrl = data.data?.[0]?.url;
-        if (!imgUrl) {
-            rpLog('error', 'SCENE', `❌ 初始场景图返回数据异常: ${JSON.stringify(data).slice(0, 300)}`);
-            return;
-        }
-
-        rpLog('info', 'SCENE', `✅ 初始场景图生成成功`);
-        rpLog('debug', 'SCENE', `图片 URL: ${imgUrl.slice(0, 100)}...`);
 
         // 保存状态并设为背景
         state.currentSceneBg = imgUrl;
@@ -325,18 +290,9 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText,
         rpLog('info', 'SCENE', `场景描述: ${sceneDesc.slice(0, 100)}`);
         rpLog('info', 'SCENE', `角色外貌: ${(charObj?.appearance || '无').slice(0, 60)}`);
 
-        const requestBody = {
-            model: 'agnes-image-2.1-flash',
-            prompt: prompt,
-            size: '256x341',
-            n: 1,
-            extra_body: { response_format: 'url' }
-        };
-
         // 只传入场景中实际出现的角色参考图
         const sceneRefs = App.getSceneCharacterFaceUrls(replyText, state.characters, metadata);
         if (sceneRefs.length > 0) {
-            requestBody.extra_body.image = sceneRefs;
             rpLog('info', 'SCENE', `✅ 场景参考图: ${sceneRefs.length} 张（仅在场角色）`);
             sceneRefs.forEach((url, i) => {
                 rpLog('info', 'SCENE', `  参考图#${i+1}: ${url.slice(0, 120)}`);
@@ -345,40 +301,14 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText,
             rpLog('warn', 'SCENE', '❌ 暂无角色头像，将使用文生图模式');
         }
 
-        rpLog('info', 'SCENE', `📦 API 请求体: model=${requestBody.model}, size=${requestBody.size}, refs=${sceneRefs.length}`);
-        rpLog('info', 'SCENE', `📝 完整请求体: ${JSON.stringify(requestBody).slice(0, 2000)}`);
-
-        rpLog('info', 'TIMEOUT', `生图请求开始: chat_scene (${charName})`);
-        const imgStart = Date.now();
-        const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(120000)
+        // 统一生图入口（自动模型降级）
+        const imgUrl = await App.agnesImageGenerate({
+            prompt,
+            refImages: sceneRefs,
+            size: '256x341',
+            model: 'agnes-image-2.1-flash',
+            label: `chat_scene_${charName}`
         });
-
-        const imgElapsed = Date.now() - imgStart;
-        rpLog('info', 'TIMEOUT', `生图请求完成: chat_scene (${charName}), 耗时 ${imgElapsed}ms, status=${resp.status}`);
-
-        if (!resp.ok) {
-            const errText = await resp.text().catch(() => '(无法读取)');
-            rpLog('error', 'SCENE', `❌ 场景图生成失败: status=${resp.status}`);
-            rpLog('info', 'SCENE', `📋 完整错误响应: ${errText.slice(0, 1000)}`);
-            return;
-        }
-
-        const data = await resp.json();
-        const imgUrl = data.data?.[0]?.url;
-        if (!imgUrl) {
-            rpLog('error', 'SCENE', `❌ 场景图返回数据异常: ${JSON.stringify(data).slice(0, 300)}`);
-            return;
-        }
-
-        rpLog('info', 'SCENE', `✅ 场景图生成成功`);
-        rpLog('info', 'SCENE', `图片 URL: ${imgUrl.slice(0, 120)}`);
 
         // 更新状态
         state.currentSceneBg = imgUrl;
