@@ -13,13 +13,10 @@ export function validateFormat(rawText, parsedMessages) {
     let missingDialogue = false;
     let shouldRetry = false;
 
-    // 1. 场景：必须有场景内容（parsedMessages 中有 isScene=true 即可）
-    //    不再要求 {花括号} 包裹
+    // 1. 场景：可选，不再强制要求
+    // 场景描述仅在场景变化/关键剧情时输出，其余轮次可以省略
     const hasSceneMsg = parsedMessages.some(m => m.isScene === true);
-    if (!hasSceneMsg) {
-        missingScene = true;
-        details.push('场景描述缺失');
-    }
+    // missingScene 不再触发重试
 
     // 2. 角色名前缀：必须有 :角色名: 格式
     const hasNamePrefix = /:[\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_\u2022\u00B7·]{0,12}:\s*[\(\u300c]/.test(rawText);
