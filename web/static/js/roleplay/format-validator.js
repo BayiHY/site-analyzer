@@ -25,11 +25,11 @@ export function validateFormat(rawText, parsedMessages) {
         details.push('角色名前缀缺失（必须用 :角色名: 格式）');
     }
 
-    // 3. 建议回复：必须存在 <>
+    // 3. 建议回复：可选，缺失时后台异步生成
     const hasReplies = /<[^>]+>/.test(rawText);
     if (!hasReplies) {
         missingReplies = true;
-        details.push('建议回复缺失');
+        details.push('建议回复缺失（将后台异步生成）');
     }
 
     // 4. 对话内容：必须有 「」 包裹
@@ -46,7 +46,9 @@ export function validateFormat(rawText, parsedMessages) {
     }
 
     // 综合判断
-    if (missingReplies || (missingPrefix && missingDialogue)) {
+    // 注意：建议回复缺失不再触发重试，改为后台异步生成
+    // 重试仅针对严重格式偏离
+    if (missingPrefix && missingDialogue) {
         shouldRetry = true;
     }
 

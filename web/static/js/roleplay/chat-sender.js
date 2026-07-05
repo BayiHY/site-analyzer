@@ -79,12 +79,12 @@ ${formatModule.buildFormatRequirements()}`;
         const parsedMessages = await App.parseMultiCharReply(response, state.activeCharIndex);
 
         // ===== 4.5 检查解析层重试信号（2026-07-04 新增） =====
+        // 注意：建议回复缺失不再触发重试，改为后台异步生成
         let needsRetry = parsedMessages.some(m => m._needsRetry);
         if (needsRetry) {
             const firstRetryMsg = parsedMessages.find(m => m._needsRetry);
             let retryReason = firstRetryMsg?._retryReason || '未知原因';
             rpLog('error', 'PARSE-RETRY', `⚠️ 解析层要求重试: ${retryReason}，丢弃当前回复并重新请求`);
-            // 丢弃已渲染的消息（如果已经渲染了）
             // 重新请求 LLM
             rpLog('info', 'PARSE-RETRY', '重新构建历史并请求 LLM...');
             const retryMessages = [
@@ -116,19 +116,19 @@ ${formatModule.buildFormatRequirements()}`;
             document.getElementById('send-btn').disabled = false;
         }
 
-        // ===== 5. 后处理：4 项并行执行 =====
-        rpLog('info', 'TIMEOUT', '后处理开始: 4 项并行');
+        // ===== 5. 后处理：5 项并行执行 =====
+        rpLog('info', 'TIMEOUT', '后处理开始: 5 项并行');
         const postProcessStart = Date.now();
         Promise.allSettled([
             // 后处理 1: 场景图生成 → 见 scene-images.js
             (async () => {
                 try {
-                    rpLog('info', 'TIMEOUT', '后处理[1/4] 场景图生成开始');
+                    rpLog('info', 'TIMEOUT', '后处理[1/5] 场景图生成开始');
                     const sceneDesc = App.parseSceneFromReply(response);
                     if (sceneDesc && App.isSceneChanged(activeChar.name, sceneDesc)) {
                         await App.generateSceneImage(activeChar.name, sceneDesc, activeChar, response, null);
                     }
-                    rpLog('info', 'TIMEOUT', `后处理[1/4] 场景图完成 (${Date.now()-postProcessStart}ms)`);
+                    rpLog('info', 'TIMEOUT', `后处理[1/5] 场景图完成 (${Date.now()-postProcessStart}ms)`);
                 } catch (e) {
                     console.warn('场景图生成失败:', e);
                 }
@@ -136,9 +136,9 @@ ${formatModule.buildFormatRequirements()}`;
             // 后处理 2: 情感指标更新 → 见 emotion-update.js
             (async () => {
                 try {
-                    rpLog('info', 'TIMEOUT', '后处理[2/4] 情感更新开始');
+                    rpLog('info', 'TIMEOUT', '后处理[2/5] 情感更新开始');
                     await App.updateEmotions(activeChar.name, text, response);
-                    rpLog('info', 'TIMEOUT', `后处理[2/4] 情感完成 (${Date.now()-postProcessStart}ms)`);
+                    rpLog('info', 'TIMEOUT', `后处理[2/5] 情感完成 (${Date.now()-postProcessStart}ms)`);
                 } catch (e) {
                     console.warn('情感更新失败:', e);
                 }
@@ -146,12 +146,12 @@ ${formatModule.buildFormatRequirements()}`;
             // 后处理 3: 信息披露评估 → 见 progressive-disclosure.js
             (async () => {
                 try {
-                    rpLog('info', 'TIMEOUT', '后处理[3/4] 信息披露开始');
+                    rpLog('info', 'TIMEOUT', '后处理[3/5] 信息披露开始');
                     await App.updateRevealedInfo(activeChar.name, text, response);
                     if (state.currentPanel === 'characters') {
                         document.getElementById('panel-body').innerHTML = renderCharactersPanel();
                     }
-                    rpLog('info', 'TIMEOUT', `后处理[3/4] 信息披露完成 (${Date.now()-postProcessStart}ms)`);
+                    rpLog('info', 'TIMEOUT', `后处理[3/5] 信息披露完成 (${Date.now()-postProcessStart}ms)`);
                 } catch (e) {
                     console.warn('信息披露评估失败:', e);
                 }
@@ -159,11 +159,36 @@ ${formatModule.buildFormatRequirements()}`;
             // 后处理 4: 动态属性更新 → 见 dynamic-attrs.js
             (async () => {
                 try {
-                    rpLog('info', 'TIMEOUT', '后处理[4/4] 动态属性开始');
+                    rpLog('info', 'TIMEOUT', '后处理[4/5] 动态属性开始');
                     await App.updateDynamicAttributes(activeChar.name, text, response);
-                    rpLog('info', 'TIMEOUT', `后处理[4/4] 动态属性完成 (${Date.now()-postProcessStart}ms)`);
+                    rpLog('info', 'TIMEOUT', `后处理[4/5] 动态属性完成 (${Date.now()-postProcessStart}ms)`);
                 } catch (e) {
                     console.warn('动态属性更新失败:', e);
+                }
+            })(),
+            // 后处理 5: 异步生成建议回复选项（仅在 LLM 未提供 <> 标签时触发）
+            (async () => {
+                try {
+                    rpLog('info', 'TIMEOUT', '后处理[5/5] 异步建议回复生成开始');
+                    // 检查是否已有建议回复（从解析的消息中提取）
+                    const lastMsg = state.messages[state.messages.length - 1];
+                    const hasReplies = lastMsg && lastMsg.suggestedReplies && lastMsg.suggestedReplies.length >= 2;
+                    if (hasReplies) {
+                        rpLog('info', 'TIMEOUT', '后处理[5/5] 已有建议回复，跳过异步生成');
+                        return;
+                    }
+                    rpLog('info', 'TIMEOUT', '后处理[5/5] 无建议回复，触发异步生成');
+                    // 延迟 500ms 开始，避免与角色消息渲染竞争
+                    await new Promise(r => setTimeout(r, 500));
+                    const opts = await App.generateReplyOptions(text, response);
+                    if (opts && opts.length >= 2) {
+                        App.renderReplyOptions(opts, lastMsg?.id || 'unknown');
+                        rpLog('info', 'TIMEOUT', `后处理[5/5] 异步建议回复完成 (${opts.length} 条)`);
+                    } else {
+                        rpLog('warn', 'TIMEOUT', `后处理[5/5] 异步生成选项不足 (${opts?.length || 0} 条)`);
+                    }
+                } catch (e) {
+                    console.warn('异步建议回复生成失败:', e);
                 }
             })()
         ]).then(() => {
@@ -259,11 +284,14 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
         }
 
         // ===== 综合重试信号（2026-07-04 增强） =====
-        let overallNeedsRetry = formatResult.shouldRetry || replyNeedsRetry || identityResult.conflicts.length > 2;
+        // 注意：建议回复缺失/质量差不再触发重试，改为后台异步生成
+        // 重试仅针对严重格式偏离和身份冲突
+        let overallNeedsRetry = formatResult.shouldRetry || identityResult.conflicts.length > 2;
+        // 同时记录是否需要后台异步生成建议回复
+        const needsAsyncReplyOptions = !replyResult.replies || replyResult.replies.length < 2;
         if (overallNeedsRetry) {
             const reasons = [];
             if (formatResult.shouldRetry) reasons.push(`格式偏离[${formatResult.details.join(',')}]`);
-            if (replyNeedsRetry) reasons.push(`回复质量[${replyRetryReason}]`);
             if (identityResult.conflicts.length > 2) reasons.push(`身份冲突[${identityResult.conflicts.length}条]`);
             rpLog('error', 'PARSE-RETRY', `⚠️ 解析层触发重试信号: ${reasons.join('; ')}`);
             // 在第一条消息上标记重试原因，供 sendMessage 捕获
@@ -271,6 +299,10 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
                 messages[0]._needsRetry = true;
                 messages[0]._retryReason = reasons.join('; ');
             }
+        }
+        // 将异步生成信号附加到第一条消息，供 sendMessage 捕获
+        if (needsAsyncReplyOptions && messages.length > 0) {
+            messages[0]._needsAsyncReplyOptions = true;
         }
 
         // 附加场景消息（时间戳必须在所有角色消息之前）
