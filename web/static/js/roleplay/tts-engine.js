@@ -21,6 +21,11 @@ let _pendingBlobURLs = {};      // 防止 blob URL 被 GC 回收
 let _ttsQueue = [];             // 待处理的任务 [{msg, msgEl, resolve}]
 let _ttsQueueActive = false;    // 队列是否正在处理
 
+// ===== 自动播放队列：按消息渲染顺序，等待当前播放结束后串行播放 =====
+let _autoPlayQueue = [];        // 待自动播放的 [{msgId, decodedBuffer}]
+let _autoPlayPending = false;   // 是否有待处理的自动播放
+let _lastPlayedMsgId = null;    // 最后一条已播放的消息 ID（用于顺序校验）
+
 /**
  * enqueueTTS — 将一条消息的 TTS 生成+播放加入有序队列
  * 保证：先进先出，前一个处理完（生成/播放/失败）后才处理下一个
@@ -205,9 +210,10 @@ function insertAudioIntoBubble(msgEl, audioResult, msg) {
         setCapsuleStatus('ready', '▶️', '点击播放');
         rpLog('info', 'TTS', `WEB-AUDIO decoded: ${decodedBuffer.sampleRate}Hz ${decodedBuffer.duration.toFixed(2)}s (msgId=${msgId})`);
         
-        // 自动播放（仅非恢复模式）
+        // 自动播放（仅非恢复模式）— 加入自动播放队列，按消息渲染顺序串行
         if (!isRestoring) {
-            playTTSFromBuffer(msgId, decodedBuffer);
+            _lastPlayedMsgId = msgId;
+            enqueueAutoPlay(msgId, decodedBuffer);
         }
     }, function(error) {
         setCapsuleStatus('error', '❌', '解码失败');
@@ -265,7 +271,122 @@ function insertAudioIntoBubble(msgEl, audioResult, msg) {
 }
 
 /**
- * 从 AudioBuffer 播放音频
+ * 将自动播放任务加入队列（按消息渲染顺序）
+ * 如果当前没有音频在播放，立即播放；否则等待当前播放结束后按序播放
+ */
+function enqueueAutoPlay(msgId, decodedBuffer) {
+    _autoPlayQueue.push({ msgId, buffer: decodedBuffer });
+    rpLog('info', 'TTS', `自动播放入队 msgId=${msgId} 队列长度=${_autoPlayQueue.length}`);
+    
+    // 如果没有正在播放且队列没有待处理，立即开始
+    if (!_playingMsgId && !_autoPlayPending) {
+        drainAutoPlayQueue();
+    }
+}
+
+/**
+ *  draining 自动播放队列：按序播放，等待当前音频结束后取下一个
+ */
+function drainAutoPlayQueue() {
+    if (_autoPlayQueue.length === 0) {
+        _autoPlayPending = false;
+        return;
+    }
+    
+    _autoPlayPending = true;
+    const task = _autoPlayQueue.shift();
+    rpLog('info', 'TTS', `自动播放出队 msgId=${task.msgId} 剩余=${_autoPlayQueue.length}`);
+    
+    // 立即播放（如果当前无播放）或等待当前播放结束
+    if (!_playingMsgId) {
+        playAutoPlayTask(task);
+    }
+    // 如果当前有播放，playTTSFromBuffer 的 onended 会触发 drainAutoPlayQueue
+}
+
+function playAutoPlayTask(task) {
+    const msgId = task.msgId;
+    const buffer = task.buffer;
+    const audioCtx = _audioContexts[msgId];
+    if (!audioCtx || !buffer) {
+        rpLog('warn', 'TTS', `自动播放跳过: msgId=${msgId} 上下文或buffer不存在`);
+        _autoPlayPending = false;
+        // 延迟一点继续处理下一个
+        setTimeout(drainAutoPlayQueue, 100);
+        return;
+    }
+    
+    // 创建播放源
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    
+    // 应用 pitch/rate/volume 调整
+    const msg = state.messages.find(m => m.id === msgId);
+    if (msg) {
+        const charIdx = msg.charIndex;
+        const char = charIdx != null ? state.characters[charIdx] : null;
+        const params = App.computeFinalParams(char, msg);
+        const rate = parseFloat(params?.rate?.replace('%','')) / 100 || 0.05;
+        const pitch = parseFloat(params?.pitch?.replace('Hz','')) || 0;
+        const volume = parseFloat(params?.volume?.replace('%','')) / 100 || 0;
+        
+        source.playbackRate.value = 1 + rate;
+        source.detune.value = pitch * 100;
+        
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = Math.max(0, Math.min(1, 1 + volume / 100));
+        
+        source.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+    } else {
+        source.connect(audioCtx.destination);
+    }
+    
+    _playingMsgId = msgId;
+    
+    // 更新胶囊状态为播放中
+    const capsule = document.querySelector(`.tts-capsule[data-msg-id="${msgId}"]`);
+    if (capsule) {
+        capsule.dataset.status = 'playing';
+        const icon = capsule.querySelector('.tts-icon');
+        const label = capsule.querySelector('.tts-label');
+        if (icon) icon.textContent = '🔊';
+        if (label) label.textContent = '播放中...';
+    }
+    
+    rpLog('info', 'TTS', `自动播放 (msgId=${msgId})`);
+    
+    source.start(0);
+    _activeSources.push(source);
+    _currentAudio = source;
+    
+    // 播放结束后：处理队列中的下一个
+    source.onended = function() {
+        const idx = _activeSources.indexOf(source);
+        if (idx !== -1) _activeSources.splice(idx, 1);
+        
+        if (_playingMsgId === msgId) {
+            rpLog('info', 'TTS', `自动播放 msgId=${msgId} 结束`);
+            _currentAudio = null;
+            _playingMsgId = null;
+            
+            if (capsule) {
+                capsule.dataset.status = 'done';
+                const icon = capsule.querySelector('.tts-icon');
+                const label = capsule.querySelector('.tts-label');
+                if (icon) icon.textContent = '✅';
+                if (label) label.textContent = '播放完成';
+            }
+            
+            // 继续播放队列中的下一个
+            _autoPlayPending = false;
+            setTimeout(drainAutoPlayQueue, 200);
+        }
+    };
+}
+
+/**
+ * 从 AudioBuffer 播放音频（手动点击时使用，会中断当前播放）
  */
 function playTTSFromBuffer(msgId, decodedBuffer) {
     const audioCtx = _audioContexts[msgId];
@@ -338,7 +459,7 @@ function playTTSFromBuffer(msgId, decodedBuffer) {
 }
 
 /**
- * 停止音频 — 停止所有活跃源，彻底清场
+ * 停止音频 — 停止所有活跃源，彻底清场，清空自动播放队列
  */
 function stopTTS() {
     // 停止所有活跃源
@@ -359,6 +480,10 @@ function stopTTS() {
         }
     }
     _playingMsgId = null;
+    
+    // 清空自动播放队列（手动中断时放弃排队）
+    _autoPlayQueue = [];
+    _autoPlayPending = false;
 }
 
 /**
@@ -420,6 +545,10 @@ App.stopAllAudio = function() {
     _audioBuffers = {};
     
     _playingMsgId = null;
+    
+    // 清空自动播放队列
+    _autoPlayQueue = [];
+    _autoPlayPending = false;
 };
 
 // ===== TTS 音色配置 =====
