@@ -427,7 +427,7 @@ function playTTSFromBuffer(msgId, decodedBuffer) {
         source.connect(audioCtx.destination);
     }
     
-    // 播放 — 使用 audioCtx.currentTime 代替 0，确保 resume 后正确播放
+    // 播放 — 使用 audioCtx.currentTime 代替 0，确保 ctx 已运行
     if (audioCtx.state === 'suspended') {
         audioCtx.resume().then(() => {
             source.start(audioCtx.currentTime);
@@ -516,7 +516,15 @@ function togglePlayTTS(msgId) {
     } else {
         // 停止旧的，播放新的
         stopTTS();
-        playTTSFromBuffer(msgId, buffer);
+        // 先确保 AudioContext 运行，再播放
+        const audioCtx = _audioContexts[msgId];
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume().then(() => {
+                playTTSFromBuffer(msgId, buffer);
+            }).catch(e => rpLog('warn', 'TTS', `togglePlayTTS resume failed: ${e.message}`));
+        } else {
+            playTTSFromBuffer(msgId, buffer);
+        }
     }
 }
 
