@@ -13,7 +13,7 @@
  */
 export function buildCharPrompt(count, playerGender, inspiration, genderHint, state) {
     const pg = playerGender || state.player?.gender || '男';
-    const visualStyle = state.story?.imageStyle || 'akira toriyama style';
+    const visualStyle = state.story?.imageStyle || '';
     const worldview = state.story.worldview || '未设定';
     const title = state.story.title || '';
     const mainArc = (state.story.mainArc || []).map(a => `・${a.phase}：${a.description}`).join('\\\\n');
@@ -83,9 +83,13 @@ export function buildCharPrompt(count, playerGender, inspiration, genderHint, st
         return count; // fallback 到传入的 count
     })();
 
+    const styleInstruction = visualStyle
+        ? `全局统一的画面风格为「${visualStyle}」。所有角色的外观、服装、环境描写都必须符合这一视觉风格。角色生图字段（imageFace/imageHair/imageBody/imageClothes/imageEnvironment）要围绕这一风格构建。`
+        : `画面风格随机：请根据故事灵感自由选择合适的画面风格，并在每个角色的 imageFace/imageHair/imageBody/imageClothes/imageEnvironment 字段中体现所选风格。`;
+
     return `你是角色设计师和编剧。请根据以下世界观和用户灵感生成恰好 ${effectiveCount} 个鲜活的角色。
 
-⚠️ 【画面风格】全局统一的画面风格为「${visualStyle}」。所有角色的外观、服装、环境描写都必须符合这一视觉风格。角色生图字段（imageFace/imageHair/imageBody/imageClothes/imageEnvironment）要围绕这一风格构建。
+⚠️ 【画面风格】${styleInstruction}
 
 ⚠️ 【用户灵感优先】用户明确要求：${inspiration || '无特定要求'}。角色设计必须严格遵循用户灵感中的所有要求（时代背景、地点、角色数量、性别比例、关系类型等）。
 

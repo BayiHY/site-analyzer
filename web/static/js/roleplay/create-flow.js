@@ -35,8 +35,8 @@ App.createCharacter = async function() {
     state.emotions = {};
     state.revealed = {};
 
-    // 画面风格优先级：用户手动选择 > LLM 语义识别 > 默认 akira toriyama style
-    // 灵感检测使用 LLM 语义识别，不做转译/映射
+    // 画面风格优先级：LLM 灵感检测 > 用户手动选择 > 默认 akira toriyama style
+    // 用户选"🎲 随机"时，完全交给 LLM 从灵感中识别
     const setupSelect = document.getElementById('setup-art-style');
     const userSelectedStyle = setupSelect && setupSelect.value ? setupSelect.value : null;
     
@@ -74,25 +74,24 @@ App.createCharacter = async function() {
         rpLog('warn', 'STYLE', `LLM 风格识别异常: ${e.message}，使用用户选择`);
     }
     
-    // 优先级链：用户手动选择 > 灵感检测（仅当 LLM 返回非默认值时） > 默认 akira toriyama style
-    // 关键修复：LLM 返回 'akira toriyama style' 可能是 fallback 默认值，
-    // 不是真正的灵感检测结果。只有当用户选择了其他风格时，才优先使用用户选择。
+    // 优先级链：灵感检测（LLM 返回的任何结果都直接用） > 用户手动选择 > 默认随机
+    // 只要灵感中强调了画风/画面风格，LLM 返回的结果就是有效识别，不视为 fallback
     let imageStyle;
-    if (userSelectedStyle) {
-        // 用户手动选择了风格 → 始终优先使用用户选择
-        imageStyle = userSelectedStyle;
-        rpLog('info', 'STYLE', `使用用户手动选择的画面风格: ${userSelectedStyle}`);
-        // 如果 LLM 检测到了不同的风格，记录警告但不覆盖
-        if (detectedStyle && detectedStyle !== userSelectedStyle && detectedStyle !== 'akira toriyama style') {
-            rpLog('warn', 'STYLE', `LLM 检测到风格 "${detectedStyle}" 与用户选择 "${userSelectedStyle}" 不一致，以用户选择为准`);
-        }
-    } else if (detectedStyle && detectedStyle !== 'akira toriyama style') {
-        // 没有用户选择，且 LLM 检测到了有意义的风格（不是默认 fallback）
+    if (detectedStyle) {
+        // LLM 从灵感中识别到了风格，直接使用，不判断是否是 akira toriyama style
         imageStyle = detectedStyle;
         rpLog('info', 'STYLE', `从灵感中检测到画面风格: ${detectedStyle}`);
+        if (userSelectedStyle && userSelectedStyle !== detectedStyle) {
+            rpLog('info', 'STYLE', `用户手动选择 "${userSelectedStyle}" 被灵感检测结果 "${detectedStyle}" 覆盖（灵感优先）`);
+        }
     } else {
-        imageStyle = 'akira toriyama style';
-        rpLog('info', 'STYLE', `使用默认画面风格: akira toriyama style (用户未选择, LLM检测=${detectedStyle || 'null'})`);
+        // LLM 未能识别（灵感为空或无法判断） → 使用用户选择或默认随机
+        imageStyle = userSelectedStyle || '';
+        if (!imageStyle) {
+            rpLog('info', 'STYLE', `灵感未检测到风格且用户未选择，使用随机`);
+        } else {
+            rpLog('info', 'STYLE', `灵感未检测到风格，使用用户选择: ${imageStyle}`);
+        }
     }
     state.story.imageStyle = imageStyle;
 

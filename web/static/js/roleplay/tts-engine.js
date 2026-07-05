@@ -336,7 +336,7 @@ function playAutoPlayTask(task) {
         const charIdx = msg.charIndex;
         const char = charIdx != null ? state.characters[charIdx] : null;
         const params = App.computeFinalParams(char, msg);
-        const rate = parseFloat(params?.rate?.replace('%','')) / 100 || 0.05;
+        const rate = parseFloat(params?.rate?.replace('%','')) / 100 || 0;
         const pitch = parseFloat(params?.pitch?.replace('Hz','')) || 0;
         const volume = parseFloat(params?.volume?.replace('%','')) / 100 || 0;
         
@@ -421,7 +421,7 @@ function playTTSFromBuffer(msgId, decodedBuffer) {
         const charIdx = msg.charIndex;
         const char = charIdx != null ? state.characters[charIdx] : null;
         const params = App.computeFinalParams(char, msg);
-        const rate = parseFloat(params?.rate?.replace('%','')) / 100 || 0.05;
+        const rate = parseFloat(params?.rate?.replace('%','')) / 100 || 0;
         const pitch = parseFloat(params?.pitch?.replace('Hz','')) || 0;
         const volume = parseFloat(params?.volume?.replace('%','')) / 100 || 0;
         
@@ -742,19 +742,20 @@ function inferEmotionOffset(msg) {
     return offset;
 }
 
-// ===== 计算最终 TTS 参数（基底 + 情绪偏移）=====
+// ===== 计算最终 TTS 参数（基底 pitch + 情绪偏移 rate/volume）=====
 App.computeFinalParams = function(character, msg) {
     const base = getCharacterBaseParams(character);
     const offset = inferEmotionOffset(msg);
 
-    let finalPitch = Math.max(-15, Math.min(15, base.pitch + offset.pitch));
+    // pitch 只用基底，不受情绪影响
+    let finalPitch = base.pitch;
     let finalRate = Math.max(-35, Math.min(35, base.rate + offset.rate));
     let finalVolume = Math.max(-100, Math.min(100, base.volume + offset.volume));
 
     const result = {
-        pitch: formatParamValue(Math.round(finalPitch / 5) * 5, 'Hz'),
-        rate: formatParamValue(Math.round(finalRate / 5) * 5, '%'),
-        volume: formatParamValue(Math.round(finalVolume / 5) * 5, '%')
+        pitch: formatParamValue(Math.round(finalPitch), 'Hz'),
+        rate: formatParamValue(Math.round(finalRate), '%'),
+        volume: formatParamValue(Math.round(finalVolume), '%')
     };
     rpLog('info', 'TTS', `FINAL ${character?.name || '?'}: base[${base.pitch}Hz/${base.rate}%] + offset[${offset.pitch}/${offset.rate}%] → pitch=${result.pitch} rate=${result.rate} vol=${result.volume}`);
     return result;
