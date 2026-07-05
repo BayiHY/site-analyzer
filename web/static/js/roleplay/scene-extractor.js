@@ -180,11 +180,14 @@ export function extractScene(text) {
         // 如果提取到了角色段落，返回分离结果
         if (charLines.length > 0) {
             sceneText = sceneLines.filter(l => l.trim()).join('\n').trim() || null;
-            const charText = charLines.join('\n').trim();
-            // 计算 remaining 的起始位置
+            // 计算 remaining 的起始位置：按原始 lines 顺序累加，遇到第一个 charLines 中的行就停止
             let charPos = 0;
-            for (const l of sceneLines) {
-                charPos += l.length + 1;
+            for (let i = 0; i < lines.length; i++) {
+                if (charLines.includes(lines[i])) {
+                    // 找到第一个角色行，从此处截取
+                    break;
+                }
+                charPos += lines[i].length + 1;
             }
             remaining = cleaned.slice(charPos);
 

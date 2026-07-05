@@ -48,11 +48,17 @@ async function processTTSQueue() {
     }
 
     const task = _ttsQueue.shift();
-    rpLog('info', 'TTS', `出队处理 msgId=${task.msg.id} 剩余=${_ttsQueue.length}`);
+    rpLog('info', 'TTS', `出队处理 msgId=${task.msg.id} 剩余=${_ttsQueue.length} isNarration=${task.isNarration || false}`);
 
     try {
-        // 1. 生成 TTS 音频
-        const audioUrl = await generateTTSForMessage(task.msg);
+        let audioUrl;
+        if (task.isNarration) {
+            // 环境旁白：使用 xiaoxiao 固定声线
+            audioUrl = await App.generateNarrationTTS(task.msg.content || '');
+        } else {
+            // 角色对话：使用角色音色
+            audioUrl = await generateTTSForMessage(task.msg);
+        }
         if (!audioUrl) {
             rpLog('info', 'TTS', `msgId=${task.msg.id} 音频生成失败，跳过`);
             task.resolve(false);
@@ -828,6 +834,176 @@ App.autoMatchVoice = function(character) {
     return DEFAULT_VOICE_BY_GENDER[gender] || DEFAULT_VOICE_BY_GENDER['女'];
 }
 
+// ===== 环境旁白 TTS 专用 =====
+// 固定声线: zh-CN-XiaoxiaoNeural, 固定 pitch=0Hz rate=+0% volume=+0%, 语速可通过设置调整
+
+const NARRATION_VOICE = 'zh-CN-XiaoxiaoNeural';
+
+/**
+ * 生成环境旁白 TTS 音频
+ * 使用固定的 xiaoxiao 声线，语速由 state.narrationSettings.rate 控制
+ */
+App.generateNarrationTTS = async function(text) {
+    if (!text || text.length < 2) return null;
+
+    const rate = state.narrationSettings?.rate || '+0%';
+    const pitch = '+0Hz';
+    const volume = '+0%';
+
+    const cacheKey = App.ttsCacheKey(text, NARRATION_VOICE, rate, pitch, volume);
+
+    // 1. 先查精确缓存
+    try {
+        const cache = await App.getTtsCache();
+        const cachedResp = await cache.match(cacheKey);
+        if (cachedResp) {
+            rpLog('info', 'TTS', `旁白命中缓存: ${text.substring(0, 30)}...`);
+            const cachedArrayBuffer = await cachedResp.arrayBuffer();
+            return {
+                type: 'arraybuffer',
+                data: cachedArrayBuffer,
+                mimeType: cachedResp.headers?.get('content-type') || 'audio/mpeg'
+            };
+        }
+    } catch (e) {
+        rpLog('info', 'TTS', `旁白 Cache API 读取失败: ${e.message}`);
+    }
+
+    // 2. 调后端生成
+    rpLog('info', 'TTS', `旁白生成 text="${text.substring(0, 30)}..." voice=${NARRATION_VOICE} rate=${rate}`);
+    try {
+        const resp = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, voice: NARRATION_VOICE, rate, volume, pitch })
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${resp.status}`);
+        }
+
+        const arrayBuffer = await resp.arrayBuffer();
+
+        // 存入 Cache API
+        try {
+            const cache = await App.getTtsCache();
+            const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+            await cache.put(cacheKey, new Response(blob, {
+                headers: { 'Content-Type': 'audio/mpeg' }
+            }));
+        } catch (e) {
+            rpLog('info', 'TTS', `旁白缓存写入失败: ${e.message}`);
+        }
+
+        return {
+            type: 'arraybuffer',
+            data: arrayBuffer,
+            mimeType: 'audio/mpeg'
+        };
+    } catch (e) {
+        rpLog('info', 'TTS', `旁白生成失败: ${e.message}`);
+        return null;
+    }
+}
+
+/**
+ * 为场景消息（环境旁白）嵌入音频胶囊
+ * 复用 TTS 队列机制，保证串行处理
+ */
+App.attachNarrationTTS = function(msgEl, msg) {
+    if (!App.isTTSEnabled()) return;
+    if (msgEl.querySelector('.tts-capsule')) return;
+
+    const text = msg.content || '';
+    if (!text || text.length < 2) return;
+
+    // 获取角色信息用于持久化 meta
+    const charIdx = msg.charIndex;
+    const char = charIdx != null ? state.characters[charIdx] : null;
+    const voice = NARRATION_VOICE;
+    const rate = state.narrationSettings?.rate || '+0%';
+    const pitch = '+0Hz';
+    const volume = '+0%';
+
+    // 先插入"生成中"占位
+    setTimeout(() => {
+        const bubble = msgEl.querySelector('.bubble');
+        if (!bubble) return;
+        if (bubble.querySelector('.tts-capsule')) return;
+
+        const capsule = document.createElement('button');
+        capsule.className = 'tts-capsule thought-btn';
+        capsule.dataset.msgId = msg.id;
+        capsule.dataset.status = 'generating';
+        capsule.disabled = true;
+        capsule.style.cursor = 'default';
+
+        const spinner = document.createElement('span');
+        spinner.className = 'tts-spinner';
+        spinner.style.cssText = `
+            display: none; width: 10px; height: 10px;
+            border: 2px solid currentColor; border-top-color: transparent;
+            border-radius: 50%; animation: tts-spin 0.8s linear infinite;
+        `;
+        const icon = document.createElement('span');
+        icon.className = 'tts-icon';
+        icon.textContent = '🎙️';
+        icon.style.cssText = `
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; line-height: 1; pointer-events: none; margin-right: 6px;
+        `;
+        const label = document.createElement('span');
+        label.className = 'tts-label';
+        label.textContent = '生成中...';
+
+        capsule.appendChild(spinner);
+        capsule.appendChild(icon);
+        capsule.appendChild(label);
+        bubble.appendChild(capsule);
+    }, 50);
+
+    // 使用独立的 TTS 队列处理旁白（与角色消息共享队列）
+    enqueueNarrationTTS(msg, msgEl).then(success => {
+        if (!success) {
+            setTimeout(() => {
+                const bubble = msgEl.querySelector('.bubble');
+                if (!bubble) return;
+                const capsule = bubble.querySelector('.tts-capsule');
+                if (capsule && capsule.dataset.status === 'generating') {
+                    capsule.dataset.status = 'error';
+                    const icon = capsule.querySelector('.tts-icon');
+                    const label = capsule.querySelector('.tts-label');
+                    const spinner = capsule.querySelector('.tts-spinner');
+                    if (spinner) spinner.style.display = 'none';
+                    if (icon) icon.textContent = '🔇';
+                    if (label) label.textContent = '语音生成失败 · 点击重试';
+                    capsule.disabled = false;
+                    capsule.style.cursor = 'pointer';
+                    capsule.onclick = function() {
+                        capsule.remove();
+                        App.attachNarrationTTS(msgEl, msg);
+                    };
+                }
+            }, 100);
+        }
+    });
+}
+
+/**
+ * 旁白 TTS 入队 — 复用有序队列机制
+ */
+function enqueueNarrationTTS(msg, msgEl) {
+    return new Promise((resolve) => {
+        _ttsQueue.push({ msg, msgEl, resolve, isNarration: true });
+        rpLog('info', 'TTS', `旁白入队 msgId=${msg.id} 队列长度=${_ttsQueue.length}`);
+        if (!_ttsQueueActive) {
+            _ttsQueueActive = true;
+            processTTSQueue();
+        }
+    });
+}
+
 // ===== 在消息气泡中嵌入音频播放器（新版：走队列）=====
 App.attachAudioToBubble = function(msgEl, msg) {
     if (msg.role !== 'char' || msg.type === 'image') return;
@@ -919,7 +1095,7 @@ App.attachAudioToBubble = function(msgEl, msg) {
 App.restoreAudioControls = function() {
     rpLog('info', 'TTS', `开始重建音频控件，共 ${state.messages.length} 条消息`);
 
-    // 收集需要重建的消息
+    // 收集需要重建的消息（角色消息 + 场景旁白）
     const msgsToRestore = [];
     for (const msg of state.messages) {
         if (msg.role !== 'char' || msg.type === 'image') continue;
@@ -932,9 +1108,16 @@ App.restoreAudioControls = function() {
         // 跳过已有音频胶囊的
         if (msgEl.querySelector('.tts-capsule')) continue;
 
-        // 检查是否有持久化的 TTS 参数
+        // 场景旁白：即使没有持久化 meta 也尝试重建（用当前 narrationSettings）
+        if (msg.isScene) {
+            if (!msg.content || msg.content.length < 2) continue;
+            msgsToRestore.push({ msg, msgEl, isNarration: true });
+            continue;
+        }
+
+        // 角色消息：检查是否有持久化的 TTS 参数
         if (!msg._ttsText || !msg._ttsVoice) continue;
-        msgsToRestore.push({ msg, msgEl });
+        msgsToRestore.push({ msg, msgEl, isNarration: false });
     }
 
     rpLog('info', 'TTS', `找到 ${msgsToRestore.length} 条需要重建的音频控件`);
@@ -946,35 +1129,56 @@ App.restoreAudioControls = function() {
             rpLog('info', 'TTS', `全部重建完成`);
             return;
         }
-        const { msg, msgEl } = msgsToRestore[idx++];
+        const { msg, msgEl, isNarration } = msgsToRestore[idx++];
         msg._isRestoring = true;
-        const params = {
-            text: msg._ttsText,
-            voice: msg._ttsVoice,
-            rate: msg._ttsRate || '+0%',
-            pitch: msg._ttsPitch || '+0Hz',
-            volume: msg._ttsVolume || '+0%'
-        };
 
-        App.generateTTS(params.text, params.voice, params.rate, params.volume, params.pitch)
-            .then(audioResult => {
-                if (!audioResult || audioResult.type !== 'arraybuffer') {
-                    rpLog('info', 'TTS', `重建失败 msgId=${msg.id} (无音频)`);
-                    return;
-                }
-                const bubble = msgEl.querySelector('.bubble');
-                if (!bubble || bubble.querySelector('.tts-capsule')) return;
+        if (isNarration) {
+            // 旁白重建：使用当前 narrationSettings 的 rate
+            App.generateNarrationTTS(msg.content || '')
+                .then(audioResult => {
+                    if (!audioResult || audioResult.type !== 'arraybuffer') {
+                        rpLog('info', 'TTS', `旁白重建失败 msgId=${msg.id} (无音频)`);
+                        return;
+                    }
+                    const bubble = msgEl.querySelector('.bubble');
+                    if (!bubble || bubble.querySelector('.tts-capsule')) return;
+                    insertAudioIntoBubble(msgEl, audioResult, msg);
+                })
+                .catch(e => {
+                    rpLog('info', 'TTS', `旁白重建异常 msgId=${msg.id}: ${e.message}`);
+                })
+                .finally(() => {
+                    setTimeout(restoreNext, 200);
+                });
+        } else {
+            const params = {
+                text: msg._ttsText,
+                voice: msg._ttsVoice,
+                rate: msg._ttsRate || '+0%',
+                pitch: msg._ttsPitch || '+0Hz',
+                volume: msg._ttsVolume || '+0%'
+            };
 
-                // 复用 insertAudioIntoBubble 创建胶囊按钮
-                insertAudioIntoBubble(msgEl, audioResult, msg);
-            })
-            .catch(e => {
-                rpLog('info', 'TTS', `重建异常 msgId=${msg.id}: ${e.message}`);
-            })
-            .finally(() => {
-                // 间隔 200ms 后重建下一条
-                setTimeout(restoreNext, 200);
-            });
+            App.generateTTS(params.text, params.voice, params.rate, params.volume, params.pitch)
+                .then(audioResult => {
+                    if (!audioResult || audioResult.type !== 'arraybuffer') {
+                        rpLog('info', 'TTS', `重建失败 msgId=${msg.id} (无音频)`);
+                        return;
+                    }
+                    const bubble = msgEl.querySelector('.bubble');
+                    if (!bubble || bubble.querySelector('.tts-capsule')) return;
+
+                    // 复用 insertAudioIntoBubble 创建胶囊按钮
+                    insertAudioIntoBubble(msgEl, audioResult, msg);
+                })
+                .catch(e => {
+                    rpLog('info', 'TTS', `重建异常 msgId=${msg.id}: ${e.message}`);
+                })
+                .finally(() => {
+                    // 间隔 200ms 后重建下一条
+                    setTimeout(restoreNext, 200);
+                });
+        }
     }
     restoreNext();
 }

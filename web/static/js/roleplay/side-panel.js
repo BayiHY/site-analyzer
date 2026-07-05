@@ -136,6 +136,8 @@ App.renderCharactersPanel = function() {
 }
 
 App.renderSettingsPanel = function() {
+    const ns = state.narrationSettings || { enabled: true, rate: '+0%' };
+    const rateVal = parseInt(ns.rate?.replace('%','')) || 0;
     return `
         <div class="setting-item">
             <label>对话 API Key</label>
@@ -148,6 +150,26 @@ App.renderSettingsPanel = function() {
             <div class="setting-hint">用于角色图片生成的 API 密钥</div>
         </div>
         <button class="btn btn-primary btn-sm" onclick="App.saveSettings()" style="margin-top:8px;">保存设置</button>
+        <hr style="border-color:var(--border);margin:20px 0;">
+        <div class="setting-item">
+            <label>🎙️ 环境旁白</label>
+            <div class="setting-hint" style="margin-bottom:8px;">场景描述气泡自动生成语音，使用固定女声（xiaoxiao）</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                <label style="font-size:0.85rem;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="setting-narration-enabled" ${ns.enabled !== false ? 'checked' : ''}>
+                    启用环境旁白
+                </label>
+            </div>
+            <label style="font-size:0.85rem;color:var(--text);">语速调节</label>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
+                <span style="font-size:0.75rem;color:var(--text-dim);">慢</span>
+                <input type="range" id="setting-narration-rate" min="-30" max="30" value="${rateVal}" step="5"
+                       style="flex:1;" oninput="document.getElementById('narration-rate-val').textContent=this.value+'%'">
+                <span style="font-size:0.8rem;color:var(--text);min-width:36px;text-align:right;" id="narration-rate-val">${ns.rate}</span>
+                <span style="font-size:0.75rem;color:var(--text-dim);">快</span>
+            </div>
+            <div class="setting-hint">语速范围 -30% ~ +30%，0% 为标准语速</div>
+        </div>
         <hr style="border-color:var(--border);margin:20px 0;">
         <div class="setting-item">
             <label>故事标题</label>

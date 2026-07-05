@@ -15,6 +15,11 @@ App.renderMessage = function(msg) {
         div.appendChild(bubble);
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
+
+        // 环境旁白 TTS
+        if (msg._played !== true && state.narrationSettings?.enabled !== false) {
+            setTimeout(() => App.attachNarrationTTS(div, msg), 100);
+        }
         return;
     }
 

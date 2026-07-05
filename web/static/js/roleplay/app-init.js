@@ -287,7 +287,19 @@ App.renderMessages = function() {
 App.saveSettings = function() {
     state.apiKeys.chat = document.getElementById('setting-chat-key').value.trim();
     state.apiKeys.image = document.getElementById('setting-image-key').value.trim();
+
+    // 保存环境旁白设置
+    const narrEnabled = document.getElementById('setting-narration-enabled');
+    if (narrEnabled) {
+        state.narrationSettings.enabled = narrEnabled.checked;
+    }
+    const narrRate = document.getElementById('setting-narration-rate');
+    if (narrRate) {
+        state.narrationSettings.rate = narrRate.value + '%';
+    }
+
     localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
+    localStorage.setItem('rp_narration_settings', JSON.stringify(state.narrationSettings));
 
     // 保存故事标题
     const titleEl = document.getElementById('setting-story-title');

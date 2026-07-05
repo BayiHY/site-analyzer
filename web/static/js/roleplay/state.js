@@ -20,7 +20,12 @@ let state = {
     // sceneHistory = [{ charName, sceneDesc, imageUrl }]
     sceneHistory: [],
     // 聊天窗口当前背景场景图 URL
-    currentSceneBg: ''
+    currentSceneBg: '',
+    // 环境旁白 TTS 设置
+    narrationSettings: {
+        enabled: true,
+        rate: '+0%'
+    }
 };
 
 // ===== IndexedDB 存储（带 localStorage 回退）=====
@@ -253,10 +258,18 @@ App.loadMessages = async function() {
 // ===== localStorage 快捷存取 =====
 App.saveSettings = function() {
     localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
+    localStorage.setItem('rp_narration_settings', JSON.stringify(state.narrationSettings));
 }
 App.loadSettings = function() {
     const saved = localStorage.getItem('rp_apiKeys');
     if (saved) {
         try { Object.assign(state.apiKeys, JSON.parse(saved)); } catch(e) {}
+    }
+    const narrSaved = localStorage.getItem('rp_narration_settings');
+    if (narrSaved) {
+        try {
+            const parsed = JSON.parse(narrSaved);
+            state.narrationSettings = { ...state.narrationSettings, ...parsed };
+        } catch(e) {}
     }
 }
