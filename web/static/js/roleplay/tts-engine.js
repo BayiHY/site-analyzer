@@ -12,6 +12,7 @@ function writeString(view, offset, string) {
 // ===== 全局音频管理器 =====
 let _currentAudio = null;       // 当前正在播放的 AudioBufferSourceNode
 let _playingMsgId = null;       // 正在播放的消息 ID
+let _activeSources = [];        // 所有活跃源节点（用于彻底清理）
 let _audioContexts = {};        // msgId → AudioContext 映射
 let _audioBuffers = {};         // msgId → AudioBuffer 映射
 let _pendingBlobURLs = {};      // 防止 blob URL 被 GC 回收
@@ -294,6 +295,7 @@ function playTTSFromBuffer(msgId, decodedBuffer) {
     
     // 播放
     source.start(0);
+    _activeSources.push(source);
     _currentAudio = source;
     _playingMsgId = msgId;
     
@@ -310,29 +312,37 @@ function playTTSFromBuffer(msgId, decodedBuffer) {
     rpLog('info', 'TTS', `WEB-AUDIO playing (msgId=${msgId})`);
     
     source.onended = function() {
-        rpLog('info', 'TTS', `msgId=${msgId} 播放结束`);
-        _currentAudio = null;
-        _playingMsgId = null;
+        // 从活跃列表中移除
+        const idx = _activeSources.indexOf(source);
+        if (idx !== -1) _activeSources.splice(idx, 1);
         
-        // 更新胶囊状态
-        if (capsule) {
-            capsule.dataset.status = 'done';
-            const icon = capsule.querySelector('.tts-icon');
-            const label = capsule.querySelector('.tts-label');
-            if (icon) icon.textContent = '✅';
-            if (label) label.textContent = '播放完成';
+        // 只有当这个是当前播放的才清理全局状态
+        if (_playingMsgId === msgId) {
+            rpLog('info', 'TTS', `msgId=${msgId} 播放结束`);
+            _currentAudio = null;
+            _playingMsgId = null;
+            
+            if (capsule) {
+                capsule.dataset.status = 'done';
+                const icon = capsule.querySelector('.tts-icon');
+                const label = capsule.querySelector('.tts-label');
+                if (icon) icon.textContent = '✅';
+                if (label) label.textContent = '播放完成';
+            }
         }
     };
 }
 
 /**
- * 停止音频 — 停止全局当前播放的音频，更新对应胶囊
+ * 停止音频 — 停止所有活跃源，彻底清场
  */
 function stopTTS() {
-    if (_currentAudio) {
-        try { _currentAudio.stop(); } catch(e) {}
-        _currentAudio = null;
+    // 停止所有活跃源
+    for (const source of _activeSources) {
+        try { source.stop(); } catch(e) {}
     }
+    _activeSources = [];
+    _currentAudio = null;
     // 清除正在播放的胶囊状态
     if (_playingMsgId) {
         const prevCapsule = document.querySelector(`.tts-capsule[data-msg-id="${_playingMsgId}"]`);
