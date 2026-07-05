@@ -263,9 +263,25 @@ App.renderMessages = function() {
                 msg._played = true;
             }
         } catch(e) {}
+        // 恢复持久化的 TTS 参数（刷新后重建音频控件需要）
+        try {
+            const ttsMeta = JSON.parse(sessionStorage.getItem('rp_tts_meta') || '{}');
+            if (ttsMeta[msg.id]) {
+                msg._ttsText = ttsMeta[msg.id].text || '';
+                msg._ttsVoice = ttsMeta[msg.id].voice || '';
+                msg._ttsRate = ttsMeta[msg.id].rate || '+0%';
+                msg._ttsPitch = ttsMeta[msg.id].pitch || '+0Hz';
+                msg._ttsVolume = ttsMeta[msg.id].volume || '+0%';
+            }
+        } catch(e) {}
         renderMessage(msg);
     });
     container.scrollTop = container.scrollHeight;
+
+    // 刷新后重建所有已播放消息的音频控件
+    if (App.isTTSEnabled()) {
+        App.restoreAudioControls();
+    }
 }
 
 App.saveSettings = function() {

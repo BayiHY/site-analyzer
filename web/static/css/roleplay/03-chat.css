@@ -146,6 +146,9 @@
     cursor: pointer;
     transition: all 0.2s;
 }
+.msg .bubble .tts-capsule.thought-btn {
+    margin-left: 6px;
+}
 .msg .bubble .thought-btn:hover {
     background: rgba(167, 139, 250, 0.3);
     border-color: #a78bfa;
