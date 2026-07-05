@@ -246,7 +246,11 @@ function insertAudioIntoBubble(msgEl, audioResult, msg) {
     const charIdx = msg.charIndex;
     const char = charIdx != null ? state.characters[charIdx] : null;
     const voice = App.autoMatchVoice(char);
-    const params = App.computeFinalParams(char, msg);
+    // 场景旁白不使用情绪变频变速，固定 +0Hz/+0%
+    if (msg.isScene) {
+        rpLog('info', 'TTS', `场景消息跳过情绪检测，使用固定参数 pitch=+0Hz rate=+0%`);
+    }
+    const params = msg.isScene ? { rate: '+0%', pitch: '+0Hz', volume: '+0%' } : App.computeFinalParams(char, msg);
     const rate = params?.rate || '+0%';
     const pitch = params?.pitch || '+0Hz';
     const volume = params?.volume || '+0%';
@@ -328,7 +332,7 @@ function playAutoPlayTask(task) {
     
     // 应用 pitch/rate/volume 调整
     const msg = state.messages.find(m => m.id === msgId);
-    if (msg) {
+    if (msg && !msg.isScene) {
         const charIdx = msg.charIndex;
         const char = charIdx != null ? state.characters[charIdx] : null;
         const params = App.computeFinalParams(char, msg);
@@ -413,7 +417,7 @@ function playTTSFromBuffer(msgId, decodedBuffer) {
     
     // 应用 pitch/rate/volume 调整
     const msg = state.messages.find(m => m.id === msgId);
-    if (msg) {
+    if (msg && !msg.isScene) {
         const charIdx = msg.charIndex;
         const char = charIdx != null ? state.characters[charIdx] : null;
         const params = App.computeFinalParams(char, msg);
