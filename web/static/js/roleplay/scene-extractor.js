@@ -142,7 +142,60 @@ export function extractScene(text) {
         }
     }
 
-    // === 策略 4: 没有检测到场景 ===
+    // === 策略 4: 没有 :角色名: 格式，尝试从 (动作)对话[想法] 段落中提取角色行 ===
+    // 当 LLM 没有输出 :角色名: 前缀时，逐行检测 (xxx)对话[yyy] 格式
+    // 如果某行以 ( 开头且包含 「 或 [ ，视为角色段落，将其与场景分离
+    const charParagraphPattern = /^\([^)]*\)[^\[]*\[/;
+    const hasAnyCharParagraph = lines.some(l => charParagraphPattern.test(l.trim()));
+
+    if (hasAnyCharParagraph && sceneEndIndex === 0) {
+        // 所有行都被当作场景了，现在重新划分
+        let sceneLines = [];
+        let charLines = [];
+        let inScene = true;
+
+        for (let i = 0; i < lines.length; i++) {
+            const trimmed = lines[i].trim();
+            if (trimmed === '') {
+                // 空行：如果在场景中，保留为场景分隔；如果在角色段中，跳过
+                if (inScene) {
+                    sceneLines.push(lines[i]);
+                }
+                continue;
+            }
+
+            if (charParagraphPattern.test(trimmed)) {
+                // 这是一行角色段落
+                inScene = false;
+                charLines.push(lines[i]);
+            } else if (!inScene) {
+                // 已在角色段落区域，继续追加
+                charLines.push(lines[i]);
+            } else {
+                // 仍在场景区域
+                sceneLines.push(lines[i]);
+            }
+        }
+
+        // 如果提取到了角色段落，返回分离结果
+        if (charLines.length > 0) {
+            sceneText = sceneLines.filter(l => l.trim()).join('\n').trim() || null;
+            const charText = charLines.join('\n').trim();
+            // 计算 remaining 的起始位置
+            let charPos = 0;
+            for (const l of sceneLines) {
+                charPos += l.length + 1;
+            }
+            remaining = cleaned.slice(charPos);
+
+            if (typeof rpLog !== 'undefined') {
+                rpLog('INFO', 'PARSE-SCENE', `策略4: 从(动作)段落提取角色行 ${charLines.length} 段, 场景=${sceneText ? sceneText.length : 0}字符`);
+            }
+            return { sceneText, remaining };
+        }
+    }
+
+    // === 策略 5: 完全没有场景和角色行 ===
     if (typeof rpLog !== 'undefined') {
         rpLog('INFO', 'PARSE-SCENE', '无场景描述，返回 null');
     }

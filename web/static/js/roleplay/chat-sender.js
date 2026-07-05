@@ -103,7 +103,9 @@ ${formatModule.buildFormatRequirements()}`;
             hideTyping();
             document.getElementById('send-btn').disabled = false;
             rpLog('info', 'PARSE-RETRY', `✅ 重试成功`);
-        } else {
+            // 更新 response 为重试结果，确保后处理使用正确的内容
+            response = retryResponse;
+        }
             for (const msg of parsedMessages) {
                 state.messages.push(msg);
                 renderMessage(msg);

@@ -109,6 +109,8 @@ function insertAudioIntoBubble(msgEl, audioResult, msg) {
     const bubble = msgEl.querySelector('.bubble');
     if (!bubble) return false;
 
+    // 是否来自刷新后的恢复流程
+    const isRestoring = msg._isRestoring;
     // 移除旧的生成中占位（可能是 .tts-loading 或 .tts-capsule[data-status="generating"]）
     const oldLoading = bubble.querySelector('.tts-loading');
     if (oldLoading) oldLoading.remove();
@@ -200,11 +202,13 @@ function insertAudioIntoBubble(msgEl, audioResult, msg) {
 
     audioCtx.decodeAudioData(arrayBuffer.slice(0), function(decodedBuffer) {
         _audioBuffers[msgId] = decodedBuffer;
-        setCapsuleStatus('ready', '▶️', `播放 (${decodedBuffer.duration.toFixed(1)}s)`);
+        setCapsuleStatus('ready', '▶️', '点击播放');
         rpLog('info', 'TTS', `WEB-AUDIO decoded: ${decodedBuffer.sampleRate}Hz ${decodedBuffer.duration.toFixed(2)}s (msgId=${msgId})`);
         
-        // 自动播放
-        playTTSFromBuffer(msgId, decodedBuffer);
+        // 自动播放（仅非恢复模式）
+        if (!isRestoring) {
+            playTTSFromBuffer(msgId, decodedBuffer);
+        }
     }, function(error) {
         setCapsuleStatus('error', '❌', '解码失败');
         rpLog('error', 'TTS', `WEB-AUDIO decode error: ${error.message} (msgId=${msgId})`);
@@ -791,6 +795,7 @@ App.restoreAudioControls = function() {
             return;
         }
         const { msg, msgEl } = msgsToRestore[idx++];
+        msg._isRestoring = true;
         const params = {
             text: msg._ttsText,
             voice: msg._ttsVoice,
