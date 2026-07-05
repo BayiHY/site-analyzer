@@ -69,7 +69,7 @@ ${formatModule.buildFormatRequirements()}`;
 
         rpLog('info', 'TIMEOUT', `LLM 请求开始: chat, history_msgs=${messages.length}`);
         const chatStart = Date.now();
-        const response = await App.agnesChat(messages, { route: 'chat' });
+        let response = await App.agnesChat(messages, { route: 'chat' });
         const chatElapsed = Date.now() - chatStart;
         rpLog('info', 'TIMEOUT', `LLM 请求完成: chat, 耗时 ${chatElapsed}ms, output_chars=${(response || '').length}`);
         if (chatElapsed > 60000) {
@@ -80,10 +80,10 @@ ${formatModule.buildFormatRequirements()}`;
         const parsedMessages = await App.parseMultiCharReply(response, state.activeCharIndex);
 
         // ===== 4.5 检查解析层重试信号（2026-07-04 新增） =====
-        const needsRetry = parsedMessages.some(m => m._needsRetry);
+        let needsRetry = parsedMessages.some(m => m._needsRetry);
         if (needsRetry) {
             const firstRetryMsg = parsedMessages.find(m => m._needsRetry);
-            const retryReason = firstRetryMsg?._retryReason || '未知原因';
+            let retryReason = firstRetryMsg?._retryReason || '未知原因';
             rpLog('error', 'PARSE-RETRY', `⚠️ 解析层要求重试: ${retryReason}，丢弃当前回复并重新请求`);
             // 丢弃已渲染的消息（如果已经渲染了）
             // 重新请求 LLM
@@ -105,7 +105,7 @@ ${formatModule.buildFormatRequirements()}`;
             rpLog('info', 'PARSE-RETRY', `✅ 重试成功`);
             // 更新 response 为重试结果，确保后处理使用正确的内容
             response = retryResponse;
-        }
+        } else {
             for (const msg of parsedMessages) {
                 state.messages.push(msg);
                 renderMessage(msg);
