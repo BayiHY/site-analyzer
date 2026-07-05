@@ -13,7 +13,6 @@ App.sendMessage = async function() {
     input.value = '';
     input.style.height = 'auto';
 
-    const activeChar = state.characters[state.activeCharIndex];
     rpLog('info', 'TIMEOUT', `sendMessage 开始: "${text.slice(0, 50)}..."`);
 
     // 用户消息
@@ -54,11 +53,11 @@ App.sendMessage = async function() {
 
 ${worldviewModule.buildWorldview(state)}
 
-${cardModule.buildCharacterCard(activeChar, state)}
+${cardModule.buildCharacterCard(state)}
 
-${sceneModule.buildSceneRules(allChars, activeChar, state)}
+${sceneModule.buildSceneRules(allChars, state)}
 
-${emotionModule.buildEmotionGuide(activeChar.name, state)}
+${emotionModule.buildEmotionGuide(state)}
 
 ${formatModule.buildFormatRequirements()}`;
 
