@@ -356,7 +356,16 @@ function playAutoPlayTask(task) {
     
     rpLog('info', 'TTS', `自动播放 (msgId=${msgId})`);
     
-    source.start(0);
+    // 确保 AudioContext 处于运行状态，避免 suspended 导致开头被截断
+    // resume 是异步的，必须 await 后再 start
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+            rpLog('info', 'TTS', `audioCtx resumed for msgId=${msgId}`);
+            source.start(audioCtx.currentTime);
+        }).catch(e => rpLog('warn', 'TTS', `audioCtx.resume failed: ${e.message}`));
+    } else {
+        source.start(audioCtx.currentTime);
+    }
     _activeSources.push(source);
     _currentAudio = source;
     
@@ -418,8 +427,14 @@ function playTTSFromBuffer(msgId, decodedBuffer) {
         source.connect(audioCtx.destination);
     }
     
-    // 播放
-    source.start(0);
+    // 播放 — 使用 audioCtx.currentTime 代替 0，确保 resume 后正确播放
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+            source.start(audioCtx.currentTime);
+        }).catch(e => rpLog('warn', 'TTS', `playTTSFromBuffer resume failed: ${e.message}`));
+    } else {
+        source.start(audioCtx.currentTime);
+    }
     _activeSources.push(source);
     _currentAudio = source;
     _playingMsgId = msgId;
