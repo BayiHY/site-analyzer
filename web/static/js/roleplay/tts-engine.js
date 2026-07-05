@@ -263,9 +263,6 @@ function insertAudioIntoBubble(msgEl, audioResult, msg) {
  * 从 AudioBuffer 播放音频
  */
 function playTTSFromBuffer(msgId, decodedBuffer) {
-    // 停止之前的播放
-    stopTTS(msgId);
-    
     const audioCtx = _audioContexts[msgId];
     if (!audioCtx) return;
 
@@ -329,6 +326,28 @@ function playTTSFromBuffer(msgId, decodedBuffer) {
 }
 
 /**
+ * 停止音频 — 停止全局当前播放的音频，更新对应胶囊
+ */
+function stopTTS() {
+    if (_currentAudio) {
+        try { _currentAudio.stop(); } catch(e) {}
+        _currentAudio = null;
+    }
+    // 清除正在播放的胶囊状态
+    if (_playingMsgId) {
+        const prevCapsule = document.querySelector(`.tts-capsule[data-msg-id="${_playingMsgId}"]`);
+        if (prevCapsule) {
+            prevCapsule.dataset.status = 'ready';
+            const icon = prevCapsule.querySelector('.tts-icon');
+            const label = prevCapsule.querySelector('.tts-label');
+            if (icon) icon.textContent = '▶️';
+            if (label) label.textContent = '点击播放';
+        }
+    }
+    _playingMsgId = null;
+}
+
+/**
  * 停止/播放音频
  */
 function togglePlayTTS(msgId) {
@@ -338,32 +357,12 @@ function togglePlayTTS(msgId) {
     const capsule = document.querySelector(`.tts-capsule[data-msg-id="${msgId}"]`);
     
     if (_playingMsgId === msgId && _currentAudio) {
-        // 正在播放 → 停止
-        stopTTS(msgId);
+        // 正在播放自己 → 停止
+        stopTTS();
     } else {
-        // 停止状态 → 播放
-        stopTTS(msgId);
+        // 停止旧的，播放新的
+        stopTTS();
         playTTSFromBuffer(msgId, buffer);
-    }
-}
-
-/**
- * 停止音频
- */
-function stopTTS(msgId) {
-    if (_currentAudio) {
-        try { _currentAudio.stop(); } catch(e) {}
-        _currentAudio = null;
-    }
-    _playingMsgId = null;
-    
-    const capsule = document.querySelector(`.tts-capsule[data-msg-id="${msgId}"]`);
-    if (capsule) {
-        capsule.dataset.status = 'ready';
-        const icon = capsule.querySelector('.tts-icon');
-        const label = capsule.querySelector('.tts-label');
-        if (icon) icon.textContent = '▶️';
-        if (label) label.textContent = '点击播放';
     }
 }
 
