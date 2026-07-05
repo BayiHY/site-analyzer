@@ -25,7 +25,7 @@ export function validateFormat(rawText, parsedMessages) {
     const hasNamePrefix = /:[\u4e00-\u9fa5a-zA-Z][\u4e00-\u9fa5a-zA-Z0-9_\u2022\u00B7·]{0,12}:\s*[\(\u300c]/.test(rawText);
     if (!hasNamePrefix && parsedMessages.length > 0) {
         missingPrefix = true;
-        details.push('角色名前缀缺失');
+        details.push('角色名前缀缺失（必须用 :角色名: 格式）');
     }
 
     // 3. 建议回复：必须存在 <>

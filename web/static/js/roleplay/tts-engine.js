@@ -108,11 +108,13 @@ function insertAudioIntoBubble(msgEl, audioResult, msg) {
     const bubble = msgEl.querySelector('.bubble');
     if (!bubble) return false;
 
-    // 移除占位
-    const loading = bubble.querySelector('.tts-loading');
-    if (loading) loading.remove();
+    // 移除旧的生成中占位（可能是 .tts-loading 或 .tts-capsule[data-status="generating"]）
+    const oldLoading = bubble.querySelector('.tts-loading');
+    if (oldLoading) oldLoading.remove();
+    const oldCapsule = bubble.querySelector('.tts-capsule[data-status="generating"]');
+    if (oldCapsule) oldCapsule.remove();
 
-    // 避免重复插入
+    // 避免重复插入（已有完整音频胶囊则跳过）
     if (bubble.querySelector('.tts-capsule')) return false;
 
     if (!audioResult || audioResult.type !== 'arraybuffer') {
@@ -166,7 +168,12 @@ function insertAudioIntoBubble(msgEl, audioResult, msg) {
     capsule.appendChild(icon);
     capsule.appendChild(label);
     bubble.appendChild(capsule);
-
+    
+    // 初始状态：生成中
+    capsule.dataset.status = 'generating';
+    icon.textContent = '⏳';
+    label.textContent = '生成中...';
+    
     // 只添加 spinner 动画，其余全部复用 thought-btn 的样式
     if (!document.getElementById('tts-capsule-style')) {
         const style = document.createElement('style');
@@ -662,7 +669,7 @@ App.attachAudioToBubble = function(msgEl, msg) {
     if (!App.isTTSEnabled()) return;
 
     // 检查是否已经有音频（避免重复）
-    if (msgEl.querySelector('.tts-audio-player')) return;
+    if (msgEl.querySelector('.tts-capsule')) return;
 
     // 只提取对话内容用于 TTS
     let text = '';
@@ -678,34 +685,63 @@ App.attachAudioToBubble = function(msgEl, msg) {
     const char = charIdx != null ? state.characters[charIdx] : null;
     rpLog('info', 'TTS', `CHAR charIndex=${charIdx} charName=${char ? char.name : 'NULL'}`);
 
-    // 先插入"生成中"占位
+    // 先插入"生成中"占位 — 复用音频胶囊结构
     setTimeout(() => {
         const bubble = msgEl.querySelector('.bubble');
         if (!bubble) return;
-        if (bubble.querySelector('.tts-audio-player') || bubble.querySelector('.tts-loading')) return;
+        if (bubble.querySelector('.tts-capsule')) return;
 
-        const loading = document.createElement('div');
-        loading.className = 'tts-loading';
-        loading.innerHTML = '🔊 生成中...';
-        loading.style.cssText = 'margin-top:8px;font-size:0.75rem;color:var(--text-dim);display:flex;align-items:center;gap:4px;';
-        bubble.appendChild(loading);
+        const capsule = document.createElement('button');
+        capsule.className = 'tts-capsule thought-btn';
+        capsule.dataset.msgId = msg.id;
+        capsule.dataset.status = 'generating';
+        capsule.disabled = true;
+        capsule.style.cursor = 'default';
+
+        const spinner = document.createElement('span');
+        spinner.className = 'tts-spinner';
+        spinner.style.cssText = `
+            display: none; width: 10px; height: 10px;
+            border: 2px solid currentColor; border-top-color: transparent;
+            border-radius: 50%; animation: tts-spin 0.8s linear infinite;
+        `;
+        const icon = document.createElement('span');
+        icon.className = 'tts-icon';
+        icon.textContent = '⏳';
+        icon.style.cssText = `
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; line-height: 1; pointer-events: none; margin-right: 6px;
+        `;
+        const label = document.createElement('span');
+        label.className = 'tts-label';
+        label.textContent = '生成中...';
+
+        capsule.appendChild(spinner);
+        capsule.appendChild(icon);
+        capsule.appendChild(label);
+        bubble.appendChild(capsule);
     }, 50);
 
     // 加入有序队列（串行处理）
     enqueueTTS(msg, msgEl).then(success => {
         if (!success) {
-            // 生成失败：替换为错误提示
+            // 生成失败：更新为错误胶囊，可点击重试
             setTimeout(() => {
                 const bubble = msgEl.querySelector('.bubble');
                 if (!bubble) return;
-                const loading = bubble.querySelector('.tts-loading');
-                if (loading) {
-                    loading.className = 'tts-error';
-                    loading.innerHTML = '🔇 语音生成失败';
-                    loading.style.cssText = 'margin-top:8px;font-size:0.75rem;color:var(--danger);display:inline-block;cursor:pointer;opacity:0.7;transition:opacity 0.2s;';
-                    loading.title = '点击重试';
-                    loading.onclick = function() {
-                        loading.remove();
+                const capsule = bubble.querySelector('.tts-capsule');
+                if (capsule && capsule.dataset.status === 'generating') {
+                    capsule.dataset.status = 'error';
+                    const icon = capsule.querySelector('.tts-icon');
+                    const label = capsule.querySelector('.tts-label');
+                    const spinner = capsule.querySelector('.tts-spinner');
+                    if (spinner) spinner.style.display = 'none';
+                    if (icon) icon.textContent = '🔇';
+                    if (label) label.textContent = '语音生成失败 · 点击重试';
+                    capsule.disabled = false;
+                    capsule.style.cursor = 'pointer';
+                    capsule.onclick = function() {
+                        capsule.remove();
                         App.attachAudioToBubble(msgEl, msg);
                     };
                 }

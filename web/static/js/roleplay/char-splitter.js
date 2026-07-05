@@ -92,8 +92,36 @@ export function splitCharParts(text) {
     }
     
     // 兜底：返回原文本作为单段
+    // 2026-07-05 增强：尝试从 (角色名xxx) 括号中提取角色名作为 :角色名: 前缀
     const trimmed = text.trim();
     if (trimmed) {
+        // 检测是否有 (角色名xxx)(动作) 格式 — 即括号内以角色名开头
+        // 逐行处理，因为可能有多个角色
+        const lines = trimmed.split('\n');
+        const reformattedLines = [];
+        let hasReformat = false;
+        for (const line of lines) {
+            const m = line.match(/^\(([\u4e00-\u9fa5a-zA-Z]{1,8})(.*?)\)(.*)/s);
+            if (m) {
+                const extractedName = m[1].trim();
+                const actionPart = m[2];
+                const rest = m[3];
+                const knownNames = state.characters.map(c => c.name);
+                const match = knownNames.find(n => extractedName.includes(n) || n.includes(extractedName));
+                if (match) {
+                    reformattedLines.push(`:${match}:(${actionPart})${rest}`);
+                    hasReformat = true;
+                    if (typeof rpLog !== 'undefined') {
+                        rpLog('INFO', 'PARSE-CHAR', `兜底重组：从"(角色名...)"提取"${extractedName}"→"${match}"，重组为 :${match}:`);
+                    }
+                    continue;
+                }
+            }
+            reformattedLines.push(line);
+        }
+        if (hasReformat) {
+            return reformattedLines;
+        }
         if (typeof rpLog !== 'undefined') {
             rpLog('WARN', 'PARSE-CHAR', '未检测到角色行格式，返回原文本作为单段');
         }
