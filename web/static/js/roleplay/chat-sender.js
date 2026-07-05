@@ -78,8 +78,44 @@ ${formatModule.buildFormatRequirements()}`;
         // ===== 4. 解析多角色回复 =====
         const parsedMessages = await App.parseMultiCharReply(response, state.activeCharIndex);
 
+        // ===== 4.3 角色消息兜底修正（2026-07-05 新增） =====
+        // 第一轮解析后检测格式偏离，使用兜底智能体修正
+        let repairedResponse = null;
+        if (!parsedMessages.some(m => m._needsRetry)) {
+            // 只有非重试路径才需要兜底修正（重试路径已经有强制格式提示）
+            const repairAgent = await import('./roleplay-repair-agent.js');
+            const diagnosis = repairAgent.diagnoseRawReply(response, parsedMessages);
+            
+            if (diagnosis.needsRepair) {
+                rpLog('warn', 'REPAIR-AGENT', `格式偏离检测: ${diagnosis.reason} (字符数=${diagnosis.charCount}, 有前缀=${diagnosis.hasPrefix}, 有标签=${diagnosis.hasReplies})`);
+                
+                try {
+                    repairedResponse = await repairAgent.repairReply(
+                        response,
+                        state.characters || [],
+                        text,
+                        diagnosis.reason
+                    );
+                    rpLog('info', 'REPAIR-AGENT', `兜底修正成功，重新解析...`);
+                    
+                    // 用修正后的回复重新解析
+                    const repairedMessages = await App.parseMultiCharReply(repairedResponse, state.activeCharIndex);
+                    // 替换原始解析结果
+                    parsedMessages.length = 0;
+                    repairedMessages.forEach(m => parsedMessages.push(m));
+                    // 更新 response 为修正后的内容
+                    response = repairedResponse;
+                } catch (repairErr) {
+                    rpLog('error', 'REPAIR-AGENT', `兜底修正失败: ${repairErr.message}，使用原始解析结果`);
+                    // 修正失败，继续使用原始 parsedMessages
+                }
+            } else {
+                rpLog('info', 'REPAIR-AGENT', `格式正常，无需兜底修正`);
+            }
+        }
+
         // ===== 4.5 检查解析层重试信号（2026-07-04 新增） =====
-        // 注意：建议回复缺失不再触发重试，改为后台异步生成
+        // 注意：兜底修正后如果仍有 _needsRetry，说明修正也失败了，走重试
         let needsRetry = parsedMessages.some(m => m._needsRetry);
         if (needsRetry) {
             const firstRetryMsg = parsedMessages.find(m => m._needsRetry);

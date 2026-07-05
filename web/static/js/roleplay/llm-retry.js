@@ -110,6 +110,7 @@ App.agnesChatWithFallback = async function(messages, options = {}) {
             'disclosure': 0.2,
             'worldview': 0.7,
             'characters': 0.3,
+            'repair': 0.1,        // 兜底修正：极低温度
             'default': currentTemp ?? 1.0
         };
         const effectiveTemp = tempByRoute[route] ?? tempByRoute.default;

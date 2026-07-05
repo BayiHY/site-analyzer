@@ -72,6 +72,7 @@ App.agnesChat = async function(messages, options = {}) {
         'disclosure': 0.2,    // 信息披露：JSON 格式
         'worldview': 0.7,     // 世界观生成：需要创意
         'characters': 0.3,    // 角色生成：TSV 格式
+        'repair': 0.1,        // 角色消息兜底修正：极低温度保证格式稳定
         'default': temperature
     };
     const effectiveTemp = tempByRoute[route] ?? temperature;
