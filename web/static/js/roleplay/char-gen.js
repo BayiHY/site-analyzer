@@ -223,6 +223,8 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
             motivation: c.motivation || '',
             speechStyle: c.speechStyle || '',
             voice: c.voice || '',
+            ttsPitch: c.ttsPitch || '',
+            ttsRate: c.ttsRate || '',
             __modules__: modules
         };
     });

@@ -330,27 +330,8 @@ function playAutoPlayTask(task) {
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
     
-    // 应用 pitch/rate/volume 调整
-    const msg = state.messages.find(m => m.id === msgId);
-    if (msg && !msg.isScene) {
-        const charIdx = msg.charIndex;
-        const char = charIdx != null ? state.characters[charIdx] : null;
-        const params = App.computeFinalParams(char, msg);
-        const rate = parseFloat(params?.rate?.replace('%','')) / 100 || 0;
-        const pitch = parseFloat(params?.pitch?.replace('Hz','')) || 0;
-        const volume = parseFloat(params?.volume?.replace('%','')) / 100 || 0;
-        
-        source.playbackRate.value = 1 + rate;
-        source.detune.value = pitch * 100;
-        
-        const gainNode = audioCtx.createGain();
-        gainNode.gain.value = Math.max(0, Math.min(1, 1 + volume / 100));
-        
-        source.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-    } else {
-        source.connect(audioCtx.destination);
-    }
+    // 直接使用 edge-tts 生成的原始音频，不做额外 pitch/rate/volume 处理
+    source.connect(audioCtx.destination);
     
     _playingMsgId = msgId;
     
@@ -415,27 +396,8 @@ function playTTSFromBuffer(msgId, decodedBuffer) {
     const source = audioCtx.createBufferSource();
     source.buffer = decodedBuffer;
     
-    // 应用 pitch/rate/volume 调整
-    const msg = state.messages.find(m => m.id === msgId);
-    if (msg && !msg.isScene) {
-        const charIdx = msg.charIndex;
-        const char = charIdx != null ? state.characters[charIdx] : null;
-        const params = App.computeFinalParams(char, msg);
-        const rate = parseFloat(params?.rate?.replace('%','')) / 100 || 0;
-        const pitch = parseFloat(params?.pitch?.replace('Hz','')) || 0;
-        const volume = parseFloat(params?.volume?.replace('%','')) / 100 || 0;
-        
-        source.playbackRate.value = 1 + rate;
-        source.detune.value = pitch * 100;
-        
-        const gainNode = audioCtx.createGain();
-        gainNode.gain.value = Math.max(0, Math.min(1, 1 + volume / 100));
-        
-        source.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-    } else {
-        source.connect(audioCtx.destination);
-    }
+    // 直接使用 edge-tts 生成的原始音频，不做额外 pitch/rate/volume 处理
+    source.connect(audioCtx.destination);
     
     // 播放 — 使用 audioCtx.currentTime 代替 0，确保 ctx 已运行
     if (audioCtx.state === 'suspended') {
