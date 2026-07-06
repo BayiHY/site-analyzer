@@ -164,7 +164,7 @@ App.renderSettingsPanel = function() {
             <div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
                 <span style="font-size:0.75rem;color:var(--text-dim);">慢</span>
                 <input type="range" id="setting-narration-rate" min="-30" max="30" value="${rateVal}" step="5"
-                       style="flex:1;" oninput="document.getElementById('narration-rate-val').textContent=this.value+'%'">
+                       style="flex:1;" oninput="document.getElementById('narration-rate-val').textContent=(this.value>=0?'+':'')+this.value+'%'">
                 <span style="font-size:0.8rem;color:var(--text);min-width:36px;text-align:right;" id="narration-rate-val">${ns.rate}</span>
                 <span style="font-size:0.75rem;color:var(--text-dim);">快</span>
             </div>

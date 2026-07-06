@@ -618,9 +618,10 @@ App.ttsCacheKey = function(text, voice, rate, pitch, volume) {
 }
 
 // ===== TTS 结构化参数 =====
+// 注意：实际运行时 rate 钳位到 ±8%，pitch 钳位到 ±4Hz（由 computeFinalParams 和 voice-allocation.js 控制）
 const TTS_PARAMS = {
-    rate: { min: '-50%', max: '+100%', step: 10, unit: '%' },
-    pitch: { min: '-50Hz', max: '+100Hz', step: 10, unit: 'Hz' },
+    rate: { min: '-8%', max: '+8%', step: 1, unit: '%' },
+    pitch: { min: '-4Hz', max: '+4Hz', step: 1, unit: 'Hz' },
     volume: { min: '-100%', max: '+100%', step: 10, unit: '%' }
 };
 
@@ -677,28 +678,30 @@ function getCharacterBaseParams(character) {
 }
 
 // ===== 情绪 → 参数偏移映射 =====
+// 注意：pitch 偏移已被 computeFinalParams 忽略（pitch 只用基底值，不受情绪影响）
+// 保留 pitch 字段仅为向后兼容，未来可移除
 const EMOTION_OFFSETS = {
-    angry:       { pitch: +8, rate: +15, volume: +20 },
-    excited:     { pitch: +5, rate: +20, volume: +15 },
-    shouting:    { pitch: +10, rate: +10, volume: +30 },
-    gentle:      { pitch: -3, rate: -8, volume: -10 },
+    angry:       { pitch: 0, rate: +15, volume: +20 },
+    excited:     { pitch: 0, rate: +20, volume: +15 },
+    shouting:    { pitch: 0, rate: +10, volume: +30 },
+    gentle:      { pitch: 0, rate: -8, volume: -10 },
     calm:        { pitch: 0, rate: 0, volume: 0 },
     whisper:     { pitch: 0, rate: -10, volume: -30 },
-    sad:         { pitch: -5, rate: -10, volume: -10 },
-    depressed:   { pitch: -8, rate: -15, volume: -15 },
-    crying:      { pitch: -3, rate: -5, volume: -15 },
+    sad:         { pitch: 0, rate: -10, volume: -10 },
+    depressed:   { pitch: 0, rate: -15, volume: -15 },
+    crying:      { pitch: 0, rate: -5, volume: -15 },
     hesitant:    { pitch: 0, rate: -10, volume: -10 },
-    nervous:     { pitch: +3, rate: +10, volume: -5 },
-    scared:      { pitch: +5, rate: +15, volume: -10 },
-    confident:   { pitch: +3, rate: 0, volume: +5 },
-    serious:     { pitch: -3, rate: -5, volume: 0 },
-    commanding:  { pitch: -5, rate: 0, volume: +15 },
-    happy:       { pitch: +3, rate: +5, volume: +5 },
-    cheerful:    { pitch: +5, rate: +10, volume: +10 },
-    playful:     { pitch: +5, rate: +8, volume: 0 },
-    anxious:     { pitch: +3, rate: +10, volume: -5 },
-    threatening: { pitch: -8, rate: -5, volume: +10 },
-    surprised:   { pitch: +8, rate: +15, volume: +15 },
+    nervous:     { pitch: 0, rate: +10, volume: -5 },
+    scared:      { pitch: 0, rate: +15, volume: -10 },
+    confident:   { pitch: 0, rate: 0, volume: +5 },
+    serious:     { pitch: 0, rate: -5, volume: 0 },
+    commanding:  { pitch: 0, rate: 0, volume: +15 },
+    happy:       { pitch: 0, rate: +5, volume: +5 },
+    cheerful:    { pitch: 0, rate: +10, volume: +10 },
+    playful:     { pitch: 0, rate: +8, volume: 0 },
+    anxious:     { pitch: 0, rate: +10, volume: -5 },
+    threatening: { pitch: 0, rate: -5, volume: +10 },
+    surprised:   { pitch: 0, rate: +15, volume: +15 },
     indifferent: { pitch: 0, rate: -5, volume: -10 },
 };
 
@@ -747,8 +750,9 @@ App.computeFinalParams = function(character, msg) {
     const base = getCharacterBaseParams(character);
     const offset = inferEmotionOffset(msg);
 
-    // pitch 只用基底，不受情绪影响
+    // pitch 只用基底，不受情绪影响（voice-allocation.js 已钳位到 ±4Hz）
     let finalPitch = base.pitch;
+    // rate 基底 + 情绪偏移后钳位到 ±8%（step 1%）
     let finalRate = Math.max(-8, Math.min(8, base.rate + offset.rate));
     let finalVolume = Math.max(-100, Math.min(100, base.volume + offset.volume));
 
@@ -851,7 +855,9 @@ const NARRATION_VOICE = 'zh-CN-XiaoxiaoNeural';
 App.generateNarrationTTS = async function(text) {
     if (!text || text.length < 2) return null;
 
-    const rate = state.narrationSettings?.rate || '+0%';
+    // 防御性：确保 rate 带 + 前缀（edge-tts 要求）
+    let rate = state.narrationSettings?.rate || '+0%';
+    if (rate && !rate.startsWith('+') && !rate.startsWith('-')) rate = '+' + rate;
     const pitch = '+0Hz';
     const volume = '+0%';
 
@@ -927,7 +933,9 @@ App.attachNarrationTTS = function(msgEl, msg) {
     const charIdx = msg.charIndex;
     const char = charIdx != null ? state.characters[charIdx] : null;
     const voice = NARRATION_VOICE;
-    const rate = state.narrationSettings?.rate || '+0%';
+    // 防御性：确保 rate 带 + 前缀（edge-tts 要求）
+    let rate = state.narrationSettings?.rate || '+0%';
+    if (rate && !rate.startsWith('+') && !rate.startsWith('-')) rate = '+' + rate;
     const pitch = '+0Hz';
     const volume = '+0%';
 

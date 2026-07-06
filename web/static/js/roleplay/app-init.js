@@ -295,7 +295,8 @@ App.saveSettings = function() {
     }
     const narrRate = document.getElementById('setting-narration-rate');
     if (narrRate) {
-        state.narrationSettings.rate = narrRate.value + '%';
+        const val = parseInt(narrRate.value, 10) || 0;
+        state.narrationSettings.rate = (val >= 0 ? '+' : '') + val + '%';
     }
 
     localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
