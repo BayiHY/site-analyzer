@@ -320,15 +320,17 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
         }
 
         // ===== 综合重试信号（2026-07-04 增强） =====
-        // 注意：建议回复缺失/质量差不再触发重试，改为后台异步生成
-        // 重试仅针对严重格式偏离和身份冲突
-        let overallNeedsRetry = formatResult.shouldRetry || identityResult.conflicts.length > 2;
+        // 建议回复缺失 → 后台异步生成（不触发重试）
+        // 建议回复质量差（口水词/无效） → 触发重试
+        // 重试针对：严重格式偏离、身份冲突、口水词过多
+        let overallNeedsRetry = formatResult.shouldRetry || identityResult.conflicts.length > 2 || replyNeedsRetry;
         // 同时记录是否需要后台异步生成建议回复
         const needsAsyncReplyOptions = !replyResult.replies || replyResult.replies.length < 2;
         if (overallNeedsRetry) {
             const reasons = [];
             if (formatResult.shouldRetry) reasons.push(`格式偏离[${formatResult.details.join(',')}]`);
             if (identityResult.conflicts.length > 2) reasons.push(`身份冲突[${identityResult.conflicts.length}条]`);
+            if (replyNeedsRetry) reasons.push(`建议回复质量差[${replyRetryReason}]`);
             rpLog('error', 'PARSE-RETRY', `⚠️ 解析层触发重试信号: ${reasons.join('; ')}`);
             // 在第一条消息上标记重试原因，供 sendMessage 捕获
             if (messages.length > 0) {
