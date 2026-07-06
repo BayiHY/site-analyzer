@@ -580,10 +580,10 @@ App.ttsCacheKey = function(text, voice, rate, pitch, volume) {
 }
 
 // ===== TTS 结构化参数 =====
-// 注意：实际运行时 rate 钳位到 ±8%，pitch 钳位到 ±4Hz（由 computeFinalParams 和 voice-allocation.js 控制）
+// 注意：实际运行时 rate 钳位到 ±8%，pitch 钳位到 ±40Hz（步长 8Hz，由 computeFinalParams 和 voice-allocation.js 控制）
 const TTS_PARAMS = {
     rate: { min: '-8%', max: '+8%', step: 1, unit: '%' },
-    pitch: { min: '-4Hz', max: '+4Hz', step: 1, unit: 'Hz' },
+    pitch: { min: '-40Hz', max: '+40Hz', step: 8, unit: 'Hz' },
     volume: { min: '-100%', max: '+100%', step: 10, unit: '%' }
 };
 
@@ -712,7 +712,7 @@ App.computeFinalParams = function(character, msg) {
     const base = getCharacterBaseParams(character);
     const offset = inferEmotionOffset(msg);
 
-    // pitch 只用基底，不受情绪影响（voice-allocation.js 已钳位到 ±4Hz）
+    // pitch 只用基底，不受情绪影响（voice-allocation.js 已钳位到 ±40Hz，步长 8Hz）
     let finalPitch = base.pitch;
     // rate 基底 + 情绪偏移后钳位到 ±8%（step 1%）
     let finalRate = Math.max(-8, Math.min(8, base.rate + offset.rate));

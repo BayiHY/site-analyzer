@@ -9,9 +9,10 @@ export function allocateVoices(characters) {
     // 统一女声使用 Xiaoyi，男声使用 Yunxi（LLM 已按 prompt 输出）
     const DEFAULT_VOICE_BY_GENDER = { '女': 'zh-CN-XiaoyiNeural', '男': 'zh-CN-YunxiNeural' };
 
-    // pitch 范围 ±4Hz
-    const MIN_PITCH = -4;
-    const MAX_PITCH = 4;
+    // pitch 范围 ±40Hz，步长 8Hz
+    const MIN_PITCH = -40;
+    const MAX_PITCH = 40;
+    const PITCH_STEP = 8;
 
     // 随机整数 [min, max]
     function randInt(min, max) {
@@ -37,15 +38,17 @@ export function allocateVoices(characters) {
             char.voice = DEFAULT_VOICE_BY_GENDER[char.gender] || DEFAULT_VOICE_BY_GENDER['女'];
         }
 
-        // ttsPitch: 如果 LLM 没填，随机分配 -2~+2
+        // ttsPitch: 如果 LLM 没填，随机分配 -32~+32（步长 8）
         if (!char.ttsPitch) {
-            const base = randInt(-2, 2);
+            const base = PITCH_STEP * (randInt(-4, 4));
             char.ttsPitch = fmtPitch(base);
         } else {
-            // 超出 ±4 钳位
+            // 超出 ±40 钳位
             const pp = parsePitch(char.ttsPitch);
             if (pp < MIN_PITCH || pp > MAX_PITCH) {
-                char.ttsPitch = fmtPitch(Math.round(Math.max(MIN_PITCH, Math.min(MAX_PITCH, pp))));
+                // 钳位到最近的步长值
+                const snapped = Math.round(pp / PITCH_STEP) * PITCH_STEP;
+                char.ttsPitch = fmtPitch(Math.max(MIN_PITCH, Math.min(MAX_PITCH, snapped)));
             }
         }
 
@@ -81,7 +84,7 @@ export function allocateVoices(characters) {
                 let newPitch;
                 let attempts = 0;
                 do {
-                    newPitch = randInt(MIN_PITCH, MAX_PITCH);
+                    newPitch = PITCH_STEP * randInt(-5, 5);
                     attempts++;
                 } while (Object.values(pitchCount).some(c => c > 1) && attempts < 50);
 

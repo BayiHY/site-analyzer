@@ -142,21 +142,21 @@ ${genderHint ? `【性别倾向】${genderHint}` : ''}
 - secret: 隐藏的秘密（30字以内）
 - speechStyle: 说话风格（20字以内）
 - voice: Edge TTS 语音名称（女声默认 zh-CN-XiaoyiNeural，男声默认 zh-CN-YunxiNeural）
-- ttsPitch: 音色基底音高（格式如 -4Hz、-3Hz、-2Hz、-1Hz、0Hz、+1Hz、+2Hz、+3Hz、+4Hz，控制角色音色高低，范围 ±4Hz）
+- ttsPitch: 音色基底音高（格式如 -40Hz、-32Hz、-24Hz、-16Hz、-8Hz、0Hz、+8Hz、+16Hz、+24Hz、+32Hz、+40Hz，控制角色音色高低，范围 ±40Hz，步长 8Hz）
 - ttsRate: 语速基底（格式如 -10%、-5%、0%、+5%、+10%、+15%，配合 pitch 塑造性格底色）
   设计原则：
   • pitch 决定音色基础（高低），rate 辅助塑造性格（快=急躁/活泼，慢=沉稳/阴柔）
   • ttsRate 严格控制在 -8% ~ +8% 范围内，超出会失真不自然
-  • pitch 严格控制在 -4Hz ~ +4Hz 范围内，超出会失真不自然
+  • pitch 严格控制在 -40Hz ~ +40Hz 范围内，超出会失真不自然
   • 每个角色的 ttsPitch/ttsRate 必须根据其具体属性（年龄、职业、性格、身份、说话方式）量身定制
-  • 角色间必须差异化：同一故事内，同性别角色的 pitch 值绝对不能完全相同（±1Hz 也算不同）。输出前先检查一遍所有同性别角色的 pitch 值。
+  • 角色间必须差异化：同一故事内，同性别角色的 pitch 值绝对不能完全相同（±8Hz 也算不同）。输出前先检查一遍所有同性别角色的 pitch 值。
   • 可以有各类音色参数参考，但是根据角色实际属性微调，避免每个故事都是刻板音色
-  • pitch 分配完全随机但必须贴合角色性格、体型、外貌。不要套模板，不要刻板化。步长为 1Hz，例如：
-    - 一个男角色可以是 0Hz，两个可以是 -1Hz 和 +2Hz，三个可以是 -3Hz、+1Hz、+4Hz
-    - 前移一步或后移一步都可以，前增后减也可以，关键是贴合角色风格
+  • pitch 分配完全随机但必须贴合角色性格、体型、外貌。不要套模板，不要刻板化。步长为 8Hz，例如：
+    - 一个男角色可以是 0Hz，两个可以是 -8Hz 和 +16Hz，三个可以是 -24Hz、+8Hz、+32Hz
+    - 前移三步或后移三步都可以，前增后减也可以，关键是贴合角色风格
     - 避免刻板印象：不是所有大叔都低沉、不是所有萝莉都高音、不是所有反派都尖锐
-    - 考虑角色内在特质：温柔的大叔可以用 +2Hz，冷酷的少女可以用 -3Hz，反差更有记忆点
-  • pitch 默认基准 -2Hz ~ +2Hz 随机。比基准高亢尖细就增加（+1~+2），比基准粗犷低沉就减少（-1~-2），步长 1Hz
+    - 考虑角色内在特质：温柔的大叔可以用 +24Hz，冷酷的少女可以用 -16Hz，反差更有记忆点
+  • pitch 默认基准 -32Hz ~ +32Hz 随机。比基准高亢就增加（+8~+16 步进），比基准粗犷低沉就减少（-8~-16 步进），步长 8Hz
 
 - imageFace: 五官脸型（英文）
 - imageHair: 发型发色（英文）
@@ -166,8 +166,8 @@ ${genderHint ? `【性别倾向】${genderHint}` : ''}
 所有 image* 字段全部用英文，适合 AI 绘画。
 
 示例（不要照抄内容，只照格式）：
-阿德拉|28|女|苍白瘦削，左眼黄铜义眼|冷静理智，极度缺乏安全感|曾是贵族家替补厨师，因被诬陷遭驱逐|起初视主角为棋子，后转为生死搭档|复仇并查明父亲失踪真相|义眼中封印着低阶怨灵|冷嘲热讽，用烹饪术语隐喻人生险恶|zh-CN-XiaoyiNeural|-8Hz|0%|pale skin, left eye is a brass gear prosthetic, sharp cheekbones|long black hair in a neat bob cut, minimal makeup|slender and slightly hunched frame|white apron over dark Victorian dress, brass goggles on head|dimly lit kitchen with steam and warm amber glow
-巴尔扎|45|男|魁梧如熊，右臂机械锅铲义肢|暴躁冲动，护短|前地下拳手，被深渊灶台改造为活体搅拌机|雇佣兵兼守护者，认为主角是少数不把他当怪物看的人|保护主角，终结自己作为器具的命运|机械义肢内部连接着未成熟的灵体心脏|粗鲁直白，常伴有吞咽口水的声音|zh-CN-YunxiNeural|-10Hz|-5%|broad square jaw, scar across nose, thick eyebrows|short buzz cut, sweat-dampened hair|massive muscular build, right arm is a mechanical spatula|torn tank top revealing mechanical parts, leather combat pants|gritty underground arena with sparks and smoke
+阿德拉|28|女|苍白瘦削，左眼黄铜义眼|冷静理智，极度缺乏安全感|曾是贵族家替补厨师，因被诬陷遭驱逐|起初视主角为棋子，后转为生死搭档|复仇并查明父亲失踪真相|义眼中封印着低阶怨灵|冷嘲热讽，用烹饪术语隐喻人生险恶|zh-CN-XiaoyiNeural|-16Hz|0%|pale skin, left eye is a brass gear prosthetic, sharp cheekbones|long black hair in a neat bob cut, minimal makeup|slender and slightly hunched frame|white apron over dark Victorian dress, brass goggles on head|dimly lit kitchen with steam and warm amber glow
+巴尔扎|45|男|魁梧如熊，右臂机械锅铲义肢|暴躁冲动，护短|前地下拳手，被深渊灶台改造为活体搅拌机|雇佣兵兼守护者，认为主角是少数不把他当怪物看的人|保护主角，终结自己作为器具的命运|机械义肢内部连接着未成熟的灵体心脏|粗鲁直白，常伴有吞咽口水的声音|zh-CN-YunxiNeural|-24Hz|-8%|broad square jaw, scar across nose, thick eyebrows|short buzz cut, sweat-dampened hair|massive muscular build, right arm is a mechanical spatula|torn tank top revealing mechanical parts, leather combat pants|gritty underground arena with sparks and smoke
 
 要求：
 1. 角色之间要有关系网（亲友、敌对、师徒、竞争对手等）
