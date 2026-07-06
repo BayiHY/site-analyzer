@@ -749,7 +749,7 @@ App.computeFinalParams = function(character, msg) {
 
     // pitch 只用基底，不受情绪影响
     let finalPitch = base.pitch;
-    let finalRate = Math.max(-35, Math.min(35, base.rate + offset.rate));
+    let finalRate = Math.max(-8, Math.min(8, base.rate + offset.rate));
     let finalVolume = Math.max(-100, Math.min(100, base.volume + offset.volume));
 
     const result = {
