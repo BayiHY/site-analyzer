@@ -140,10 +140,7 @@ App.generateCharactersAndStart = async function() {
 
                 // 序章生成任务（基于角色数据生成）
                 const openingTask = App.generateOpeningScene().then(scene => {
-                    if (scene) {
-                        state.story.openingScene = scene;
-                        rpLog('info', 'OPENING', '序章生成完成，已存入 state.story.openingScene');
-                    }
+                    rpLog('info', 'OPENING', `序章生成完成，长度: ${scene?.length || 0}`);
                     return scene;
                 }).catch(err => {
                     rpLog('warn', 'OPENING', '序章生成失败: ' + err.message);
@@ -157,16 +154,16 @@ App.generateCharactersAndStart = async function() {
                 rpLog('info', 'IMG', `角色头像生成完成: ${chars.length}/${chars.length} 角色, 主角:${playerOk}`);
 
                 // 等待序章完成
-                const openingScene = await openingTask;
-                if (openingScene) {
+                const openingRaw = await openingTask;
+                if (openingRaw) {
                     rpLog('info', 'OPENING', '序章生成完成');
                 }
 
                 // 角色头像全部完成 + 序章完成 → 生成初始场景图
-                if (state.story.openingScene) {
+                if (openingRaw) {
                     rpLog('info', 'SCENE', '角色头像全部完成 + 序章完成，开始生成初始场景图');
                     addSystemMessage('🖼️ 正在生成场景图...');
-                    await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene);
+                    await App.generateInitialSceneImage(openingRaw, openingRaw);
                     rpLog('info', 'SCENE', '初始场景图生成完成');
                 }
             } catch (imgErr) {
@@ -176,17 +173,17 @@ App.generateCharactersAndStart = async function() {
         } else if (!state.apiKeys.image) {
             // 没有生图 API Key，也生成序章
             try {
-                const openingScene = await App.generateOpeningScene();
-                if (openingScene) {
-                    state.story.openingScene = openingScene;
-                    rpLog('info', 'OPENING', '序章生成完成（无生图），已存入 state.story.openingScene');
+                const openingFromNoKey = await App.generateOpeningScene();
+                if (openingFromNoKey) {
+                    openingRaw = openingFromNoKey;
+                    rpLog('info', 'OPENING', '序章生成完成（无生图）');
                 }
             } catch (err) {
                 rpLog('warn', 'OPENING', '序章生成失败: ' + err.message);
             }
         }
 
-        const openingRaw = state.story.openingScene || '';
+        const openingRaw = openingRaw || '';
         let openingText = openingRaw;
         let openingReplies = [];
         const replyMatch = openingRaw.match(/<(.+)>$/);
@@ -202,10 +199,13 @@ App.generateCharactersAndStart = async function() {
             type: 'text',
             content: openingMsg,
             timestamp: new Date().toISOString(),
-            charIndex: 0,
-            suggestedReplies: openingReplies
+            charIndex: 0
         });
         renderMessage(state.messages[state.messages.length - 1]);
+        // 渲染建议回复选项（独立于消息对象）
+        if (openingReplies.length > 0) {
+            App.renderReplyOptions(openingReplies, state.messages[state.messages.length - 1].id);
+        }
         saveMessages().catch(() => {});
 
         rpLog('info', 'CHARS', '角色生成完成，进入聊天阶段');
@@ -300,10 +300,7 @@ App.regenerateCharacters = async function() {
 
                 // 序章生成任务（基于新角色数据重新生成）
                 const openingTask = App.generateOpeningScene().then(scene => {
-                    if (scene) {
-                        state.story.openingScene = scene;
-                        rpLog('info', 'OPENING', '序章重新生成完成，已存入 state.story.openingScene');
-                    }
+                    rpLog('info', 'OPENING', `序章重新生成完成，长度: ${scene?.length || 0}`);
                     return scene;
                 }).catch(err => {
                     rpLog('warn', 'OPENING', '序章重新生成失败: ' + err.message);
@@ -317,16 +314,16 @@ App.regenerateCharacters = async function() {
                 rpLog('info', 'IMG', `角色头像重新生成完成: ${chars.length}/${chars.length} 角色, 主角:${playerOk}`);
 
                 // 等待序章完成
-                const openingScene = await openingTask;
-                if (openingScene) {
+                const openingRaw = await openingTask;
+                if (openingRaw) {
                     rpLog('info', 'OPENING', '序章重新生成完成');
                 }
 
                 // 角色头像全部完成 + 序章完成 → 生成初始场景图
-                if (state.story.openingScene) {
+                if (openingRaw) {
                     rpLog('info', 'SCENE', '角色头像全部完成 + 序章完成，开始重新生成初始场景图');
                     addSystemMessage('🖼️ 正在重新生成场景图...');
-                    await App.generateInitialSceneImage(state.story.openingScene, state.story.openingScene);
+                    await App.generateInitialSceneImage(openingRaw, openingRaw);
                     rpLog('info', 'SCENE', '初始场景图重新生成完成');
                 }
             } catch (imgErr) {
@@ -336,17 +333,17 @@ App.regenerateCharacters = async function() {
         } else if (!state.apiKeys.image) {
             // 没有生图 API Key，也重新生成序章
             try {
-                const openingScene = await App.generateOpeningScene();
-                if (openingScene) {
-                    state.story.openingScene = openingScene;
-                    rpLog('info', 'OPENING', '序章重新生成完成（无生图），已存入 state.story.openingScene');
+                const openingFromNoKey = await App.generateOpeningScene();
+                if (openingFromNoKey) {
+                    openingRaw = openingFromNoKey;
+                    rpLog('info', 'OPENING', '序章重新生成完成（无生图）');
                 }
             } catch (err) {
                 rpLog('warn', 'OPENING', '序章重新生成失败: ' + err.message);
             }
         }
 
-        const openingRaw = state.story.openingScene || '';
+        const openingRaw = openingRaw || '';
         let openingText = openingRaw;
         let openingReplies = [];
         const replyMatch = openingRaw.match(/<(.+)>$/);
@@ -362,10 +359,13 @@ App.regenerateCharacters = async function() {
             type: 'text',
             content: openingMsg,
             timestamp: new Date().toISOString(),
-            charIndex: 0,
-            suggestedReplies: openingReplies
+            charIndex: 0
         });
         renderMessage(state.messages[state.messages.length - 1]);
+        // 渲染建议回复选项（独立于消息对象）
+        if (openingReplies.length > 0) {
+            App.renderReplyOptions(openingReplies, state.messages[state.messages.length - 1].id);
+        }
         saveMessages().catch(() => {});
 
         rpLog('info', 'REGEN', '角色重新生成完成，进入聊天阶段');

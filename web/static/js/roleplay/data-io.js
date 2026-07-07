@@ -14,7 +14,7 @@ App.exportData = function() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `roleplay_${state.characters[0]?.name || 'data'}_${Date.now()}.json`;
+    a.download = `roleplay_${state.story?.title || 'data'}_${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
 }

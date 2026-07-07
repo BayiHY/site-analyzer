@@ -1,5 +1,5 @@
 // === Section: 消息发送主流程 ===
-// 构建对话历史 → 调用 LLM → 渲染回复 → 触发后处理
+// 构建对话历史 → 对话智能体编故事 → 结构化智能体拆JSON → 前端消费结构化数据
 
 App.sendMessage = async function() {
     const input = document.getElementById('chat-input');
@@ -75,156 +75,93 @@ ${formatModule.buildFormatRequirements()}`;
             rpLog('error', 'TIMEOUT', `⚠️ 超时警告: chat 请求耗时 ${chatElapsed}ms`);
         }
 
-        // ===== 4. 解析多角色回复 =====
-        const parsedMessages = await App.parseMultiCharReply(response, state.activeCharIndex);
+        // ===== 4. 调用结构化智能体拆 JSON =====
+        rpLog('info', 'TIMEOUT', '调用结构化智能体拆分回复...');
+        rpLog('info', 'TIMEOUT', `原始回复内容: ${response.slice(0, 500)}${response.length > 500 ? '...' : ''}`);
+        const structStart = Date.now();
+        const structuredResult = await App.structuredParseReply(response, {
+            characters: allChars,
+            emotions: state.emotions || {},
+            dynamicAttrs: Object.fromEntries(
+                allChars.map(c => [c.name, {
+                    perception: c.perception || '',
+                    secret: c.secret || '',
+                    currentMood: c.currentMood || ''
+                }])
+            ),
+            revealedInfo: state.revealed || {}
+        });
+        rpLog('info', 'TIMEOUT', `结构化拆分完成: 耗时 ${Date.now()-structStart}ms, scene=${(structuredResult.scene || '').length}字符, chars=${(structuredResult.characters || []).length}个`);
 
-        // ===== 4.3 角色消息兜底修正（2026-07-05 新增） =====
-        // 第一轮解析后检测格式偏离，使用兜底智能体修正
-        let repairedResponse = null;
-        if (!parsedMessages.some(m => m._needsRetry)) {
-            // 只有非重试路径才需要兜底修正（重试路径已经有强制格式提示）
-            const repairAgent = await import('./roleplay-repair-agent.js');
-            const diagnosis = repairAgent.diagnoseRawReply(response, parsedMessages);
-            
-            if (diagnosis.needsRepair) {
-                rpLog('warn', 'REPAIR-AGENT', `格式偏离检测: ${diagnosis.reason} (字符数=${diagnosis.charCount}, 有前缀=${diagnosis.hasPrefix}, 有标签=${diagnosis.hasReplies})`);
-                
-                try {
-                    repairedResponse = await repairAgent.repairReply(
-                        response,
-                        state.characters || [],
-                        text,
-                        diagnosis.reason
-                    );
-                    rpLog('info', 'REPAIR-AGENT', `兜底修正成功，重新解析...`);
-                    
-                    // 用修正后的回复重新解析
-                    const repairedMessages = await App.parseMultiCharReply(repairedResponse, state.activeCharIndex);
-                    // 替换原始解析结果
-                    parsedMessages.length = 0;
-                    repairedMessages.forEach(m => parsedMessages.push(m));
-                    // 更新 response 为修正后的内容
-                    response = repairedResponse;
-                } catch (repairErr) {
-                    rpLog('error', 'REPAIR-AGENT', `兜底修正失败: ${repairErr.message}，使用原始解析结果`);
-                    // 修正失败，继续使用原始 parsedMessages
-                }
-            } else {
-                rpLog('info', 'REPAIR-AGENT', `格式正常，无需兜底修正`);
-            }
+        // ===== 5. 渲染结构化消息 =====
+        const baseMs = Date.now();
+        const renderedMessages = App.structuredToMessages(structuredResult, 'msg_' + baseMs);
+
+        for (const msg of renderedMessages) {
+            state.messages.push(msg);
+            renderMessage(msg);
         }
+        await saveMessages();
 
-        // ===== 4.5 检查解析层重试信号（2026-07-04 新增） =====
-        // 注意：兜底修正后如果仍有 _needsRetry，说明修正也失败了，走重试
-        let needsRetry = parsedMessages.some(m => m._needsRetry);
-        if (needsRetry) {
-            const firstRetryMsg = parsedMessages.find(m => m._needsRetry);
-            let retryReason = firstRetryMsg?._retryReason || '未知原因';
-            rpLog('error', 'PARSE-RETRY', `⚠️ 解析层要求重试: ${retryReason}，丢弃当前回复并重新请求`);
-            // 重新请求 LLM
-            rpLog('info', 'PARSE-RETRY', '重新构建历史并请求 LLM...');
-            const retryMessages = [
-                { role: 'system', content: systemPrompt },
-                ...historyMessages,
-                { role: 'user', content: text + '\n\n【强制要求】上一次回复格式严重偏离，请严格按照以下格式回复：\n场景描述（纯文本，不要加标签行）\n:角色1:(动作/神态)「对话内容」[内心想法]\n:角色2:(动作/神态)「对话内容」[内心想法]\n<回复1┇回复2┇回复3>' }
-            ];
-            const retryResponse = await App.agnesChatWithFallback(retryMessages, { route: 'chat' });
-            const retryParsed = await App.parseMultiCharReply(retryResponse, state.activeCharIndex);
-            for (const msg of retryParsed) {
-                state.messages.push(msg);
-                renderMessage(msg);
-            }
-            await saveMessages();
-            hideTyping();
-            document.getElementById('send-btn').disabled = false;
-            rpLog('info', 'PARSE-RETRY', `✅ 重试成功`);
-            // 更新 response 为重试结果，确保后处理使用正确的内容
-            response = retryResponse;
-        } else {
-            for (const msg of parsedMessages) {
-                state.messages.push(msg);
-                renderMessage(msg);
-            }
-            await saveMessages();
+        // 角色消息渲染完成，立即解锁发送按钮
+        hideTyping();
+        document.getElementById('send-btn').disabled = false;
 
-            // 角色消息渲染完成，立即解锁发送按钮
-            hideTyping();
-            document.getElementById('send-btn').disabled = false;
-        }
+        // ===== 6. 应用结构化更新（情感/属性/信息披露） =====
+        const charNames = structuredResult.characters ? structuredResult.characters.map(c => c.name) : [];
+        App.applyStructuredUpdates(structuredResult, charNames);
 
-        // ===== 5. 后处理：5 项并行执行 =====
-        rpLog('info', 'TIMEOUT', '后处理开始: 5 项并行');
+        // ===== 7. 后处理 =====
+        rpLog('info', 'TIMEOUT', '后处理开始');
         const postProcessStart = Date.now();
+        // 从结构化结果中提取首个发言角色（用于场景图/建议回复）
+        const firstChar = structuredResult.characters?.[0] || null;
         Promise.allSettled([
-            // 后处理 1: 场景图生成 → 见 scene-images.js
+            // 后处理 1: 场景图生成
             (async () => {
                 try {
-                    rpLog('info', 'TIMEOUT', '后处理[1/5] 场景图生成开始');
-                    const sceneDesc = App.parseSceneFromReply(response);
-                    if (sceneDesc && App.isSceneChanged(activeChar.name, sceneDesc)) {
-                        await App.generateSceneImage(activeChar.name, sceneDesc, activeChar, response, null);
+                    rpLog('info', 'TIMEOUT', '后处理[1/3] 场景图生成开始');
+                    const sceneImgModule = await import('./scene-images.js');
+                    if (structuredResult.scene && firstChar && App.isSceneChanged(firstChar.name, structuredResult.scene)) {
+                        await App.generateSceneImage(firstChar.name, structuredResult.scene, firstChar, structuredResult, null);
                     }
-                    rpLog('info', 'TIMEOUT', `后处理[1/5] 场景图完成 (${Date.now()-postProcessStart}ms)`);
+                    rpLog('info', 'TIMEOUT', `后处理[1/3] 场景图完成 (${Date.now()-postProcessStart}ms)`);
                 } catch (e) {
                     console.warn('场景图生成失败:', e);
                 }
             })(),
-            // 后处理 2: 情感指标更新 → 见 emotion-update.js
+            // 后处理 2: 异步生成建议回复选项
             (async () => {
                 try {
-                    rpLog('info', 'TIMEOUT', '后处理[2/5] 情感更新开始');
-                    await App.updateEmotions(activeChar.name, text, response);
-                    rpLog('info', 'TIMEOUT', `后处理[2/5] 情感完成 (${Date.now()-postProcessStart}ms)`);
-                } catch (e) {
-                    console.warn('情感更新失败:', e);
-                }
-            })(),
-            // 后处理 3: 信息披露评估 → 见 progressive-disclosure.js
-            (async () => {
-                try {
-                    rpLog('info', 'TIMEOUT', '后处理[3/5] 信息披露开始');
-                    await App.updateRevealedInfo(activeChar.name, text, response);
-                    if (state.currentPanel === 'characters') {
-                        document.getElementById('panel-body').innerHTML = renderCharactersPanel();
-                    }
-                    rpLog('info', 'TIMEOUT', `后处理[3/5] 信息披露完成 (${Date.now()-postProcessStart}ms)`);
-                } catch (e) {
-                    console.warn('信息披露评估失败:', e);
-                }
-            })(),
-            // 后处理 4: 动态属性更新 → 见 dynamic-attrs.js
-            (async () => {
-                try {
-                    rpLog('info', 'TIMEOUT', '后处理[4/5] 动态属性开始');
-                    await App.updateDynamicAttributes(activeChar.name, text, response);
-                    rpLog('info', 'TIMEOUT', `后处理[4/5] 动态属性完成 (${Date.now()-postProcessStart}ms)`);
-                } catch (e) {
-                    console.warn('动态属性更新失败:', e);
-                }
-            })(),
-            // 后处理 5: 异步生成建议回复选项（仅在 LLM 未提供 <> 标签时触发）
-            (async () => {
-                try {
-                    rpLog('info', 'TIMEOUT', '后处理[5/5] 异步建议回复生成开始');
-                    // 检查是否已有建议回复（从解析的消息中提取）
-                    const lastMsg = state.messages[state.messages.length - 1];
-                    const hasReplies = lastMsg && lastMsg.suggestedReplies && lastMsg.suggestedReplies.length >= 2;
-                    if (hasReplies) {
-                        rpLog('info', 'TIMEOUT', '后处理[5/5] 已有建议回复，跳过异步生成');
-                        return;
-                    }
-                    rpLog('info', 'TIMEOUT', '后处理[5/5] 无建议回复，触发异步生成');
-                    // 延迟 500ms 开始，避免与角色消息渲染竞争
+                    rpLog('info', 'TIMEOUT', '后处理[2/3] 异步建议回复生成开始');
                     await new Promise(r => setTimeout(r, 500));
-                    const opts = await App.generateReplyOptions(text, response);
+                    const lastCharDialog = structuredResult.characters?.[0]?.dialogue || '';
+                    const opts = await App.generateReplyOptions({
+                        lastUserMessage: text,
+                        lastCharResponse: lastCharDialog,
+                        recentMessages: state.messages.filter(m => m.role !== 'system').slice(-6)
+                    });
                     if (opts && opts.length >= 2) {
-                        App.renderReplyOptions(opts, lastMsg?.id || 'unknown');
-                        rpLog('info', 'TIMEOUT', `后处理[5/5] 异步建议回复完成 (${opts.length} 条)`);
+                        App.renderReplyOptions(opts, state.messages[state.messages.length - 1]?.id || 'unknown');
+                        rpLog('info', 'TIMEOUT', `后处理[2/3] 异步建议回复完成 (${opts.length} 条)`);
                     } else {
-                        rpLog('warn', 'TIMEOUT', `后处理[5/5] 异步生成选项不足 (${opts?.length || 0} 条)`);
+                        rpLog('warn', 'TIMEOUT', `后处理[2/3] 异步生成选项不足 (${opts?.length || 0} 条)`);
                     }
                 } catch (e) {
                     console.warn('异步建议回复生成失败:', e);
+                }
+            })(),
+            // 后处理 3: TTS 生成（原有逻辑）
+            (async () => {
+                try {
+                    rpLog('info', 'TIMEOUT', '后处理[3/3] TTS 开始');
+                    const ttsModule = await import('./tts-manager.js');
+                    if (ttsModule && ttsModule.handlePostReply) {
+                        await ttsModule.handlePostReply(structuredResult);
+                    }
+                    rpLog('info', 'TIMEOUT', `后处理[3/3] TTS 完成 (${Date.now()-postProcessStart}ms)`);
+                } catch (e) {
+                    console.warn('TTS 处理失败:', e);
                 }
             })()
         ]).then(() => {
@@ -232,146 +169,64 @@ ${formatModule.buildFormatRequirements()}`;
         });
 
     } catch (err) {
+        rpLog('error', 'SEND', `❌ 发送失败: ${err.message}`);
         addSystemMessage(`回复失败: ${err.message || '未知错误'}`);
         hideTyping();
         document.getElementById('send-btn').disabled = false;
     }
 }
 
-// === 多角色回复解析器 ===
-// 编排 scene-extractor → reply-extractor → char-splitter → content-parser
-// 格式: {场景}角色1:(动作)语言[内心想法]┆角色2:(动作)语言[内心想法]<建议回复1|建议回复2|建议回复3>
+// === 多角色回复解析器（保留作为向后兼容兜底） ===
 
 App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
+    rpLog('warn', 'PARSE', 'parseMultiCharReply 已被弃用，请使用 structuredToMessages');
     const messages = [];
-    let text = rawText.trim();
-    rpLog('info', 'TIMEOUT', `解析多角色回复开始: ${(text||'').length} 字符`);
-    const parseStart = Date.now();
-
-    // 统一时间戳基准：确保场景消息的时间戳早于角色消息
-    const baseTimestamp = new Date().toISOString();
     const baseMs = Date.now();
+    const baseTimestamp = new Date().toISOString();
 
-    try {
-        // 步骤 1: 提取场景
-        const sceneExtractor = await import('./scene-extractor.js');
-        const { sceneText, remaining: afterScene } = sceneExtractor.extractScene(text);
+    const sceneExtractor = await import('./scene-extractor.js');
+    const { sceneText, remaining: afterScene } = sceneExtractor.extractScene(rawText);
 
-        // 步骤 2: 提取建议回复（2026-07-04 增强：返回 needsRetry 信号）
-        const replyExtractor = await import('./reply-extractor.js');
-        const replyResult = replyExtractor.extractSuggestedReplies(afterScene);
-        const { replies: suggestedReplies, remaining: afterReply, needsRetry: replyNeedsRetry, retryReason: replyRetryReason } = replyResult;
+    const replyExtractor = await import('./reply-extractor.js');
+    replyExtractor.extractSuggestedReplies(afterScene);
 
-        // 步骤 3: 分割角色段落
-        const charSplitter = await import('./char-splitter.js');
-        const charParts = charSplitter.splitCharParts(afterReply);
+    const charSplitter = await import('./char-splitter.js');
+    const charParts = charSplitter.splitCharParts(afterScene);
 
-        // 步骤 4: 解析每个角色段落
-        const contentParser = await import('./content-parser.js');
-        for (let i = 0; i < charParts.length; i++) {
-            const trimmed = charParts[i].trim();
-            if (!trimmed) continue;
+    const contentParser = await import('./content-parser.js');
+    for (let i = 0; i < charParts.length; i++) {
+        const trimmed = charParts[i].trim();
+        if (!trimmed) continue;
 
-            const { charName, charIdx, action, dialogue, thought, formattedContent } = contentParser.parseContent(trimmed, null, defaultCharIndex, suggestedReplies);
+        const { charName, charIdx, action, dialogue, thought, formattedContent } = contentParser.parseContent(trimmed, null, defaultCharIndex);
 
-            messages.push({
-                id: 'msg_char_' + (baseMs + i + 1),
-                role: 'char',
-                type: 'multi_char',
-                content: formattedContent,
-                charIndex: charIdx,
-                charName: charName || state.characters[charIdx]?.name || '',
-                action: action,
-                dialogue: dialogue,
-                thought: thought,
-                suggestedReplies: suggestedReplies,
-                timestamp: new Date(baseMs + i + 1).toISOString()
-            });
-            rpLog('INFO', 'PARSE-CHAR', `角色消息 #${messages.length} (charIdx=${charIdx}): 建议回复=${JSON.stringify(suggestedReplies)}, 动作="${action}", 对话="${dialogue}", 想法="${thought}"`);
-        }
+        messages.push({
+            id: 'msg_char_' + (baseMs + i + 1),
+            role: 'char',
+            type: 'multi_char',
+            content: formattedContent,
+            charIndex: charIdx,
+            charName: charName || state.characters[charIdx]?.name || '',
+            action: action,
+            dialogue: dialogue,
+            thought: thought,
+            timestamp: new Date(baseMs + i + 1).toISOString()
+        });
+    }
 
-        // ===== 格式校验层：检测 LLM 回复是否严重偏离格式 =====
-        const formatValidator = await import('./format-validator.js');
-        const formatResult = formatValidator.validateFormat(rawText, messages);
-        if (formatResult.missingScene || formatResult.missingPrefix || formatResult.missingReplies) {
-            rpLog('warn', 'FORMAT-CHECK', `格式偏离: 场景描述=${formatResult.missingScene ? '缺失' : '有'}, 角色前缀=${formatResult.missingPrefix ? '缺失' : '有'}, 建议回复=${formatResult.missingReplies ? '缺失' : '有'}, 触发重试: ${formatResult.shouldRetry}`);
-        }
+    if (sceneText) {
+        messages.unshift({
+            id: 'msg_scene_' + baseMs,
+            role: 'char',
+            type: 'text',
+            content: sceneText,
+            charIndex: defaultCharIndex,
+            isScene: true,
+            timestamp: baseTimestamp
+        });
+    }
 
-        // ===== 角色身份一致性校验（2026-07-04 新增） =====
-        const identityValidator = await import('./identity-validator.js');
-        const identityResult = identityValidator.validateIdentityConsistency(messages, state.characters);
-        if (!identityResult.valid) {
-            rpLog('warn', 'IDENTITY-CHECK', `身份校验失败: ${identityResult.conflicts.map(c => `${c.charName}: ${c.reason}`).join('; ')}`);
-        }
-
-        // ===== 场景在场规则校验 =====
-        if (messages.length > 0) {
-            const presenceValidator = await import('./scene-presence-validator.js');
-            const presenceResult = presenceValidator.validateScenePresence(
-                rawText,
-                state.characters[state.activeCharIndex]?.name,
-                state.characters
-            );
-            if (!presenceResult.valid) {
-                rpLog('warn', 'SCENE-RULE', `场景在场规则违反: ${presenceResult.conflicts.join(', ')} 声明不在场但实际出场`);
-                // 标记为需要重试，后续在 sendMessage 中处理
-                messages[0]._sceneRuleViolation = presenceResult;
-            }
-        }
-
-        // ===== 综合重试信号（2026-07-04 增强） =====
-        // 建议回复缺失 → 后台异步生成（不触发重试）
-        // 建议回复质量差（口水词/无效） → 触发重试
-        // 重试针对：严重格式偏离、身份冲突、口水词过多
-        let overallNeedsRetry = formatResult.shouldRetry || identityResult.conflicts.length > 2 || replyNeedsRetry;
-        // 同时记录是否需要后台异步生成建议回复
-        const needsAsyncReplyOptions = !replyResult.replies || replyResult.replies.length < 2;
-        if (overallNeedsRetry) {
-            const reasons = [];
-            if (formatResult.shouldRetry) reasons.push(`格式偏离[${formatResult.details.join(',')}]`);
-            if (identityResult.conflicts.length > 2) reasons.push(`身份冲突[${identityResult.conflicts.length}条]`);
-            if (replyNeedsRetry) reasons.push(`建议回复质量差[${replyRetryReason}]`);
-            rpLog('error', 'PARSE-RETRY', `⚠️ 解析层触发重试信号: ${reasons.join('; ')}`);
-            // 在第一条消息上标记重试原因，供 sendMessage 捕获
-            if (messages.length > 0) {
-                messages[0]._needsRetry = true;
-                messages[0]._retryReason = reasons.join('; ');
-            }
-        }
-        // 将异步生成信号附加到第一条消息，供 sendMessage 捕获
-        if (needsAsyncReplyOptions && messages.length > 0) {
-            messages[0]._needsAsyncReplyOptions = true;
-        }
-
-        // 附加场景消息（时间戳必须在所有角色消息之前）
-        if (sceneText) {
-            const sceneMsg = {
-                id: 'msg_scene_' + baseMs,
-                role: 'char',
-                type: 'text',
-                content: sceneText,
-                charIndex: defaultCharIndex,
-                isScene: true,
-                timestamp: baseTimestamp
-            };
-            messages.unshift(sceneMsg);
-        }
-
-        // 如果没有解析出任何角色消息，fallback 为单条普通消息
-        if (messages.length === 0) {
-            rpLog('warn', 'PARSE', '⚠️ 未解析出任何角色消息，使用 fallback 原始文本');
-            messages.push({
-                id: 'msg_' + baseMs,
-                role: 'char',
-                type: 'text',
-                content: text,
-                charIndex: defaultCharIndex,
-                timestamp: baseTimestamp
-            });
-        }
-    } catch (parseErr) {
-        // 解析异常兜底：确保至少有一条消息返回，不会让消息被吞
-        rpLog('error', 'PARSE', `解析异常，使用兜底消息: ${parseErr.message}`);
+    if (messages.length === 0) {
         messages.push({
             id: 'msg_' + baseMs,
             role: 'char',
@@ -382,6 +237,5 @@ App.parseMultiCharReply = async function(rawText, defaultCharIndex) {
         });
     }
 
-    rpLog('info', 'TIMEOUT', `解析多角色回复完成: ${messages.length} 条消息, 耗时 ${Date.now()-parseStart}ms`);
     return messages;
 };

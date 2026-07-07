@@ -4,7 +4,7 @@
 /**
  * 解析单个角色消息的内容
  */
-export function parseContent(trimmed, charName, defaultCharIndex, suggestedReplies) {
+export function parseContent(trimmed, charName, defaultCharIndex) {
     // 提取 :角色名: 前缀
     let prefixMatch = trimmed.match(/^:([^:：]+):(.+)/);
     if (prefixMatch) {

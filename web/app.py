@@ -1118,6 +1118,360 @@ def tts_api():
         return jsonify({'error': str(e)}), 500
 
 
+# ==================== 结构化输出智能体 ====================
+
+GLM_API_KEY = os.environ.get('GLM_API_KEY', '')
+GLM_API_URL = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+STRUCTURED_OUTPUT_MAX_RETRIES = 3
+STRUCTURED_OUTPUT_TIMEOUT = 120  # 秒
+STRUCTURED_OUTPUT_MAX_CHARS = 18000  # 最大输入字符数（留 2K 余量，实测 20K 稳定）
+STRUCTURED_OUTPUT_TRUNCATE_MSG = '输入内容过长（超过18000字符），已自动裁剪至前18000字符。部分内容未被分析。'
+
+
+def _truncate_content(story_content, schema_fields):
+    """裁剪超长内容，返回 (截断后内容, 是否被截断)"""
+    if len(story_content) <= STRUCTURED_OUTPUT_MAX_CHARS:
+        return story_content, False
+    
+    # 保留开头 + 末尾各一半，中间用省略号
+    half = STRUCTURED_OUTPUT_MAX_CHARS // 2
+    truncated = story_content[:half] + '\n\n…（内容过长，已裁剪中间部分 …）\n\n' + story_content[-(STRUCTURED_OUTPUT_MAX_CHARS - half):]
+    return truncated, True
+
+
+def _build_structured_prompt(schema_description, story_content, truncate_notice=None):
+    """构建结构化输出 system prompt"""
+    notice_section = f"\n\n⚠️ 注意：{truncate_notice}" if truncate_notice else ""
+    return f"""你是一个严格的数据提取助手。请将用户提供的内容按照以下字段定义提取为结构化数据。{notice_section}
+
+【字段定义】
+{schema_description}
+
+【输出要求】
+1. 只输出合法的 JSON，不要输出任何其他文字
+2. 不要包含 JSON 代码块标记（如 ```json）
+3. 所有字符串字段的值必须是字符串类型，不要省略引号
+4. 数组字段如果是空的，返回空数组 []
+5. 如果某个字段在原文中找不到对应内容，返回 null
+
+【用户内容】
+{story_content}"""
+
+
+def _extract_json_from_response(text):
+    """从 LLM 响应中提取 JSON（处理 ```json 包裹等情况）"""
+    text = text.strip()
+    # 尝试直接解析
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # 尝试提取 ```json ... ``` 包裹的内容
+    import re
+    match = re.search(r'```(?:json)?\s*\n(.*?)\n```', text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+    # 尝试找到第一个 { 到最后一个 } 之间的内容
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end != -1 and end > start:
+        try:
+            return json.loads(text[start:end+1])
+        except json.JSONDecodeError:
+            pass
+    return None
+
+
+def _call_glm_for_structured_output(system_prompt, story_content, schema_fields, max_retries=STRUCTURED_OUTPUT_MAX_RETRIES):
+    """调用 GLM API 进行结构化输出，带重试和 JSON 校验"""
+    import urllib.request
+    import urllib.error
+
+    messages = [
+        {"role": "user", "content": f"{system_prompt}\n\n请提取以下内容的结构化数据：\n\n{story_content}"}
+    ]
+
+    payload = {
+        "model": "glm-4-flash",
+        "messages": messages,
+        "temperature": 0.1,
+        "max_tokens": 4096,
+        "response_format": {"type": "json_object"}
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GLM_API_KEY}"
+    }
+
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(
+                GLM_API_URL,
+                data=json.dumps(payload).encode('utf-8'),
+                headers=headers,
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=STRUCTURED_OUTPUT_TIMEOUT) as resp:
+                result = json.loads(resp.read().decode('utf-8'))
+                reply = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+                extracted = _extract_json_from_response(reply)
+                if extracted is not None:
+                    # 校验返回的 JSON 是否包含所有必需字段
+                    required_keys = {f['name'] for f in schema_fields}
+                    if required_keys.issubset(set(extracted.keys())):
+                        app.logger.info(f'✅ 结构化输出成功 (attempt={attempt+1})')
+                        return extracted
+                    else:
+                        missing = required_keys - set(extracted.keys())
+                        app.logger.warning(f'⚠️ 缺少字段: {missing}, 重试...')
+                else:
+                    app.logger.warning(f'⚠️ JSON 解析失败 (attempt={attempt+1}), 重试...')
+        except Exception as e:
+            app.logger.error(f'❌ GLM 调用失败 (attempt={attempt+1}): {e}')
+
+        # 如果不是最后一次，稍微等待后重试
+        if attempt < max_retries - 1:
+            time.sleep(0.5 * (attempt + 1))
+
+    app.logger.error(f'❌ 结构化输出最终失败，已重试 {max_retries} 次')
+    return None
+
+
+@app.route('/api/structured-output', methods=['POST', 'OPTIONS'])
+def structured_output_api():
+    """结构化输出智能体端点
+    
+    前端传入 storyContent（非结构化内容）和 schema（字段定义），
+    后端调用 GLM-4-Flash 提取结构化数据。
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '请求体必须是 JSON'}), 400
+
+    story_content = data.get('storyContent', '').strip()
+    schema = data.get('schema', {})
+
+    if not story_content:
+        return jsonify({'error': 'storyContent 不能为空'}), 400
+    if not schema or 'fields' not in schema:
+        return jsonify({'error': 'schema.fields 不能为空'}), 400
+
+    fields = schema.get('fields', [])
+    if not fields:
+        return jsonify({'error': 'fields 数组不能为空'}), 400
+
+    # 裁剪超长内容
+    truncated_content, was_truncated = _truncate_content(story_content, fields)
+    truncate_notice = STRUCTURED_OUTPUT_TRUNCATE_MSG if was_truncated else None
+
+    # 构建 schema 描述文本
+    schema_desc_lines = []
+    for f in fields:
+        fname = f.get('name', '?')
+        fdesc = f.get('desc', '')
+        ftype = f.get('type', 'string')
+        schema_desc_lines.append(f"- **{fname}** ({ftype}): {fdesc}")
+    schema_description = '\n'.join(schema_desc_lines)
+
+    # 构建 system prompt
+    system_prompt = _build_structured_prompt(schema_description, truncated_content, truncate_notice)
+
+    orig_len = len(story_content)
+    trunc_len = len(truncated_content)
+    status = f' (已裁剪 {orig_len}->{trunc_len} chars)' if was_truncated else ''
+    app.logger.info(f'📦 结构化输出请求: fields={[f["name"] for f in fields]}, content_len={orig_len}{status}')
+
+    # 调用 GLM
+    result = _call_glm_for_structured_output(system_prompt, truncated_content, fields)
+
+    if result is None:
+        return jsonify({'error': '结构化输出失败，请重试'}), 500
+
+    response_data = {
+        'success': True,
+        'structuredData': result
+    }
+    if was_truncated:
+        response_data['truncated'] = True
+        response_data['originalLength'] = orig_len
+        response_data['truncatedLength'] = trunc_len
+        response_data['notice'] = STRUCTURED_OUTPUT_TRUNCATE_MSG
+
+    return jsonify(response_data)
+
+
+# ==================== 角色扮演结构化拆分智能体 ====================
+# 职责：把对话智能体输出的原始文本拆成 JSON
+# 不编故事，只拆分
+
+ROLEPLAY_STRUCTURE_MAX_CHARS = 18000
+
+
+@app.route('/api/roleplay-structure', methods=['POST', 'OPTIONS'])
+def roleplay_structure_api():
+    """结构化拆分端点
+    
+    接收对话智能体输出的原始文本，拆分为结构化 JSON：
+    - scene: 场景描述
+    - characters: [{name, action, dialogue, thought}]
+    - suggestedReplies: ["选项1", "选项2", ...]
+    - emotionDelta: {charName: {好感度: +2, ...}}
+    - dynamicAttrs: {charName: {perception: "...", ...}}
+    - revealedInfo: {charName: {appearance: true, ...}}
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '请求体必须是 JSON'}), 400
+
+    import urllib.request
+    import urllib.error
+
+    raw_text = data.get('rawText', '').strip()
+    characters = data.get('characters', [])
+    emotions = data.get('emotions', {})
+    dynamic_attrs = data.get('dynamicAttrs', {})
+    revealed_info = data.get('revealedInfo', {})
+
+    if not raw_text:
+        return jsonify({'error': 'rawText 不能为空'}), 400
+
+    # 构建角色信息文本
+    char_info_block = ''
+    if characters:
+        char_info_block = '\n【角色列表】\n'
+        for c in characters:
+            char_info_block += f"- {c.get('name', '?')}（{c.get('gender', '未知')}，{c.get('age', '?')}岁）：{c.get('personality', '无')} | {c.get('background', '无')}\n"
+
+    # 构建情感指标
+    emotion_info_block = ''
+    if emotions:
+        emotion_info_block = '\n【情感指标】\n'
+        for char_name, char_emotions in emotions.items():
+            emotion_info_block += f'{char_name}:\n'
+            for key, val in char_emotions.items():
+                current = val.get('current', 50) if isinstance(val, dict) else val
+                emotion_info_block += f'  {key}: {current}\n'
+
+    # 构建动态属性
+    attr_info_block = ''
+    if dynamic_attrs:
+        attr_info_block = '\n【动态属性】\n'
+        for char_name, attrs in dynamic_attrs.items():
+            attr_info_block += f'{char_name}:\n'
+            for k, v in attrs.items():
+                attr_info_block += f'  {k}: {v or "未设置"}\n'
+
+    # 构建披露信息
+    revealed_block = ''
+    if revealed_info:
+        revealed_block = '\n【已发现信息】\n'
+        for char_name, fields in revealed_info.items():
+            revealed_block += f'{char_name}:\n'
+            for field, found in fields.items():
+                status = '已发现' if found else '未发现'
+                revealed_block += f'  {field}: {status}\n'
+
+    # 裁剪超长内容
+    truncated_raw = raw_text
+    was_truncated = False
+    if len(raw_text) > ROLEPLAY_STRUCTURE_MAX_CHARS:
+        half = ROLEPLAY_STRUCTURE_MAX_CHARS // 2
+        truncated_raw = raw_text[:half] + '\n\n…（内容过长，已裁剪中间部分 …）\n\n' + raw_text[-(ROLEPLAY_STRUCTURE_MAX_CHARS - half):]
+        was_truncated = True
+
+    # 字段规则通过参数传入，不在提示词里硬编码
+    field_schema = data.get('fieldSchema', '')
+    context_info = data.get('contextInfo', '')
+
+    # 通用结构化拆分提示词
+    final_prompt = f"""你是一个严格的数据拆分助手。你的唯一任务是将原始文本拆分为 JSON。
+
+【字段规则】
+{field_schema}
+
+【输出要求】
+1. 只输出合法的 JSON，不要输出任何其他文字
+2. 不要包含 JSON 代码块标记（如 ```json）
+3. 所有字符串字段必须是字符串类型
+4. 数组字段如果没有内容，返回空数组 []
+5. 对象字段如果没有变化，返回空对象 {{}}
+
+{context_info}
+
+【原始文本（请拆分）】
+{truncated_raw}
+
+请输出拆分后的 JSON。"""
+
+    app.logger.info(f'📦 结构化拆分请求: rawText_len={len(raw_text)}')
+
+    messages = [{"role": "user", "content": final_prompt}]
+
+    for attempt in range(STRUCTURED_OUTPUT_MAX_RETRIES):
+        try:
+            payload = {
+                "model": "glm-4-flash",
+                "messages": messages,
+                "temperature": 0.1,
+                "max_tokens": 4096,
+                "response_format": {"type": "json_object"}
+            }
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {GLM_API_KEY}"
+            }
+            req = urllib.request.Request(
+                GLM_API_URL,
+                data=json.dumps(payload).encode('utf-8'),
+                headers=headers,
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=STRUCTURED_OUTPUT_TIMEOUT) as resp:
+                result = json.loads(resp.read().decode('utf-8'))
+                reply = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+                usage = result.get('usage', {})
+                input_tokens = usage.get('prompt_tokens') or usage.get('input_tokens') or 0
+                output_tokens = usage.get('completion_tokens') or usage.get('output_tokens') or 0
+
+                extracted = _extract_json_from_response(reply)
+                if extracted is not None:
+                    # 校验必需字段
+                    required_top = {'scene', 'characters', 'suggestedReplies', 'emotionDelta', 'dynamicAttrs', 'revealedInfo'}
+                    missing = required_top - set(extracted.keys())
+                    if not missing:
+                        app.logger.info(f'✅ 结构化拆分成功 (attempt={attempt+1})')
+                        response_data = {
+                            'success': True,
+                            'structuredData': extracted,
+                            'truncated': was_truncated
+                        }
+                        if was_truncated:
+                            response_data['notice'] = STRUCTURED_OUTPUT_TRUNCATE_MSG
+                        return jsonify(response_data)
+                    else:
+                        app.logger.warning(f'⚠️ 缺少字段: {missing}, 重试...')
+                else:
+                    app.logger.warning(f'⚠️ JSON 解析失败 (attempt={attempt+1}), 重试...')
+        except Exception as e:
+            app.logger.error(f'❌ GLM 调用失败 (attempt={attempt+1}): {e}')
+
+        if attempt < STRUCTURED_OUTPUT_MAX_RETRIES - 1:
+            time.sleep(0.5 * (attempt + 1))
+
+    app.logger.error(f'❌ 结构化拆分最终失败，已重试 {STRUCTURED_OUTPUT_MAX_RETRIES} 次')
+    return jsonify({'error': '结构化拆分失败，请重试'}), 500
+
+
 # ==================== 优雅关闭 ====================
 
 def graceful_shutdown(signum, frame):

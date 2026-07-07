@@ -106,9 +106,6 @@ App.renderMessage = function(msg) {
         bubble.textContent = msg.content;
     } else if (msg.type === 'multi_char') {
         bubble.innerHTML = App.formatMultiCharMessage(msg);
-    } else if (msg.suggestedReplies && msg.suggestedReplies.length > 0) {
-        const textHtml = App.formatInteraction(msg.content);
-        bubble.innerHTML = textHtml;
     } else {
         bubble.innerHTML = App.formatInteraction(msg.content);
     }
@@ -117,11 +114,6 @@ App.renderMessage = function(msg) {
     div.appendChild(bubble);
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
-
-    // 如果有建议回复，渲染到底部独立容器
-    if (msg.suggestedReplies && msg.suggestedReplies.length > 0) {
-        App.renderReplyOptions(msg.suggestedReplies, msg.id);
-    }
 
     // 异步生成语音
     if (msg.role === 'char' && msg._played !== true) {

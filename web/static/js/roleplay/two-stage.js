@@ -3,6 +3,7 @@
 
 App.initializeStory = async function(userInspiration, playerGender) {
     rpLog('info', 'INIT', `开始两阶段故事生成流程，玩家性别: ${playerGender || state.player?.gender}`);
+    let openingRaw = '';
 
     addSystemMessage('正在构思故事世界...');
     try {
@@ -97,8 +98,7 @@ App.initializeStory = async function(userInspiration, playerGender) {
             // 序章生成任务（基于角色数据生成，与头像并行）
             const openingTask = App.generateOpeningScene().then(scene => {
                 if (scene) {
-                    state.story.openingScene = scene;
-                    rpLog('info', 'OPENING', '序章生成完成，已存入 state.story.openingScene');
+                    rpLog('info', 'OPENING', '序章生成完成');
                 }
                 return scene;
             }).catch(err => {
@@ -113,22 +113,21 @@ App.initializeStory = async function(userInspiration, playerGender) {
             rpLog('info', 'IMG', `角色头像生成完成: ${state.characters.length}/${state.characters.length} 角色, 主角:${playerOk}`);
 
             // 等待序章完成
-            const openingScene = await openingTask;
-            if (openingScene) {
+            openingRaw = await openingTask;
+            if (openingRaw) {
                 rpLog('info', 'OPENING', '序章生成完成，开始渲染序章消息');
             } else {
                 rpLog('warn', 'OPENING', '序章生成返回空，使用空序章');
             }
 
             // 角色头像全部完成 + 序章生成完成 → 生成初始场景图
-            if (state.story.openingScene) {
+            if (openingRaw) {
                 rpLog('info', 'SCENE', '角色头像全部完成 + 序章完成，开始生成初始场景图');
                 addSystemMessage('🖼️ 正在生成场景图...');
-                rpLog('info', 'TIMING', `场景图生成前 openingScene 长度: ${state.story.openingScene.length}`);
+                rpLog('info', 'TIMING', `场景图生成前 openingScene 长度: ${openingRaw.length}`);
                 
                 // 从序章中提取结构化回复文本（用于角色名解析）
-                const replyText = state.story.openingScene;
-                await App.generateInitialSceneImage(state.story.openingScene, replyText);
+                await App.generateInitialSceneImage(openingRaw, openingRaw);
                 rpLog('info', 'SCENE', '初始场景图生成完成');
                 rpLog('info', 'TIMING', '✅ 场景图生成完成，耗时已记录');
             }
@@ -141,8 +140,8 @@ App.initializeStory = async function(userInspiration, playerGender) {
         try {
             const openingScene = await App.generateOpeningScene();
             if (openingScene) {
-                state.story.openingScene = openingScene;
-                rpLog('info', 'OPENING', '序章生成完成（无生图），已存入 state.story.openingScene');
+                openingRaw = openingScene;
+                rpLog('info', 'OPENING', '序章生成完成（无生图）');
             }
         } catch (err) {
             rpLog('warn', 'OPENING', '序章生成失败: ' + err.message);
@@ -151,7 +150,6 @@ App.initializeStory = async function(userInspiration, playerGender) {
 
     // 解析序章：复用 parseMultiCharReply 的完整解析管线（场景提取→建议回复→角色分割→内容解析）
     rpLog('info', 'TIMING', '=== 开始解析序章 ===');
-    const openingRaw = state.story.openingScene || '';
     rpLog('INFO', 'INIT-REPLY', `开场场景原始文本 (长度=${openingRaw.length}): "${openingRaw.substring(0, 150)}..."`);
     
     // 直接调用 parseMultiCharReply，复用角色回复的完整解析和渲染逻辑
