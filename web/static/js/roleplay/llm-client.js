@@ -68,6 +68,7 @@ App.agnesChat = async function(messages, options = {}) {
     // 结构化输出路由使用低温度保证格式稳定
     const tempByRoute = {
         'chat': 0.3,          // 多角色对话回复：严格格式
+        'opening': 0.7,       // 序章生成：高温度创意，结构化智能体兜底格式
         'emotion': 0.2,       // 情感评估：JSON 格式
         'disclosure': 0.2,    // 信息披露：JSON 格式
         'worldview': 0.7,     // 世界观生成：需要创意

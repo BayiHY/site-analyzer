@@ -1,104 +1,108 @@
-// === Section: 序章生成 ===
-// 在角色生成完成后，基于角色数据生成序章场景
+// === Section: 序章生成（使用对话智能体 + 结构化拆分） ===
+// 序章生成不再使用独立的 opening-gen 提示词，而是复用对话智能体的完整系统提示词
+// 生成后通过 structuredParseReply 拆分为结构化数据，再由 structuredToMessages 渲染
 
 App.generateOpeningScene = async function() {
     if (!state.story || !state.story.worldview) {
         rpLog('warn', 'OPENING', '世界观尚未生成，跳过序章生成');
-        return '';
+        return { rawText: '', structured: null };
     }
     if (!state.characters || state.characters.length === 0) {
         rpLog('warn', 'OPENING', '角色尚未生成，跳过序章生成');
-        return '';
+        return { rawText: '', structured: null };
     }
 
-    rpLog('info', 'OPENING', '开始生成序章场景');
+    rpLog('info', 'OPENING', '开始生成序章场景（对话智能体模式）');
     addSystemMessage('✍️ 正在生成序章场景...');
 
-    const worldview = state.story.worldview;
-    const title = state.story.title || '';
-    const mainArc = (state.story.mainArc || []).map(a => `・${a.phase}：${a.description}`).join('\n');
-    const toneKeywords = (state.story.toneKeywords || []).join('、');
-    const userInspiration = state.story.userInspiration || '';
-    
-    // 构建角色信息列表（供 LLM 在序章中使用真实角色名和外貌）
-    const charInfoList = state.characters.map((c, i) => {
-        const gender = c.gender === '女' ? '女性' : c.gender === '男' ? '男性' : '未知';
-        const age = c.age || '?';
-        const appearance = c.appearance || '未描述';
-        const personality = c.personality || '';
-        return `角色${i + 1}：${c.name}（${gender}，${age}岁，${appearance}，${personality ? '性格：' + personality : ''}`;
-    }).join('\n');
+    // 加载与 chat-sender 相同的提示词模块
+    const [worldviewModule, cardModule, sceneModule, emotionModule, formatModule] = await Promise.all([
+        import('./system-prompt/worldview.js'),
+        import('./system-prompt/character-card.js'),
+        import('./system-prompt/scene-rules.js'),
+        import('./system-prompt/emotion-guide.js'),
+        import('./system-prompt/format-requirements.js'),
+    ]);
 
-    const systemPrompt = `你是专业的小说作家和剧本创作者。请根据世界观、角色设定和主线剧情，创作一段沉浸式的序章场景。`;
+    const allChars = state.characters || [];
 
-    const userPrompt = `请根据以下信息创作一段序章场景：
+    // 构建系统提示词（与对话智能体完全一致）
+    const systemPrompt = `你是沉浸式多人角色扮演游戏专属剧情生成智能体。请严格依据以下全部输入信息进行创作：故事大纲、当前剧情阶段、完整历史对话、所有角色基础信息、各角色对玩家的情感指标、玩家最新行为/对话。
+请使用中文回复。
 
-【世界观】
-${worldview}
+${worldviewModule.buildWorldview(state)}
 
-【故事标题】
-${title}
+${cardModule.buildCharacterCard(state)}
 
-【主线剧情概要】
-${mainArc}
+${sceneModule.buildSceneRules(allChars, state)}
 
-【氛围关键词】
-${toneKeywords}
+${emotionModule.buildEmotionGuide(state)}
 
-【可用角色列表】（序章中必须使用以下真实角色名，不得使用其他名字）
-${charInfoList}
+${formatModule.buildFormatRequirements()}`;
 
-【用户原始灵感】
-${userInspiration || '无'}
-
-【输出格式 — 严格逐行输出，不要任何额外文字或标记】
-
-[第一行] 场景描述（纯文本，不要加 {场景描述及旁白} 这样的标签行，不要加花括号包裹）
-:角色1:(动作/神态)「对话内容」[内心想法]
-:角色2:(动作/神态)「对话内容」[内心想法]
-<回复1┇回复2┇回复3>
-
-严格规则：
-1. 第一行直接输出场景描述文字（150-250字沉浸式环境描写），**不要**用花括号包裹，**不要**输出 {场景描述及旁白} 这样的标签
-2. 从第二行开始，每行一个角色，格式严格为 :角色名:(动作/神态)「对话内容」[内心想法]
-   - ⚠️ :角色名: 前后各一个冒号（双冒号格式），不可省略
-   - ⚠️ 即使只有一个角色在场，也必须写 :角色名: 前缀
-3. 最后一行必须是 <建议回复1┇建议回复2┇建议回复3>，用尖括号包裹，┇（U+2507）分隔
-4. ⚠️ 每条回复不超过20字，必须是玩家视角的具体行动/语言，要有剧情推进作用
-5. 不能是"好的""嗯"等口水词
-6. 三条回复风格差异化：温和保守 / 主动试探 / 强势叛逆
-7. 「」为对话内容的固定包裹符号，不可省略或用其他符号替代
-8. (动作/神态) 为外在表现，[内心想法] 为角色隐秘心理，不对外表露
-9. 对话部分要体现角色性格，与角色设定一致
-10. ⚠️ 角色名字必须与实际发言内容匹配——禁止 :林悦: 的名字下写攻击性台词（如果人设是温柔型）
-
-⚠️ 重要：序章中出现的角色必须来自上述角色列表，使用真实姓名。`;
+    // 用户消息：序章阶段没有历史对话，直接给出创作指令
+    const userInspiration = state.story.userInspiration || '无';
+    const userMessage = `【序章创作指令】\n\n这是故事的开端，请基于世界观和角色设定创作一段沉浸式序章场景。要求：\n1. 场景描写生动，角色对话自然\n2. 必须使用以下角色的真实姓名\n3. 体现角色性格和世界观氛围\n4. 结尾附上 3 条玩家可选回复\n\n用户原始灵感：${userInspiration}`;
 
     try {
         const startTime = Date.now();
-        rpLog('info', 'TIMEOUT', `LLM 请求开始: opening_scene`);
-        const resp = await App.agnesChatWithFallback([{
-            role: 'system',
-            content: systemPrompt
-        }, {
-            role: 'user',
-            content: userPrompt
-        }], { route: 'opening' });
+        rpLog('info', 'TIMEOUT', `LLM 请求开始: opening_scene (对话智能体)`);
+
+        // 调用对话智能体（route='opening', 温度 0.7）
+        const response = await App.agnesChat([
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+        ], { route: 'opening' });
+
         const elapsed = Date.now() - startTime;
-        rpLog('info', 'TIMEOUT', `LLM 请求完成: opening_scene, 耗时 ${elapsed}ms`);
+        rpLog('info', 'TIMEOUT', `LLM 请求完成: opening_scene, 耗时 ${elapsed}ms, 输出长度: ${response?.length || 0}`);
 
-        // 清理可能的 markdown 代码块包裹
-        let openingScene = resp.trim();
-        const codeBlockMatch = openingScene.match(/```(?:json|text)?\s*\n([\s\S]*?)\n```/);
-        if (codeBlockMatch) {
-            openingScene = codeBlockMatch[1].trim();
-        }
+        // 调用结构化智能体拆分
+        rpLog('info', 'TIMEOUT', '调用结构化智能体拆分序章回复...');
+        const structStart = Date.now();
+        const structuredResult = await App.structuredParseReply(response, {
+            characters: allChars,
+            emotions: state.emotions || {},
+            dynamicAttrs: Object.fromEntries(
+                allChars.map(c => [c.name, {
+                    perception: c.perception || '',
+                    secret: c.secret || '',
+                    currentMood: c.currentMood || ''
+                }])
+            ),
+            revealedInfo: state.revealed || {}
+        });
+        rpLog('info', 'TIMEOUT', `结构化拆分完成: 耗时 ${Date.now()-structStart}ms, scene=${(structuredResult.scene || '').length}字符, chars=${(structuredResult.characters || []).length}个`);
 
-        rpLog('info', 'OPENING', `序章生成完成，长度: ${openingScene.length}`);
-        return openingScene;
+        rpLog('info', 'OPENING', `序章生成完成（对话智能体模式）: scene=${(structuredResult.scene || '').length}字符, chars=${structuredResult.characters?.length || 0}`);
+        // 生成 rawText 供场景图生成使用（create-flow.js / two-stage.js 取 result.rawText）
+        const rawText = App.structuredToRawText(structuredResult);
+        rpLog('info', 'OPENING', `rawText 长度: ${rawText.length} 字符`);
+        return { rawText, structured: structuredResult };
+
     } catch (err) {
         rpLog('error', 'OPENING', `序章生成失败: ${err.message}`);
         addSystemMessage(`⚠️ 序章生成失败: ${err.message}`);
-        return '';
+        return { rawText: '', structured: null };
     }
+};
+
+/**
+ * 将结构化结果转换为原始文本（场景+角色对话），用于场景图生成和旧管线兼容
+ * @param {Object} structured - structuredParseReply 的返回结果
+ * @returns {string} 原始文本
+ */
+App.structuredToRawText = function(structured) {
+    const parts = [];
+    if (structured.scene) {
+        parts.push(structured.scene);
+    }
+    for (const charData of (structured.characters || [])) {
+        let line = `:${charData.name}:`;
+        if (charData.action) line += `(${charData.action})`;
+        if (charData.dialogue) line += charData.dialogue;
+        if (charData.thought) line += `[${charData.thought}]`;
+        parts.push(line);
+    }
+    return parts.join('\n');
 };

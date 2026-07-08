@@ -225,23 +225,20 @@ const VOICE_HEURISTIC = /Neural|zh-CN|en-US|voice_/i;
 // 常见风格词列表（用于检测 imageFace 是否被填入了风格词）
 // 包含新旧关键词，确保列错位检测覆盖所有可能
 const STYLE_KEYWORDS = [
-    // 新 41 细分关键词
-    'akira toriyama style', 'rumiko takahashi style', 'studio ghibli hand-drawn cel',
-    '80s toei cel animation', '90s jump shonen cel anime', '00s josei cel anime',
-    'modern moe cel anime', 'y2k anime', 'seinen cel anime', 'trigger anime style',
-    'three-tone cel shading', 'shonen jump manga', 'shoujo manga', 'gekiga manga',
-    'webtoon korean color manhwa', 'doujinshi illustration', 'horror manga',
-    'one piece manga style', 'berserk manga style', 'blender lowpoly cartoon render',
-    'anime toon 3d render', 'pixar soft 3d cartoon', 'clay figure render',
-    'miniature diorama render', 'chibi super deformed 3d', 'transparent watercolor wash',
-    'heavy oil painting texture', 'digital thick paint illustration',
-    'graphite pencil sketch', 'chinese ink wash painting', 'hard line ink line art',
+    // 新 26 细分关键词
+    '00s josei cel anime', 'modern moe cel anime', 'y2k anime', 'seinen cel anime',
+    'three-tone cel shading', 'shoujo manga', 'horror manga',
+    'blender lowpoly cartoon render', 'anime toon 3d render',
+    'clay figure render', 'miniature diorama render', 'chibi super deformed 3d',
+    'transparent watercolor wash', 'heavy oil painting texture',
+    'digital thick paint illustration', 'graphite pencil sketch',
+    'chinese ink wash painting', 'hard line ink line art',
     'neon cyberpunk illustration', 'vaporwave retro 80s art',
     'dark gothic fantasy illustration', 'flat vector minimal illustration',
     'pixel art 16bit retro game', 'unreal engine photoreal PBR', 'pop art screen print',
     // 兼容旧关键词
-    'cel shading', 'watercolor', 'oil painting', 'anime', 'pencil sketch',
-    'comic book', 'photorealistic', '3d render', 'studio ghibli',
+    'watercolor', 'oil painting', 'anime', 'pencil sketch',
+    'comic book', 'photorealistic', '3d render',
     'cyberpunk', 'fantasy art', 'chibi', 'pixel art', 'ink wash',
     'vaporwave', 'dark fantasy', 'line art', 'concept art',
     'unreal engine', 'blender cartoon', 'thick paint', 'flat design'

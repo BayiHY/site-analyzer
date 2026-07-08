@@ -1394,7 +1394,11 @@ def roleplay_structure_api():
     context_info = data.get('contextInfo', '')
 
     # 通用结构化拆分提示词
-    final_prompt = f"""你是一个严格的数据拆分助手。你的唯一任务是将原始文本拆分为 JSON。
+    final_prompt = f"""你是一个严格的数据拆分助手。你的唯一任务是从对话智能体的自然语言叙事中提取结构化 JSON。
+
+⚠️ 重要：对话智能体输出的是纯自然语言小说叙事，不是格式标记文本。
+不要期望找到 :角色名:、(动作)、[想法]、{{场景}}、<选项> 等格式标记。
+你需要从流畅的叙事文字中理解并提取各个要素。
 
 【字段规则】
 {field_schema}
@@ -1414,8 +1418,11 @@ def roleplay_structure_api():
 请输出拆分后的 JSON。"""
 
     app.logger.info(f'📦 结构化拆分请求: rawText_len={len(raw_text)}')
+    app.logger.info(f'📦 fieldSchema: {field_schema[:2000]}')
+    app.logger.info(f'📦 contextInfo: {context_info}')
 
     messages = [{"role": "user", "content": final_prompt}]
+    app.logger.info(f'📦 传给GLM的完整prompt (len={len(final_prompt)}): {final_prompt[:5000]}')
 
     for attempt in range(STRUCTURED_OUTPUT_MAX_RETRIES):
         try:
@@ -1443,13 +1450,25 @@ def roleplay_structure_api():
                 input_tokens = usage.get('prompt_tokens') or usage.get('input_tokens') or 0
                 output_tokens = usage.get('completion_tokens') or usage.get('output_tokens') or 0
 
+                app.logger.info(f'📦 GLM 原始返回 (attempt={attempt+1}, len={len(reply)}): {reply[:3000]}')
+                app.logger.info(f'📦 输入 rawText 长度: {len(raw_text)}, 裁剪: {was_truncated}')
+
                 extracted = _extract_json_from_response(reply)
                 if extracted is not None:
                     # 校验必需字段
                     required_top = {'scene', 'characters', 'suggestedReplies', 'emotionDelta', 'dynamicAttrs', 'revealedInfo'}
                     missing = required_top - set(extracted.keys())
                     if not missing:
-                        app.logger.info(f'✅ 结构化拆分成功 (attempt={attempt+1})')
+                        chars_info = []
+                        for c in extracted.get('characters', []):
+                            chars_info.append({
+                                'name': c.get('name', ''),
+                                'action_len': len(c.get('action', '')),
+                                'dialogue_len': len(c.get('dialogue', '')),
+                                'thought_len': len(c.get('thought', '')),
+                                'thought_preview': (c.get('thought', '') or '')[:80]
+                            })
+                        app.logger.info(f'✅ 结构化拆分成功 (attempt={attempt+1}), characters={chars_info}')
                         response_data = {
                             'success': True,
                             'structuredData': extracted,
@@ -1460,16 +1479,230 @@ def roleplay_structure_api():
                         return jsonify(response_data)
                     else:
                         app.logger.warning(f'⚠️ 缺少字段: {missing}, 重试...')
+                        # 重试时将缺失字段信息追加到 messages，让 GLM 知道缺了什么
+                        messages.append({
+                            'role': 'user',
+                            'content': f'⚠️ 上一次返回的 JSON 缺少以下顶层字段：{list(missing)}。请重新输出完整 JSON，必须包含所有 6 个顶层字段：scene, characters, suggestedReplies, emotionDelta, dynamicAttrs, revealedInfo。即使字段为空也要返回（如 revealedInfo={{}}）。'
+                        })
                 else:
                     app.logger.warning(f'⚠️ JSON 解析失败 (attempt={attempt+1}), 重试...')
+                    messages.append({
+                        'role': 'user',
+                        'content': f'⚠️ 上一次返回的内容不是合法 JSON，请重新输出合法的 JSON 对象。'
+                    })
         except Exception as e:
             app.logger.error(f'❌ GLM 调用失败 (attempt={attempt+1}): {e}')
+            messages.append({
+                'role': 'user',
+                'content': f'⚠️ 上一次请求出错：{str(e)[:200]}。请重新尝试。'
+            })
 
         if attempt < STRUCTURED_OUTPUT_MAX_RETRIES - 1:
             time.sleep(0.5 * (attempt + 1))
 
     app.logger.error(f'❌ 结构化拆分最终失败，已重试 {STRUCTURED_OUTPUT_MAX_RETRIES} 次')
     return jsonify({'error': '结构化拆分失败，请重试'}), 500
+
+
+# ==================== 角色小传生成智能体 ====================
+# 职责：接收世界观 + 角色基本信息，并行调用 GLM-4-flash 生成每个角色的详细小传
+
+CHAR_BIO_MAX_RETRIES = 2
+CHAR_BIO_TIMEOUT = 60  # 秒
+
+
+def _generate_single_bio(worldview, char_basic):
+    """为单个角色生成详细小传（供 ThreadPoolExecutor 并行调用）"""
+    import urllib.request
+    import urllib.error
+
+    system_prompt = (
+        "你是资深角色设计师和编剧，擅长为虚构角色创作立体、有深度的详细小传。"
+        "请根据世界观和角色基本信息，生成完整的角色档案。"
+    )
+
+    char_name = char_basic.get('name', '?')
+    char_gender = char_basic.get('gender', '未知')
+    char_age = char_basic.get('age', '?')
+    char_relationship = char_basic.get('relationship', '与主角的关系待定')
+
+    user_content = (
+        f"【世界观概要】\n{worldview}\n\n"
+        f"【角色基本信息】\n"
+        f"- 姓名：{char_name}\n"
+        f"- 性别：{char_gender}\n"
+        f"- 年龄：{char_age}\n"
+        f"- 与主角关系：{char_relationship}\n\n"
+        f"请为该角色生成详细的 18 个字段档案，严格按以下 TSV 格式输出（用 | 分隔）：\n"
+        f"name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|ttsPitch|ttsRate|imageFace|imageHair|imageBody|imageClothes|imageEnvironment\n\n"
+        f"要求：\n"
+        f"1. appearance: 外貌特征（50字以内，具体且有辨识度）\n"
+        f"2. personality: 性格特点（50字以内，包含优点和缺点）\n"
+        f"3. background: 背景故事（80字以内，包含关键经历和转折点）\n"
+        f"4. relationship: 与主角的关系（30字以内）\n"
+        f"5. motivation: 核心动机/欲望（20字以内）\n"
+        f"6. secret: 隐藏的秘密（30字以内）\n"
+        f"7. speechStyle: 说话风格（20字以内）\n"
+        f"8. voice: Edge TTS 语音名称（女声默认 zh-CN-XiaoyiNeural，男声默认 zh-CN-YunxiNeural）\n"
+        f"9. ttsPitch: 音色基底音高（格式如 -40Hz、-32Hz、...、+40Hz，步长 8Hz，贴合角色性格）\n"
+        f"10. ttsRate: 语速基底（格式如 -10%、-5%、0%、+5%、+10%，控制在 -8% ~ +8% 范围内）\n"
+        f"11. imageFace/imageHair/imageBody/imageClothes/imageEnvironment: 全部用英文，适合 AI 绘画\n\n"
+        f"示例格式：\n"
+        f"{char_name}|{char_age}|{char_gender}|外貌描述|性格描述|背景故事|关系描述|动机|秘密|说话风格|语音|pitch|rate|face|hair|body|clothes|environment\n\n"
+        f"注意：不要输出表头，直接输出数据行！"
+    )
+
+    payload = {
+        "model": "glm-4-flash",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content}
+        ],
+        "temperature": 0.8,
+        "max_tokens": 2048
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GLM_API_KEY}"
+    }
+
+    for attempt in range(CHAR_BIO_MAX_RETRIES):
+        try:
+            req = urllib.request.Request(
+                GLM_API_URL,
+                data=json.dumps(payload).encode('utf-8'),
+                headers=headers,
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=CHAR_BIO_TIMEOUT) as resp:
+                result = json.loads(resp.read().decode('utf-8'))
+                reply = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+                
+                # 解析 TSV 输出
+                # 格式：name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|ttsPitch|ttsRate|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
+                parts = reply.strip().split('|')
+                if len(parts) >= 18:
+                    bio = {
+                        'name': parts[0].strip(),
+                        'age': int(parts[1].strip()) if parts[1].strip().isdigit() else 20,
+                        'gender': parts[2].strip(),
+                        'appearance': parts[3].strip(),
+                        'personality': parts[4].strip(),
+                        'background': parts[5].strip(),
+                        'relationship': parts[6].strip(),
+                        'motivation': parts[7].strip(),
+                        'secret': parts[8].strip(),
+                        'speechStyle': parts[9].strip(),
+                        'voice': parts[10].strip(),
+                        'ttsPitch': parts[11].strip(),
+                        'ttsRate': parts[12].strip(),
+                        'imageFace': parts[13].strip(),
+                        'imageHair': parts[14].strip(),
+                        'imageBody': parts[15].strip(),
+                        'imageClothes': parts[16].strip(),
+                        'imageEnvironment': parts[17].strip()
+                    }
+                    app.logger.info(f'✅ {char_name} 小传生成成功 (attempt={attempt+1})')
+                    return {'name': char_name, 'bio': bio}
+                else:
+                    app.logger.warning(f'⚠️ {char_name} 小传解析失败：字段数不足 ({len(parts)}/18), 重试...')
+        except Exception as e:
+            app.logger.error(f'❌ {char_name} 小传生成失败 (attempt={attempt+1}): {e}')
+        
+        if attempt < CHAR_BIO_MAX_RETRIES - 1:
+            time.sleep(0.5 * (attempt + 1))
+
+    app.logger.error(f'❌ {char_name} 小传生成最终失败，已重试 {CHAR_BIO_MAX_RETRIES} 次')
+    return {'name': char_name, 'bio': None}
+
+
+@app.route('/api/roleplay/char-bio', methods=['POST', 'OPTIONS'])
+def char_bio_api():
+    """角色小传生成端点
+    
+    接收世界观 + 角色基本信息数组，并行调用 GLM-4-flash 为每个角色生成详细小传。
+    
+    请求体：
+    {
+      "worldview": "世界观概要",
+      "characters": [
+        {"name": "林婉清", "gender": "女", "age": 24, "relationship": "拍卖行继承人"},
+        ...
+      ]
+    }
+    
+    响应体：
+    {
+      "bios": [
+        {
+          "name": "林婉清",
+          "bio": {
+            "name": "林婉清",
+            "age": 24,
+            "gender": "女",
+            "appearance": "...",
+            "personality": "...",
+            "background": "...",
+            "relationship": "...",
+            "motivation": "...",
+            "secret": "...",
+            "speechStyle": "...",
+            "voice": "...",
+            "ttsPitch": "...",
+            "ttsRate": "...",
+            "imageFace": "...",
+            "imageHair": "...",
+            "imageBody": "...",
+            "imageClothes": "...",
+            "imageEnvironment": "..."
+          }
+        },
+        ...
+      ]
+    }
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'})
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '请求体必须是 JSON'}), 400
+
+    worldview = data.get('worldview', '').strip()
+    characters = data.get('characters', [])
+
+    if not worldview:
+        return jsonify({'error': 'worldview 不能为空'}), 400
+    if not characters:
+        return jsonify({'error': 'characters 数组不能为空'}), 400
+
+    app.logger.info(f'开始为 {len(characters)} 个角色生成小传')
+
+    # 并行生成所有角色的小传
+    with ThreadPoolExecutor(max_workers=min(len(characters), 5)) as executor:
+        futures = [
+            executor.submit(_generate_single_bio, worldview, char)
+            for char in characters
+        ]
+        results = [f.result() for f in futures]
+
+    # 过滤掉失败的
+    success_bios = [r for r in results if r.get('bio')]
+    failed_names = [r['name'] for r in results if not r.get('bio')]
+
+    app.logger.info(f'小传生成完成: {len(success_bios)}/{len(characters)} 成功')
+    if failed_names:
+        app.logger.warning(f'失败角色: {", ".join(failed_names)}')
+
+    return jsonify({
+        'success': True,
+        'total': len(characters),
+        'success_count': len(success_bios),
+        'failed_count': len(failed_names),
+        'bios': success_bios,
+        'failed': failed_names
+    })
 
 
 # ==================== 优雅关闭 ====================

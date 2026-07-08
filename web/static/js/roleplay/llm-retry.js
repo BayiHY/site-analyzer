@@ -106,6 +106,7 @@ App.agnesChatWithFallback = async function(messages, options = {}) {
         // 计算路由温度
         const tempByRoute = {
             'chat': 0.3,
+            'opening': 0.7,       // 序章：高温度创意，结构化智能体兜底格式
             'emotion': 0.2,
             'disclosure': 0.2,
             'worldview': 0.7,

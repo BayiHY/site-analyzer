@@ -181,7 +181,7 @@ App.renderSettingsPanel = function() {
         <div class="setting-item" style="opacity:0.7;">
             <label>🎨 画面风格</label>
             <div style="padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:0.9rem;min-height:36px;display:flex;align-items:center;">
-                ${App.getArtStyleDisplayName(state.story?.imageStyle || state.story?.artStyle || 'akira toriyama style')}
+                ${App.getArtStyleDisplayName(state.story?.imageStyle || state.story?.artStyle || 'cel shaded anime style')}
             </div>
             <div class="setting-hint">灵感中自动检测的画面风格，不可修改</div>
         </div>

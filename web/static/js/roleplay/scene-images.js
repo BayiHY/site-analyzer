@@ -216,22 +216,29 @@ App.applySceneBackground = function(imageUrl) {
     }
 }
 App.generateInitialSceneImage = async function(openingScene, replyText, metadata) {
-    if (!openingScene) return;
+    const t0 = Date.now();
+    rpLog('info', 'SCENE', `▶️ 场景图生成开始 (t=${Date.now() - t0}ms)`);
+    if (!openingScene) {
+        rpLog('warn', 'SCENE', '❌ 场景描述为空，跳过');
+        return;
+    }
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
-        console.warn('生图 API Key 未配置，跳过初始场景图生成');
+        rpLog('warn', 'SCENE', '❌ 生图 API Key 未配置，跳过');
         return;
     }
 
     const activeChar = state.characters[state.activeCharIndex];
     const worldview = state.story?.worldview || '';
+    rpLog('info', 'SCENE', `活跃角色: ${activeChar?.name || '无'}, 角色数: ${state.characters?.length || 0}`);
+
     const prompt = App.sceneToImagePrompt(openingScene, activeChar, worldview, state.characters, replyText);
+    rpLog('info', 'SCENE', `场景提示词长度: ${prompt?.length || 0}`);
 
     try {
         rpLog('info', 'SCENE', '=== 初始场景图生成开始 ===');
         rpLog('info', 'SCENE', `场景描述: ${openingScene.slice(0, 100)}`);
         rpLog('info', 'SCENE', `世界观: ${(worldview || '').slice(0, 80)}`);
-        rpLog('info', 'SCENE', `活跃角色: ${activeChar?.name || '无'}`);
         rpLog('info', 'SCENE', `角色外貌: ${(activeChar?.appearance || '无').slice(0, 60)}`);
 
         // 只传入场景中实际出现的角色参考图
@@ -246,6 +253,7 @@ App.generateInitialSceneImage = async function(openingScene, replyText, metadata
         }
 
         // 统一生图入口（自动模型降级）
+        rpLog('info', 'SCENE', '📡 开始调用生图 API...');
         const imgUrl = await App.agnesImageGenerate({
             prompt,
             refImages: sceneRefs,
@@ -253,6 +261,7 @@ App.generateInitialSceneImage = async function(openingScene, replyText, metadata
             model: 'agnes-image-2.1-flash',
             label: 'initial_scene'
         });
+        rpLog('info', 'SCENE', `✅ 场景图生成成功: ${imgUrl.slice(0, 80)}`);
 
         // 保存状态并设为背景
         state.currentSceneBg = imgUrl;
@@ -267,23 +276,31 @@ App.generateInitialSceneImage = async function(openingScene, replyText, metadata
 
         // 应用为背景图
         App.applySceneBackground(imgUrl);
+        rpLog('info', 'SCENE', `✅ 场景图生成完成，总耗时: ${Date.now() - t0}ms`);
 
     } catch (err) {
+        rpLog('error', 'SCENE', `❌ 场景图生成失败: ${err.message || String(err)} (耗时 ${Date.now() - t0}ms)`);
         console.warn('初始场景图生成异常:', err.message);
     }
 }
 
 // === 聊天中场景变化时生成新场景图（静默更新背景，不插入消息）===
 App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText, metadata) {
-    if (!sceneDesc) return;
+    const t0 = Date.now();
+    rpLog('info', 'SCENE', `▶️ 场景图生成开始 (t=${Date.now() - t0}ms)`);
+    if (!sceneDesc) {
+        rpLog('warn', 'SCENE', '❌ 场景描述为空，跳过');
+        return;
+    }
     const apiKey = state.apiKeys.image;
     if (!apiKey) {
-        console.warn('生图 API Key 未配置，跳过场景图生成');
+        rpLog('warn', 'SCENE', '❌ 生图 API Key 未配置，跳过');
         return;
     }
 
     try {
         const prompt = App.sceneToImagePrompt(sceneDesc, charObj, state.story?.worldview || '', state.characters, replyText);
+        rpLog('info', 'SCENE', `场景提示词长度: ${prompt?.length || 0}`);
 
         rpLog('info', 'SCENE', '=== 场景图生成开始 ===');
         rpLog('info', 'SCENE', `角色: ${charName}`);
@@ -302,6 +319,7 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText,
         }
 
         // 统一生图入口（自动模型降级）
+        rpLog('info', 'SCENE', '📡 开始调用生图 API...');
         const imgUrl = await App.agnesImageGenerate({
             prompt,
             refImages: sceneRefs,
@@ -309,6 +327,7 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText,
             model: 'agnes-image-2.1-flash',
             label: `chat_scene_${charName}`
         });
+        rpLog('info', 'SCENE', `✅ 场景图生成成功: ${imgUrl.slice(0, 80)}`);
 
         // 更新状态
         state.currentSceneBg = imgUrl;
@@ -323,8 +342,10 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText,
 
         // 更新聊天窗口背景
         App.applySceneBackground(imgUrl);
+        rpLog('info', 'SCENE', `✅ 场景图生成完成，总耗时: ${Date.now() - t0}ms`);
 
     } catch (err) {
+        rpLog('error', 'SCENE', `❌ 场景图生成失败: ${err.message || String(err)} (耗时 ${Date.now() - t0}ms)`);
         console.warn('场景图生成异常:', err.message);
     }
 }

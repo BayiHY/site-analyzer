@@ -1,38 +1,27 @@
 // === Section: 图片 API 封装 ===
 // 生图 API 调用 + prompt 清洗 + 风格后缀 + 模块化三级降级
 
-// 艺术风格后缀映射（41 个细分关键词，4 大板块，无歧义无重叠）
+// 艺术风格后缀映射（27 个细分关键词，4 大板块，无歧义无重叠）
 // 绘图 prompt 使用完整细分词；后端标注标签仍可用 18 个固定词
 App.artStyleSuffixes = {
-    // === 一、日系动画细分 ===
-    'akira toriyama style': ', Akira Toriyama style, bold thick outlines, spiky hair, blocky hard shadows, Dragon Ball aesthetic',
-    'rumiko takahashi style': ', Rumiko Takahashi style, soft rounded lines, low saturation warm retro palette, Inuyasha aesthetic',
-    'studio ghibli hand-drawn cel': ', Studio Ghibli hand-drawn cel animation, watercolor textures, natural lush backgrounds, Hayao Miyazaki aesthetic',
-    '80s toei cel animation': ', 1980s Toei cel animation, extremely high saturation hard cel shading, retro anime aesthetic',
-    '90s jump shonen cel anime': ', 1990s Shonen Jump cel anime, strong dynamic poses, thick black outlines, hot-blooded action aesthetic',
+    // 默认/兜底风格
+    'cel shaded anime style': ', cel shaded anime style, clean line art, vibrant colors, professional character design',
+    // === 一、动画风格 ===
     '00s josei cel anime': ', 2000s Josei cel anime, soft gradients, macaron pastel color palette, romantic shojo aesthetic',
     'modern moe cel anime': ', modern moe cel anime, glossy skin highlights, oversized bright eyes, soft outlines, contemporary shounen aesthetic',
     'y2k anime': ', Y2K anime aesthetic, high saturation fluorescent colors, retro digital filter, early 2000s anime style',
     'seinen cel anime': ', seinen cel anime, low contrast realistic facial features, muted沉稳 tones, mature aesthetic',
-    'trigger anime style': ', Trigger studio anime style, high contrast distorted lines, explosive special effects, geist aesthetic',
     'three-tone cel shading': ', three-tone cel shading, minimal three-color flat colors, no gradients, clean unified aesthetic',
-    // === 二、漫画细分 ===
-    'shonen jump manga': ', Shonen Jump manga style, black and white screentones, speed lines, dense dot patterns, bold ink outlines',
+    // === 二、漫画风格 ===
     'shoujo manga': ', shoujo manga style, black and white gradient screentones, highlighted eye makeup,纤细 fine lines',
-    'gekiga manga': ', gekiga manga style, rough charcoal lines, oppressive high contrast black and white, adult dramatic aesthetic',
-    'webtoon korean color manhwa': ', Korean webtoon color manhwa, soft thick paint gradients, elongated beautiful proportions, vertical scroll style',
-    'doujinshi illustration': ', doujinshi illustration style, refined detailed art, atmospheric backgrounds, indie comic aesthetic',
     'horror manga': ', horror manga style, broken fragmented lines, large areas of solid black, distorted facial features, Japanese horror aesthetic',
-    'one piece manga style': ', One Piece manga style, Eiichiro Oda, exaggerated cartoon proportions, thick bold outlines, adventurous aesthetic',
-    'berserk manga style': ', Berserk manga style, dense crosshatching, heavy dark tones, dark mature fantasy aesthetic',
-    // === 三、3D 卡通细分 ===
+    // === 三、3D 卡通 ===
     'blender lowpoly cartoon render': ', Blender low-poly cartoon 3D render, geometric faceted surfaces, flat color shading, voxel aesthetic',
     'anime toon 3d render': ', anime toon 3D render, cel-shaded 3D, simulating hand-drawn cel animation texture',
-    'pixar soft 3d cartoon': ', Pixar soft 3D cartoon render, rounded smooth surfaces, global soft lighting, family-friendly CG aesthetic',
     'clay figure render': ', clay figure 3D render, matte plush clay texture, stop-motion figurine aesthetic',
     'miniature diorama render': ', miniature diorama render, shallow depth of field, physical miniature model texture, tilt-shift aesthetic',
     'chibi super deformed 3d': ', chibi super-deformed 3D, two-head proportion, oversized head tiny body, simplified structure, cute 3D aesthetic',
-    // === 四、通用美术&潮流细分 ===
+    // === 四、通用美术&潮流 ===
     'transparent watercolor wash': ', transparent watercolor wash, luminous bleeding edges, negative space留白, no heavy pigment buildup',
     'heavy oil painting texture': ', heavy oil painting texture, thick impasto brushstrokes, canvas grain, classical painting aesthetic',
     'digital thick paint illustration': ', digital thick paint illustration, layered blending, soft dark-light transitions, digital painting aesthetic',
@@ -51,7 +40,7 @@ App.artStyleSuffixes = {
 // 获取当前艺术风格后缀
 // 注意：灵感检测到的风格即使不在预设选项中，也直接作为后缀使用（不做转译/映射）
 App.getArtStyleSuffix = function() {
-    const style = state.story?.imageStyle || state.story?.artStyle || 'akira toriyama style';
+    const style = state.story?.imageStyle || state.story?.artStyle || 'cel shaded anime style';
     if (App.artStyleSuffixes[style]) {
         return App.artStyleSuffixes[style];
     }
@@ -339,8 +328,8 @@ App.generatePlayerAvatar = async function() {
     const gender = state.player?.gender || '男';
     const pw = gender === '男' ? 'young man' : 'young woman';
     const appearance = gender === '男' ? 'handsome, sharp features' : 'beautiful, delicate features';
-    const artStyle = state.story?.imageStyle || 'akira toriyama style';
-    const styleSuffix = App.artStyleSuffixes[artStyle] || App.artStyleSuffixes['akira toriyama style'];
+    const artStyle = state.story?.imageStyle || 'cel shaded anime style';
+    const styleSuffix = App.artStyleSuffixes[artStyle] || App.artStyleSuffixes['cel shaded anime style'];
     const prompt = `Portrait of ${pw}, ${appearance}, modern casual clothing, professional character concept art, detailed facial features${styleSuffix}`;
 
     console.log(`[主角] 开始生成头像 (性别: ${gender})`);
