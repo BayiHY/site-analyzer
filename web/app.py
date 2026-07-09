@@ -1511,14 +1511,33 @@ CHAR_BIO_MAX_RETRIES = 2
 CHAR_BIO_TIMEOUT = 60  # 秒
 
 
+def _clean_tsv_output(text):
+    """清理 LLM 输出的 TSV 文本：去除 markdown 包裹、分割线等噪声"""
+    if not text:
+        return ''
+    # 清理 markdown 代码块包裹
+    text = text.strip()
+    text = re.sub(r'^```(?:tsv|csv|txt|text)?\s*\n', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\n```\s*$', '', text)
+    # 清理分割线
+    text = re.sub(r'^-{3,}\s*$', '', text, flags=re.MULTILINE).strip()
+    # 清理表头行（LLM 可能误输出，匹配多种可能的表头格式）
+    text = re.sub(r'^name\s*\|\s*(?:gender|age).*?\n', '', text, flags=re.MULTILINE)
+    return text.strip()
+
+
 def _generate_single_bio(worldview, char_basic):
-    """为单个角色生成详细小传（供 ThreadPoolExecutor 并行调用）"""
+    """为单个角色生成人物内核小传（供 ThreadPoolExecutor 并行调用）
+    
+    注意：小传只生成人物内核（personality/background/motivation/secret/speechStyle），
+    外貌、声线、生图字段已在 Step 1 角色设计阶段生成，直接透传。
+    """
     import urllib.request
     import urllib.error
 
     system_prompt = (
-        "你是资深角色设计师和编剧，擅长为虚构角色创作立体、有深度的详细小传。"
-        "请根据世界观和角色基本信息，生成完整的角色档案。"
+        "你是资深角色编剧，擅长为虚构角色创作立体、有深度的背景故事。"
+        "请根据世界观和角色基础信息，生成人物内核。"
     )
 
     char_name = char_basic.get('name', '?')
@@ -1526,30 +1545,53 @@ def _generate_single_bio(worldview, char_basic):
     char_age = char_basic.get('age', '?')
     char_relationship = char_basic.get('relationship', '与主角的关系待定')
 
+    # 从 Step 1 拿到的基础信息（11 项 + 声线 + 生图）
+    appearance = char_basic.get('appearance', '')
+    voice = char_basic.get('voice', '')
+    personality = char_basic.get('personality', '')
+    relationships = char_basic.get('relationships', '')
+    origin = char_basic.get('origin', '')
+    motivation = char_basic.get('motivation', '')
+    abilities = char_basic.get('abilities', '')
+    likes = char_basic.get('likes', '')
+    habits = char_basic.get('habits', '')
+    tts_pitch = char_basic.get('ttsPitch', '')
+    tts_rate = char_basic.get('ttsRate', '')
+    image_face = char_basic.get('imageFace', '')
+    image_hair = char_basic.get('imageHair', '')
+    image_body = char_basic.get('imageBody', '')
+    image_clothes = char_basic.get('imageClothes', '')
+    image_env = char_basic.get('imageEnvironment', '')
+
     user_content = (
         f"【世界观概要】\n{worldview}\n\n"
-        f"【角色基本信息】\n"
+        f"【角色基础信息（11项标准字段）】\n"
         f"- 姓名：{char_name}\n"
         f"- 性别：{char_gender}\n"
         f"- 年龄：{char_age}\n"
-        f"- 与主角关系：{char_relationship}\n\n"
-        f"请为该角色生成详细的 18 个字段档案，严格按以下 TSV 格式输出（用 | 分隔）：\n"
-        f"name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|ttsPitch|ttsRate|imageFace|imageHair|imageBody|imageClothes|imageEnvironment\n\n"
+        f"- 外貌：{appearance or '待生成'}\n"
+        f"- 声线：{voice or '未指定'}\n"
+        f"- 性格：{personality or '待生成'}\n"
+        f"- 关系网：{relationships or '待生成'}\n"
+        f"- 出身：{origin or '待生成'}\n"
+        f"- 核心动机：{motivation or '待生成'}\n"
+        f"- 能力与短板：{abilities or '待生成'}\n"
+        f"- 喜恶：{likes or '待生成'}\n"
+        f"- 习惯癖好：{habits or '待生成'}\n\n"
+        f"请为该角色生成人物内核档案，严格按以下 TSV 格式输出（用 | 分隔）：\n"
+        f"name|gender|age|appearance|voice|personality|relationships|origin|motivation|abilities|likes|habits|ttsPitch|ttsRate|imageFace|imageHair|imageBody|imageClothes|imageEnvironment\n\n"
         f"要求：\n"
-        f"1. appearance: 外貌特征（50字以内，具体且有辨识度）\n"
-        f"2. personality: 性格特点（50字以内，包含优点和缺点）\n"
-        f"3. background: 背景故事（80字以内，包含关键经历和转折点）\n"
-        f"4. relationship: 与主角的关系（30字以内）\n"
-        f"5. motivation: 核心动机/欲望（20字以内）\n"
-        f"6. secret: 隐藏的秘密（30字以内）\n"
-        f"7. speechStyle: 说话风格（20字以内）\n"
-        f"8. voice: Edge TTS 语音名称（女声默认 zh-CN-XiaoyiNeural，男声默认 zh-CN-YunxiNeural）\n"
-        f"9. ttsPitch: 音色基底音高（格式如 -40Hz、-32Hz、...、+40Hz，步长 8Hz，贴合角色性格）\n"
-        f"10. ttsRate: 语速基底（格式如 -10%、-5%、0%、+5%、+10%，控制在 -8% ~ +8% 范围内）\n"
-        f"11. imageFace/imageHair/imageBody/imageClothes/imageEnvironment: 全部用英文，适合 AI 绘画\n\n"
+        f"1. personality: 性格特点（50字以内，包含优点和缺点，基于外貌和关系设计）\n"
+        f"2. relationships: 角色关系网（30字以内，补充详细关系）\n"
+        f"3. origin: 出身（50字以内，补充成长环境细节）\n"
+        f"4. motivation: 核心动机（20字以内，深化动机层次）\n"
+        f"5. abilities: 能力与短板（30字以内，细化能力和弱点）\n"
+        f"6. likes: 喜恶（20字以内，补充具体喜好）\n"
+        f"7. habits: 习惯癖好（20字以内，补充具体小动作）\n\n"
+        f"⚠️ 重要：appearance/voice/ttsPitch/ttsRate/imageFace/imageHair/imageBody/imageClothes/imageEnvironment 字段必须直接复制上面的角色基础信息，不要重新生成！\n"
         f"示例格式：\n"
-        f"{char_name}|{char_age}|{char_gender}|外貌描述|性格描述|背景故事|关系描述|动机|秘密|说话风格|语音|pitch|rate|face|hair|body|clothes|environment\n\n"
-        f"注意：不要输出表头，直接输出数据行！"
+        f"{char_name}|{char_gender}|{char_age}|{appearance or '外貌'}|{voice or '声线'}|性格|关系网|出身|动机|能力|喜恶|习惯|{tts_pitch or 'pitch'}|{tts_rate or 'rate'}|{image_face or 'face'}|{image_hair or 'hair'}|{image_body or 'body'}|{image_clothes or 'clothes'}|{image_env or 'env'}\n\n"
+        f"注意：不要输出表头，直接输出数据行！不要使用 markdown 代码块包裹输出。"
     )
 
     payload = {
@@ -1578,38 +1620,85 @@ def _generate_single_bio(worldview, char_basic):
             with urllib.request.urlopen(req, timeout=CHAR_BIO_TIMEOUT) as resp:
                 result = json.loads(resp.read().decode('utf-8'))
                 reply = result.get('choices', [{}])[0].get('message', {}).get('content', '')
-                
+
+                # 清理 LLM 输出中的 markdown 包裹、表头等噪声
+                cleaned = _clean_tsv_output(reply)
+
                 # 解析 TSV 输出
-                # 格式：name|age|gender|appearance|personality|background|relationship|motivation|secret|speechStyle|voice|ttsPitch|ttsRate|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
-                parts = reply.strip().split('|')
-                if len(parts) >= 18:
-                    bio = {
-                        'name': parts[0].strip(),
-                        'age': int(parts[1].strip()) if parts[1].strip().isdigit() else 20,
-                        'gender': parts[2].strip(),
-                        'appearance': parts[3].strip(),
-                        'personality': parts[4].strip(),
-                        'background': parts[5].strip(),
-                        'relationship': parts[6].strip(),
-                        'motivation': parts[7].strip(),
-                        'secret': parts[8].strip(),
-                        'speechStyle': parts[9].strip(),
-                        'voice': parts[10].strip(),
-                        'ttsPitch': parts[11].strip(),
-                        'ttsRate': parts[12].strip(),
-                        'imageFace': parts[13].strip(),
-                        'imageHair': parts[14].strip(),
-                        'imageBody': parts[15].strip(),
-                        'imageClothes': parts[16].strip(),
-                        'imageEnvironment': parts[17].strip()
-                    }
-                    app.logger.info(f'✅ {char_name} 小传生成成功 (attempt={attempt+1})')
-                    return {'name': char_name, 'bio': bio}
-                else:
-                    app.logger.warning(f'⚠️ {char_name} 小传解析失败：字段数不足 ({len(parts)}/18), 重试...')
+                parts = cleaned.split('|')
+
+                if len(parts) < 19:
+                    app.logger.warning(f'⚠️ {char_name} 小传解析失败：字段数不足 ({len(parts)}/19), 原始输出: {reply[:500]}, 清理后: {cleaned[:500]}')
+                    retry_msg = (
+                        f"\n\n【强制修正】上次输出的字段数不足 19 列（实际 {len(parts)} 列）。"
+                        f"请严格输出恰好 19 个 | 分隔的字段，不要使用任何额外文字或格式标记。"
+                        f"直接输出数据行，不要输出表头。"
+                    )
+                    payload['messages'].append({"role": "user", "content": retry_msg})
+                    continue
+
+                # 提取并验证字段
+                bio = {
+                    'name': parts[0].strip(),
+                    'gender': parts[1].strip(),
+                    'age': int(parts[2].strip()) if parts[2].strip().isdigit() else 20,
+                    'appearance': parts[3].strip(),
+                    'voice': parts[4].strip(),
+                    'personality': parts[5].strip(),
+                    'relationships': parts[6].strip(),
+                    'origin': parts[7].strip(),
+                    'motivation': parts[8].strip(),
+                    'abilities': parts[9].strip(),
+                    'likes': parts[10].strip(),
+                    'habits': parts[11].strip(),
+                    'ttsPitch': parts[12].strip(),
+                    'ttsRate': parts[13].strip(),
+                    'imageFace': parts[14].strip(),
+                    'imageHair': parts[15].strip(),
+                    'imageBody': parts[16].strip(),
+                    'imageClothes': parts[17].strip(),
+                    'imageEnvironment': parts[18].strip()
+                }
+
+                # 基本字段校验
+                if not bio['name'] or bio['name'] == '?':
+                    app.logger.warning(f'⚠️ {char_name} 小传校验失败：name 字段为空或无效')
+                    continue
+
+                # 检查 gender 是否合法
+                if bio['gender'] not in ('男', '女', '未知'):
+                    app.logger.warning(f'⚠️ {char_name} 小传校验失败：gender="{bio["gender"]}" 不合法')
+                    if char_gender in ('男', '女'):
+                        bio['gender'] = char_gender
+                    else:
+                        bio['gender'] = '未知'
+
+                # 校验：外貌/声线/生图字段必须与 Step 1 一致
+                if appearance and bio['appearance'] != appearance:
+                    app.logger.warning(f'⚠️ {char_name} 小传外貌不一致，使用 Step 1 的值')
+                    bio['appearance'] = appearance
+                if voice and bio['voice'] != voice:
+                    app.logger.warning(f'⚠️ {char_name} 小传声线不一致，使用 Step 1 的值')
+                    bio['voice'] = voice
+                    bio['ttsPitch'] = tts_pitch
+                    bio['ttsRate'] = tts_rate
+                if image_face and bio['imageFace'] != image_face:
+                    bio['imageFace'] = image_face
+                if image_hair and bio['imageHair'] != image_hair:
+                    bio['imageHair'] = image_hair
+                if image_body and bio['imageBody'] != image_body:
+                    bio['imageBody'] = image_body
+                if image_clothes and bio['imageClothes'] != image_clothes:
+                    bio['imageClothes'] = image_clothes
+                if image_env and bio['imageEnvironment'] != image_env:
+                    bio['imageEnvironment'] = image_env
+
+                app.logger.info(f'✅ {char_name} 小传生成成功 (attempt={attempt+1}), fields={len(parts)}')
+                return {'name': char_name, 'bio': bio}
+
         except Exception as e:
             app.logger.error(f'❌ {char_name} 小传生成失败 (attempt={attempt+1}): {e}')
-        
+
         if attempt < CHAR_BIO_MAX_RETRIES - 1:
             time.sleep(0.5 * (attempt + 1))
 

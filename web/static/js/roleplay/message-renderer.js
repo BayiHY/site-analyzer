@@ -28,7 +28,7 @@ App.renderMessage = function(msg) {
 
     if (msg.role === 'char' && msg.charIndex != null && state.characters[msg.charIndex]) {
         const c = state.characters[msg.charIndex];
-        let avatarUrl = c.portraitImageUrl || c.faceImageUrl;
+        let avatarUrl = c.faceImageUrl || c.portraitImageUrl;
         if (avatarUrl) {
             const img = document.createElement('img');
             img.src = avatarUrl;
@@ -249,4 +249,53 @@ App.escHtml = function(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+/**
+ * 头像生成完成后，更新已有消息气泡中的头像
+ * @param {string} charName - 角色名称
+ * @param {string} imageUrl - 全身图 URL（用于更新 portraitImageUrl 和气泡头像）
+ * 注意：对话气泡优先显示面部特写（faceImageUrl），只有当全身图还没生成时才用全身图占位
+ */
+App.updateAvatarInExistingMessages = function(charName, imageUrl) {
+    if (!imageUrl) return;
+    
+    // 找到所有该角色的消息
+    const chatContainer = document.getElementById('chat-messages');
+    if (!chatContainer) return;
+    
+    const msgDivs = chatContainer.querySelectorAll(`.msg.char[data-msg-id^="msg_opening-${charName}"]`);
+    
+    msgDivs.forEach(msgDiv => {
+        const avatar = msgDiv.querySelector(':scope > .avatar');
+        if (!avatar) return;
+        
+        // 更新头像：优先面部特写，没有才用全身图
+        const displayUrl = charName ? (() => {
+            const c = state.characters.find(c => c.name === charName);
+            return c?.faceImageUrl || imageUrl;
+        })() : imageUrl;
+        
+        avatar.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = displayUrl;
+        img.alt = charName;
+        img.loading = 'lazy';
+        img.onerror = function() {
+            this.remove();
+            avatar.textContent = charName.charAt(0);
+        };
+        avatar.appendChild(img);
+        avatar.title = charName;
+        
+        // 同步更新 state 中的角色对象
+        // 只更新 portraitImageUrl（全身图），不覆盖 faceImageUrl（面部特写）
+        const charObj = state.characters.find(c => c.name === charName);
+        if (charObj) {
+            charObj.portraitImageUrl = imageUrl;
+            saveState().catch(() => {});
+        }
+    });
+    
+    rpLog('info', 'IMG', `${charName} 头像已更新到 ${msgDivs.length} 条消息气泡`);
 }

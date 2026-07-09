@@ -65,18 +65,28 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     rpLog('info', 'CHARS', `Step 1 完成: 获取 ${basicChars.length} 个角色基本信息`);
     rpLog('info', 'CHARS', `基本信息: ${JSON.stringify(basicChars.map(c => ({name:c.name,age:c.age,gender:c.gender,relationship:c.relationship})))}`);
 
-    // ===== Step 2: 调用后端 /api/roleplay/char-bio 生成详细小传 =====
-    rpLog('info', 'CHARS', 'Step 2: 调用后端生成详细小传...');
-    addSystemMessage(`正在生成 ${basicChars.length} 个角色的详细小传...`);
+    // ===== Step 2: 调用后端 /api/roleplay/char-bio 生成人物内核 =====
+    rpLog('info', 'CHARS', 'Step 2: 调用后端生成人物内核（性格/背景/秘密/动机）...');
+    addSystemMessage(`正在为 ${basicChars.length} 个角色生成人物内核...`);
 
     const worldview = state.story.worldview || '未设定';
+    // 把 Step 1 生成的完整 18 列数据传给后端，小传只需补充 personality/background/motivation/secret/speechStyle
     const bioPayload = {
         worldview: worldview,
         characters: basicChars.map(c => ({
             name: c.name,
             gender: c.gender || '未知',
             age: parseInt(c.age) || 20,
-            relationship: c.relationship || '与主角的关系待定'
+            relationship: c.relationship || '与主角的关系待定',
+            appearance: c.appearance || '',
+            voice: c.voice || '',
+            ttsPitch: c.ttsPitch || '',
+            ttsRate: c.ttsRate || '',
+            imageFace: c.imageFace || '',
+            imageHair: c.imageHair || '',
+            imageBody: c.imageBody || '',
+            imageClothes: c.imageClothes || '',
+            imageEnvironment: c.imageEnvironment || ''
         }))
     };
 
@@ -113,7 +123,7 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
         rpLog('warn', 'CHARS', `失败角色: ${bioResp.failed.join(', ')}`);
     }
 
-    // ===== 合并基本信息和详细小传 =====
+    // ===== 合并基本信息（19 列）和人物内核（Step 2 补充） =====
     const bioMap = {};
     for (const item of bioResp.bios) {
         if (item.bio) {
@@ -125,11 +135,11 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     state.characters = basicChars.map((c, i) => {
         const bio = bioMap[c.name] || {};
         const modules = {
-            imageFace: bio.imageFace || '',
-            imageHair: bio.imageHair || '',
-            imageBody: bio.imageBody || '',
-            imageClothes: bio.imageClothes || '',
-            imageEnvironment: bio.imageEnvironment || ''
+            imageFace: bio.imageFace || c.imageFace || '',
+            imageHair: bio.imageHair || c.imageHair || '',
+            imageBody: bio.imageBody || c.imageBody || '',
+            imageClothes: bio.imageClothes || c.imageClothes || '',
+            imageEnvironment: bio.imageEnvironment || c.imageEnvironment || ''
         };
 
         const hasAnyModule = modules.imageFace || modules.imageHair || modules.imageBody || modules.imageClothes || modules.imageEnvironment;
@@ -155,20 +165,25 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
             age: bio.age || parseInt(c.age) || 20,
             gender: bio.gender || c.gender || '未知',
             appearance: bio.appearance || c.appearance || '',
-            personality: bio.personality || '',
+            personality: bio.personality || c.personality || '',
             background: bio.background || '',
-            relationship: bio.relationship || c.relationship || '',
+            relationship: bio.relationship || c.relationship || c.relationships || '',
             faceImageUrl: '',
             portraitImageUrl: '',
             imagePrompt: imagePrompt,
             perception: '',
             secret: bio.secret || '',
             currentMood: '',
-            motivation: bio.motivation || '',
+            motivation: bio.motivation || c.motivation || '',
             speechStyle: bio.speechStyle || '',
-            voice: bio.voice || '',
-            ttsPitch: bio.ttsPitch || '',
-            ttsRate: bio.ttsRate || '',
+            voice: bio.voice || c.voice || '',
+            ttsPitch: bio.ttsPitch || c.ttsPitch || '',
+            ttsRate: bio.ttsRate || c.ttsRate || '',
+            origin: bio.origin || c.origin || '',
+            abilities: bio.abilities || c.abilities || '',
+            likes: bio.likes || c.likes || '',
+            habits: bio.habits || c.habits || '',
+            relationships: bio.relationships || c.relationships || '',
             __modules__: modules
         };
     });

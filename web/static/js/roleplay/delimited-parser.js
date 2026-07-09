@@ -13,8 +13,11 @@ function parseDelimited(text) {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) return null;
 
-    // 固定 18 列定义（含 ttsPitch/ttsRate）
-    const FIXED_HEADERS = ['name','age','gender','appearance','personality','background','relationship','motivation','secret','speechStyle','voice','ttsPitch','ttsRate','imageFace','imageHair','imageBody','imageClothes','imageEnvironment'];
+    // 固定 19 列定义（基于 11 项标准基础信息 + 声线参数 + 生图字段）
+    // 11 项基础信息：name, gender, age, appearance, voice, personality, relationships, origin, motivation, abilities, likes, habits
+    // 声线参数：ttsPitch, ttsRate
+    // 生图字段：imageFace, imageHair, imageBody, imageClothes, imageEnvironment
+    const FIXED_HEADERS = ['name','gender','age','appearance','voice','personality','relationships','origin','motivation','abilities','likes','habits','ttsPitch','ttsRate','imageFace','imageHair','imageBody','imageClothes','imageEnvironment'];
     const EXPECTED_COLS = FIXED_HEADERS.length;
     const HEADER_PIPE_COUNT = EXPECTED_COLS - 1;
 
@@ -206,10 +209,10 @@ function parseKeyValLines(lines) {
 }
 
 // 安全的 | 分割：处理值中包含 | 的情况
-// threshold 必须等于表头列数（当前为 16）
+// threshold 必须等于表头列数（当前为 19）
 function splitPipe(str, threshold) {
     const parts = str.split('|');
-    const colThreshold = threshold || 16;
+    const colThreshold = threshold || 19;
     if (parts.length <= colThreshold) return parts;
     // 列数过多：前 colThreshold-1 列保持原样，剩余全部合并到最后一列（imageEnvironment 通常最长）
     const result = parts.slice(0, colThreshold - 1);

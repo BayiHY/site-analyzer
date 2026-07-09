@@ -153,6 +153,7 @@ ${genderHint ? `【性别倾向】${genderHint}` : ''}
  */
 export function buildCharBasicPrompt(count, playerGender, inspiration, genderHint, state) {
     const pg = playerGender || state.player?.gender || '男';
+    const visualStyle = state.story?.imageStyle || '';
     const worldview = state.story.worldview || '未设定';
     const title = state.story.title || '';
     const mainArc = (state.story.mainArc || []).map(a => `・${a.phase}：${a.description}`).join('\\n');
@@ -224,6 +225,8 @@ ${mainArc}
 【氛围基调】
 ${toneKeywords}
 
+【画面风格】${visualStyle || '未指定'}
+
 【角色设计约束】
 ${worldviewNotes}
 
@@ -232,17 +235,41 @@ ${worldviewNotes}
 
 输出格式要求（TSV 表格格式，用 | 分隔字段）：
 ⚠️ 第一行不要输出表头！直接输出角色数据行。
-字段顺序固定为 4 列：name|age|gender|relationship
+字段顺序固定为 19 列：
+name|gender|age|appearance|voice|personality|relationships|origin|motivation|abilities|likes|habits|ttsPitch|ttsRate|imageFace|imageHair|imageBody|imageClothes|imageEnvironment
 
-字段说明：
-- name: 角色名（2-4个字，有特色，符合世界观）
-- age: 年龄数字（合理范围内）
-- gender: 男/女
-- relationship: 与主角/玩家的关系（30字以内，描述初始关系和可能的互动方向）
+=== 11 项基础信息（静态标签，不讲故事）===
+1. name: 角色名（2-4个字，有特色，符合世界观）
+2. gender: 男/女
+3. age: 年龄数字
+4. appearance: 外貌特征（纯标签化，标志性五官/体型/疤痕/发色/瞳色，不写故事，50字以内）
+5. voice: 声线（音色+语速+说话习惯+口头禅风格，纯标签化，50字以内）
+6. personality: 性格（主性格+反差性格+性格缺陷，纯特质标签，不解释成因，50字以内）
+7. relationships: 角色关系网（亲属/羁绊/挚友/仇敌/上下级/阵营关联，标签式罗列，30字以内）
+8. origin: 出身（家世背景/成长环境/阶层/出生地/原生条件，只写现状设定，不写经历故事，50字以内）
+9. motivation: 核心动机（角色一生的核心执念/追求/行动的根本目的，20字以内）
+10. abilities: 能力与短板（专属天赋/技能/武器/优势 + 弱点/限制/代价/短板，30字以内）
+11. likes: 喜恶（喜欢的人和物/讨厌的事物/雷点/忌讳，20字以内）
+12. habits: 习惯癖好（专属小动作/生活小怪癖/下意识行为/独有细节，20字以内）
 
-要求：
-1. 角色之间要有关系网（亲友、敌对、师徒、竞争对手等）
-2. 角色设计必须符合世界观设定，不能出现违和感
-3. 避免脸谱化和套路化
-4. 每个角色必须有独特性`;
+=== 声线参数（从 voice 字段衍生）===
+- ttsPitch: 音色基底音高（格式如 -40Hz、-32Hz、...、+40Hz，步长 8Hz，贴合角色性格）
+- ttsRate: 语速基底（格式如 -10%、-5%、0%、+5%、+10%，控制在 -8% ~ +8% 范围内）
+
+=== 生图字段（全部用英文，基于 appearance 字段衍生）===
+- imageFace: 面部特征英文描述（适合 AI 绘画）
+- imageHair: 发型英文描述
+- imageBody: 体型英文描述
+- imageClothes: 服装英文描述
+- imageEnvironment: 环境/光影英文描述
+
+=== 设计原则 ===
+1. 外貌和声线必须配对设计，不能只写外貌不写声线
+2. 声线 pitch/rate 要贴合角色性格：活泼角色语速稍快(+5%)，沉稳角色语速稍慢(-5%)
+3. 同性别角色 pitch 不能相同，用 -40Hz/+32Hz/-24Hz 等微调区分
+4. 所有 11 项基础信息都是静态标签，不讲故事、不解释成因
+5. 角色之间要有关系网（亲友、敌对、师徒、竞争对手等）
+6. 角色设计必须符合世界观设定，不能出现违和感
+7. 避免脸谱化和套路化
+8. 每个角色必须有独特性`;
 }

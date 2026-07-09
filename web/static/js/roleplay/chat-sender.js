@@ -117,15 +117,17 @@ ${formatModule.buildFormatRequirements()}`;
         // 从结构化结果中提取首个发言角色（用于场景图/建议回复）
         const firstChar = structuredResult.characters?.[0] || null;
         Promise.allSettled([
-            // 后处理 1: 场景图生成
+            // 后处理 1: 场景图生成（异步，不阻塞对话渲染）
             (async () => {
                 try {
                     rpLog('info', 'TIMEOUT', '后处理[1/3] 场景图生成开始');
                     const sceneImgModule = await import('./scene-images.js');
                     if (structuredResult.scene && firstChar && App.isSceneChanged(firstChar.name, structuredResult.scene)) {
-                        await App.generateSceneImage(firstChar.name, structuredResult.scene, firstChar, structuredResult, null);
+                        App.generateSceneImage(firstChar.name, structuredResult.scene, firstChar, structuredResult, null).catch(e => {
+                            rpLog('error', 'SCENE', `场景图生成失败: ${e.message}`);
+                        });
                     }
-                    rpLog('info', 'TIMEOUT', `后处理[1/3] 场景图完成 (${Date.now()-postProcessStart}ms)`);
+                    rpLog('info', 'TIMEOUT', `后处理[1/3] 场景图已提交（不等待完成）`);
                 } catch (e) {
                     console.warn('场景图生成失败:', e);
                 }
