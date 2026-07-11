@@ -68,7 +68,7 @@ ${formatModule.buildFormatRequirements()}`;
 
         rpLog('info', 'TIMEOUT', `LLM 请求开始: chat, history_msgs=${messages.length}`);
         const chatStart = Date.now();
-        let response = await App.agnesChat(messages, { route: 'chat' });
+        let response = await App.agnesChatWithFallback(messages, { route: 'chat' });
         const chatElapsed = Date.now() - chatStart;
         rpLog('info', 'TIMEOUT', `LLM 请求完成: chat, 耗时 ${chatElapsed}ms, output_chars=${(response || '').length}`);
         if (chatElapsed > 60000) {

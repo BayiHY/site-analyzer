@@ -48,8 +48,8 @@ ${formatModule.buildFormatRequirements()}`;
         const startTime = Date.now();
         rpLog('info', 'TIMEOUT', `LLM 请求开始: opening_scene (对话智能体)`);
 
-        // 调用对话智能体（route='opening', 温度 0.7）
-        const response = await App.agnesChat([
+        // 调用对话智能体（route='opening', 温度 0.7），走降级重试
+        const response = await App.agnesChatWithFallback([
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMessage }
         ], { route: 'opening' });

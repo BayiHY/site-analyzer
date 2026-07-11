@@ -22,7 +22,8 @@ function parseDelimited(text) {
     const HEADER_PIPE_COUNT = EXPECTED_COLS - 1;
 
     // 过滤掉表头行（LLM 可能误输出）
-    const headerPattern = /^(name\s*\|\s*age\s*\||name\|age\|)/i;
+    // 兼容两种列顺序：name|gender|age|...（新 19 列）和 name|age|gender|...（旧 4 列）
+    const headerPattern = /^name\s*\|/i;
     const dataLines = lines.filter(l => !headerPattern.test(l));
     if (dataLines.length === 0) return null;
 

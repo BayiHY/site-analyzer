@@ -35,8 +35,8 @@ const FIELD_SCHEMA = `【数据结构定义】
   【角色互动】→ characters 数组（逐角色提取）
   【建议选项】→ suggestedReplies 数组（提取→开头的行）
 
-角色子要素标签（每个角色3个）：
-  角色名：           → characters[n].name
+角色子要素标签（每个角色4个）：
+  【角色名】xxx       → characters[n].name
   【动作】xxx        → characters[n].action
   【语言】xxx        → characters[n].dialogue
   【内心】xxx        → characters[n].thought
@@ -44,7 +44,7 @@ const FIELD_SCHEMA = `【数据结构定义】
 【提取规则】
 1. 找到【场景环境】标签，其后直到下一个标签前的全部内容 → scene
 2. 找到【角色互动】标签，逐角色解析：
-   - 识别"角色名："格式（角色名来自已知角色列表）
+   - 【角色名】标签后的文本 → name（必须提取，不可为空）
    - 【动作】标签后的文本 → action
    - 【语言】标签后的文本 → dialogue
    - 【内心】标签后的文本 → thought
@@ -167,33 +167,52 @@ App.generateReplyOptions = async function(params) {
     }
 
     try {
-        const response = await fetch(`${ROLEPLAY_API_BASE}/roleplay-reply-options`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                lastUserMessage,
-                lastCharResponse,
-                recentMessages
-            })
-        });
+        const activeChar = state.characters[state.activeCharIndex] || state.characters[0];
+        const systemPrompt = `你是回复选项生成器，不是角色扮演角色。你的唯一任务是为用户生成3-4条可选回复按钮文案。
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+【绝对禁止】
+- 不要输出任何角色对话、动作描写、内心独白
+- 不要用括号 ()、花括号 {}、方括号 [] 包裹内容
+- 不要写 "(瞥了一眼)" "(转身牵起他的手)" 这类格式
+- 不要输出解释性文字、前言后语
+
+【必须做的事】
+- 生成 3-4 条简短回复选项（每条 ≤20 字）
+- 选项之间用 | 分隔
+- 只输出选项文本，不要输出任何其他内容
+
+【选项类型要求】
+1. 探索型：追问细节、原因或背后故事
+2. 行动型：提出下一步行动或计划
+3. 冲突/转折型：引入新信息、质疑或矛盾
+4. （可选）沉默/观望型：选择不说话或等待
+
+【示例输出】
+深入了解这个秘密|主动提出帮忙|质问对方真相|暂时保持沉默`;
+
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...recentMessages.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }))
+        ];
+
+        rpLog('info', 'REPLY-OPTIONS', '调用 agnes chat 生成选项...');
+        const raw = await App.agnesChat(messages);
+        rpLog('info', 'REPLY-OPTIONS', `LLM 原始返回 (长度=${raw?.length || 0}): "${raw?.substring(0, 200)}..."`);
+
+        // 解析选项：优先用 parseDelimited，兜底用 | 分割
+        const items = raw.split('|').map(s => s.trim()).filter(s => s.length > 0);
+        if (items.length >= 2) {
+            rpLog('info', 'REPLY-OPTIONS', `✅ 生成 ${items.length} 条选项`);
+            return items.slice(0, 4);
         }
 
-        const result = await response.json();
-
-        if (!result.success || !result.options || result.options.length < 2) {
-            rpLog('warn', 'REPLY-OPTIONS', `返回选项不足: ${result.options?.length || 0} 条`);
-            return [];
-        }
-
-        rpLog('info', 'REPLY-OPTIONS', `✅ 生成 ${result.options.length} 条选项`);
-        return result.options;
-
+        rpLog('warn', 'REPLY-OPTIONS', `分隔符解析失败，退回降级选项`);
+        throw new Error('快捷回复解析失败');
     } catch (error) {
-        rpLog('warn', 'REPLY-OPTIONS', `生成失败: ${error.message}`);
-        return [];
+        rpLog('warn', 'REPLY-OPTIONS', `生成失败: ${error.message}，使用降级选项`);
+        // 降级：从 state 读取活跃角色生成通用选项
+        const activeChar = state.characters[state.activeCharIndex] || state.characters[0];
+        return App.getDefaultReplyOptions(activeChar, { content: lastCharResponse || '' }, { content: lastUserMessage });
     }
 };
 
