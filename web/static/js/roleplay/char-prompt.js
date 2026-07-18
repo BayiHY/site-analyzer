@@ -113,7 +113,9 @@ ${toneKeywords}
 ${worldviewNotes}
 
 【玩家信息】
+玩家扮演的角色名：${state.player?.name || '无名旅者'}
 玩家扮演的主角性别：${pg}
+⚠️ 玩家角色是独立个体，不要生成与玩家同名或身份重叠的NPC。
 ${(() => {
     // 如果用户明确要求了角色数量和性别（如"两名女角色"），不强制插入男性玩家/NPC
     const fc = parseCount(inspiration);
@@ -231,7 +233,9 @@ ${toneKeywords}
 ${worldviewNotes}
 
 【玩家信息】
+玩家扮演的角色名：${state.player?.name || '无名旅者'}
 玩家扮演的主角性别：${pg}
+⚠️ 玩家角色是独立个体，不要生成与玩家同名或身份重叠的NPC。
 
 输出格式要求（TSV 表格格式，用 | 分隔字段）：
 ⚠️ 第一行不要输出表头！直接输出角色数据行。

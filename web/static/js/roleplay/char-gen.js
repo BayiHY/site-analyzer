@@ -65,74 +65,166 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
     rpLog('info', 'CHARS', `Step 1 完成: 获取 ${basicChars.length} 个角色基本信息`);
     rpLog('info', 'CHARS', `基本信息: ${JSON.stringify(basicChars.map(c => ({name:c.name,age:c.age,gender:c.gender,relationship:c.relationship})))}`);
 
-    // ===== Step 2: 调用后端 /api/roleplay/char-bio 生成人物内核 =====
-    rpLog('info', 'CHARS', 'Step 2: 调用后端生成人物内核（性格/背景/秘密/动机）...');
+    // ===== Step 2: 前端直调 Agnes LLM 生成人物内核 =====
+    rpLog('info', 'CHARS', 'Step 2: 调用 Agnes LLM 生成人物内核（性格/背景/秘密/动机）...');
     addSystemMessage(`正在为 ${basicChars.length} 个角色生成人物内核...`);
 
     const worldview = state.story.worldview || '未设定';
-    // 把 Step 1 生成的完整 18 列数据传给后端，小传只需补充 personality/background/motivation/secret/speechStyle
-    const bioPayload = {
-        worldview: worldview,
-        characters: basicChars.map(c => ({
-            name: c.name,
-            gender: c.gender || '未知',
-            age: parseInt(c.age) || 20,
-            relationship: c.relationship || '与主角的关系待定',
-            appearance: c.appearance || '',
-            voice: c.voice || '',
-            ttsPitch: c.ttsPitch || '',
-            ttsRate: c.ttsRate || '',
-            imageFace: c.imageFace || '',
-            imageHair: c.imageHair || '',
-            imageBody: c.imageBody || '',
-            imageClothes: c.imageClothes || '',
-            imageEnvironment: c.imageEnvironment || ''
-        }))
-    };
 
-    let bioResp;
-    try {
-        const bioStartTime = Date.now();
-        rpLog('info', 'TIMEOUT', `Step 2 后端请求开始: char-bio, count=${bioPayload.characters.length}`);
-        
-        const bioReq = await fetch('/api/roleplay/char-bio', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bioPayload)
-        });
+    /**
+     * 为单个角色生成小传（前端直调 Agnes LLM）
+     */
+    async function generateSingleBio(charBasic) {
+        const charName = charBasic.name || '?';
+        const charGender = charBasic.gender || '未知';
+        const charAge = charBasic.age || 20;
+        const charRelationship = charBasic.relationship || '与主角的关系待定';
 
-        if (!bioReq.ok) {
-            const errText = await bioReq.text();
-            throw new Error(`后端请求失败: ${bioReq.status} - ${errText}`);
+        const systemPrompt = `你是资深角色编剧，擅长为虚构角色创作立体、有深度的背景故事。请根据世界观和角色基础信息，生成人物内核。
+
+【输出格式要求】
+请按以下标准化文本格式输出（每行一个字段，格式为 key: value）：
+name: 角色名
+gender: 性别
+age: 年龄
+personality: 性格特点（50 字以内，包含优点和缺点）
+background: 背景故事（100 字以内）
+motivation: 核心动机（20 字以内）
+secret: 秘密（30 字以内）
+speechStyle: 说话风格（20 字以内）
+relationships: 角色关系网（30 字以内）
+origin: 出身（50 字以内）
+abilities: 能力与短板（30 字以内）
+likes: 喜恶（20 字以内）
+habits: 习惯癖好（20 字以内）
+appearance: 外貌描述（直接从输入中复制，不要重新生成）
+voice: 声线（直接从输入中复制，不要重新生成）
+ttsPitch: TTS 音高参数（直接从输入中复制）
+ttsRate: TTS 语速参数（直接从输入中复制）
+imageFace: 面部生图描述（直接从输入中复制）
+imageHair: 发型生图描述（直接从输入中复制）
+imageBody: 身材生图描述（直接从输入中复制）
+imageClothes: 服装生图描述（直接从输入中复制）
+imageEnvironment: 场景环境生图描述（直接从输入中复制）
+
+⚠️ 注意：appearance/voice/ttsPitch/ttsRate/imageFace/imageHair/imageBody/imageClothes/imageEnvironment 字段必须直接复制输入中的值，不要重新生成！`;
+
+        const userContent = `【世界观概要】
+${worldview}
+
+【角色基础信息】
+- 姓名：${charName}
+- 性别：${charGender}
+- 年龄：${charAge}
+- 外貌：${charBasic.appearance || '待生成'}
+- 声线：${charBasic.voice || '未指定'}
+- 性格：${charBasic.personality || '待生成'}
+- 关系网：${charBasic.relationships || '待生成'}
+- 出身：${charBasic.origin || '待生成'}
+- 核心动机：${charBasic.motivation || '待生成'}
+- 能力与短板：${charBasic.abilities || '待生成'}
+- 喜恶：${charBasic.likes || '待生成'}
+- 习惯癖好：${charBasic.habits || '待生成'}
+- TTS 音高：${charBasic.ttsPitch || '未指定'}
+- TTS 语速：${charBasic.ttsRate || '未指定'}
+- 面部生图：${charBasic.imageFace || '未指定'}
+- 发型生图：${charBasic.imageHair || '未指定'}
+- 身材生图：${charBasic.imageBody || '未指定'}
+- 服装生图：${charBasic.imageClothes || '未指定'}
+- 场景生图：${charBasic.imageEnvironment || '未指定'}
+
+请为该角色生成人物内核档案。注意：
+1. personality/background/motivation/secret/speechStyle/relationships/origin/abilities/likes/habits 由你创作
+2. appearance/voice/ttsPitch/ttsRate/imageFace/imageHair/imageBody/imageClothes/imageEnvironment 必须直接复制上面的值
+3. 按标准化文本格式输出，每行一个字段，格式为 key: value
+4. 不要使用 markdown 代码块包裹输出，直接输出文本`;
+
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent }
+        ];
+
+        rpLog('info', 'CHARS-BIO', `生成 ${charName} 的小传...`);
+        const rawResponse = await App.agnesChat(messages, { temperature: 0.8 });
+
+        // 解析标准化文本格式（key: value）
+        const bio = {};
+        const lines = rawResponse.split('\n').map(l => l.trim()).filter(Boolean);
+        for (const line of lines) {
+            const colonIdx = line.indexOf(':');
+            if (colonIdx === -1) continue;
+            const key = line.substring(0, colonIdx).trim();
+            const value = line.substring(colonIdx + 1).trim();
+            if (key && value) {
+                bio[key] = value;
+            }
         }
 
-        bioResp = await bioReq.json();
-        const bioElapsed = Date.now() - bioStartTime;
-        rpLog('info', 'TIMEOUT', `Step 2 后端请求完成: char-bio, 耗时 ${bioElapsed}ms`);
-    } catch (e) {
-        rpLog('error', 'CHARS', `Step 2 后端调用失败: ${e.message}`);
-        throw new Error(`小传生成失败: ${e.message}`);
+        // 校验必要字段
+        if (!bio.name || bio.name === '?') {
+            rpLog('warn', 'CHARS-BIO', `⚠️ ${charName} 小传校验失败：name 字段为空或无效`);
+            return null;
+        }
+
+        // 补全缺失字段（从 Step 1 透传）
+        if (!bio.appearance && charBasic.appearance) bio.appearance = charBasic.appearance;
+        if (!bio.voice && charBasic.voice) {
+            bio.voice = charBasic.voice;
+            bio.ttsPitch = charBasic.ttsPitch || '';
+            bio.ttsRate = charBasic.ttsRate || '';
+        }
+        if (!bio.imageFace && charBasic.imageFace) bio.imageFace = charBasic.imageFace;
+        if (!bio.imageHair && charBasic.imageHair) bio.imageHair = charBasic.imageHair;
+        if (!bio.imageBody && charBasic.imageBody) bio.imageBody = charBasic.imageBody;
+        if (!bio.imageClothes && charBasic.imageClothes) bio.imageClothes = charBasic.imageClothes;
+        if (!bio.imageEnvironment && charBasic.imageEnvironment) bio.imageEnvironment = charBasic.imageEnvironment;
+
+        // 设置默认值
+        bio.gender = bio.gender || charGender;
+        bio.age = bio.age || String(charAge);
+        bio.personality = bio.personality || (charBasic.personality || '');
+
+        rpLog('info', 'CHARS-BIO', `✅ ${charName} 小传生成成功`);
+        return bio;
     }
 
-    if (!bioResp || !bioResp.success || !bioResp.bios || bioResp.bios.length === 0) {
-        throw new Error('小传生成失败：后端未返回有效数据');
-    }
-
-    rpLog('info', 'CHARS', `Step 2 完成: ${bioResp.success_count}/${bioResp.total} 角色小传生成成功`);
-    if (bioResp.failed && bioResp.failed.length > 0) {
-        rpLog('warn', 'CHARS', `失败角色: ${bioResp.failed.join(', ')}`);
-    }
-
-    // ===== 合并基本信息（19 列）和人物内核（Step 2 补充） =====
+    // 顺序生成所有角色的生物（避免并发限制）
     const bioMap = {};
-    for (const item of bioResp.bios) {
-        if (item.bio) {
-            bioMap[item.name] = item.bio;
+    const failedNames = [];
+    const bioStartTime = Date.now();
+
+    for (const charBasic of basicChars) {
+        try {
+            const bio = await generateSingleBio(charBasic);
+            if (bio) {
+                bioMap[bio.name] = bio;
+            } else {
+                failedNames.push(charBasic.name);
+            }
+        } catch (e) {
+            rpLog('error', 'CHARS-BIO', `❌ ${charBasic.name} 小传生成失败: ${e.message}`);
+            failedNames.push(charBasic.name);
         }
     }
 
-    // ===== 3. 保存角色 =====
-    state.characters = basicChars.map((c, i) => {
+    const bioElapsed = Date.now() - bioStartTime;
+    const successCount = Object.keys(bioMap).length;
+    rpLog('info', 'CHARS', `Step 2 完成: ${successCount}/${basicChars.length} 角色小传生成成功，耗时 ${bioElapsed}ms`);
+    if (failedNames.length > 0) {
+        rpLog('warn', 'CHARS', `失败角色: ${failedNames.join(', ')}`);
+    }
+
+    // ===== 3. 保存角色（过滤掉与玩家同名的角色）=====
+    const playerName = state.player?.name || null;
+    state.characters = basicChars
+        .filter(c => {
+            if (playerName && c.name === playerName) {
+                rpLog('warn', 'CHARS', `已过滤与玩家同名的角色 "${c.name}"，避免身份重叠`);
+                return false;
+            }
+            return true;
+        })
+        .map((c, i) => {
         const bio = bioMap[c.name] || {};
         const modules = {
             imageFace: bio.imageFace || c.imageFace || '',

@@ -1,58 +1,5 @@
 // === Section: LLM API 调用 ===
-// 直调 OpenAI 兼容端点，通过 key 格式自动识别供应商
-
-// 根据 key 格式自动识别供应商
-App.detectProvider = function(key) {
-    if (!key) return 'agnes';
-    if (key.startsWith('sk-')) return 'agnes';
-    // glm key 格式: hex.hex (如 5f61916ad6dd405a97a789a4d772cbe2.IY9xoKviUFLlOWbg)
-    if (/^[a-f0-9]{32}\.[A-Za-z0-9+\/_-]+$/.test(key)) return 'glm';
-    return 'agnes';
-}
-
-App.getEndpointAndModel = function(key) {
-    const provider = App.detectProvider(key);
-    if (provider === 'glm') {
-        return {
-            url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-            model: 'glm-4.5-flash',
-            provider: 'glm'
-        };
-    }
-    return {
-        url: 'https://apihub.agnes-ai.com/v1/chat/completions',
-        model: 'agnes-2.0-flash',
-        provider: 'agnes'
-    };
-}
-
-// GLM 不支持 system role，需要将 system prompt 合并到 user message
-App.normalizeMessagesForProvider = function(provider, messages) {
-    if (provider !== 'glm') return messages;
-    
-    // 收集 system prompt
-    let systemContent = '';
-    const userMessages = [];
-    
-    for (const msg of messages) {
-        if (msg.role === 'system') {
-            systemContent += msg.content + '\n\n';
-        } else {
-            userMessages.push(msg);
-        }
-    }
-    
-    // 如果有 system prompt，合并到第一条 user 消息
-    if (systemContent && userMessages.length > 0) {
-        const firstUser = userMessages[0];
-        firstUser.content = systemContent + firstUser.content;
-    } else if (systemContent) {
-        // 没有 user 消息，创建一个
-        userMessages.push({ role: 'user', content: systemContent });
-    }
-    
-    return userMessages;
-}
+// 直调 Agnes AI 兼容端点
 
 App.agnesChat = async function(messages, options = {}) {
     const apiKey = state.apiKeys.chat;
@@ -60,9 +7,8 @@ App.agnesChat = async function(messages, options = {}) {
         throw new Error('请先在设置中配置 API Key');
     }
 
-    const { url, model: defaultModel, provider } = App.getEndpointAndModel(apiKey);
-    const temperature = options.temperature ?? (provider === 'glm' ? 0.6 : 1.0);
-    const model = options.model || defaultModel;
+    const temperature = options.temperature ?? 1.0;
+    const model = options.model || 'agnes-2.0-flash';
     const route = options.route || 'default';
 
     // 结构化输出路由使用低温度保证格式稳定
@@ -78,28 +24,25 @@ App.agnesChat = async function(messages, options = {}) {
     };
     const effectiveTemp = tempByRoute[route] ?? temperature;
 
-    // GLM 不支持 system role，需要转换
-    const normalizedMessages = App.normalizeMessagesForProvider(provider, messages);
-
     // 计算输入总字符数
-    const inputChars = JSON.stringify(normalizedMessages).length;
+    const inputChars = JSON.stringify(messages).length;
 
     rpLog('info', 'LLM', `=== 对话请求开始 ===`);
-    rpLog('info', 'LLM', `供应商: ${provider}, 模型: ${model}`);
-    rpLog('info', 'LLM', `端点: ${url}`);
+    rpLog('info', 'LLM', `模型: ${model}`);
+    rpLog('info', 'LLM', `端点: https://apihub.agnes-ai.com/v1/chat/completions`);
     rpLog('info', 'LLM', `路由: ${route}, 温度: ${effectiveTemp} (原始=${temperature})`);
     rpLog('info', 'LLM', `输入字符数: ${inputChars}`);
 
     // 【日志】输出完整请求内容（每条消息的 role + content）
     rpLog('info', 'LLM-REQUEST', '--- 完整请求内容 ---');
-    normalizedMessages.forEach((m, idx) => {
+    messages.forEach((m, idx) => {
         rpLog('info', 'LLM-REQUEST', `[消息 ${idx}] role=${m.role}, content_len=${(m.content || '').length}`);
         const c = m.content || '';
         rpLog('info', 'LLM-REQUEST', c.length > 10000 ? c.slice(0, 10000) + '\n\n[内容过长，已截断至10000字符，原始长度=' + c.length + ']' : c);
     });
 
     const startTime = Date.now();
-    const resp = await fetch(url, {
+    const resp = await fetch('https://apihub.agnes-ai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -107,7 +50,7 @@ App.agnesChat = async function(messages, options = {}) {
         },
         body: JSON.stringify({
             model: model,
-            messages: normalizedMessages,
+            messages: messages,
             temperature: effectiveTemp,
             max_tokens: 2048
         }),

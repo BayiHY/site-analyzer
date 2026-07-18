@@ -1158,9 +1158,138 @@ def _build_structured_prompt(schema_description, story_content, truncate_notice=
 {story_content}"""
 
 
+def _fix_glm_json(text):
+    """修复 GLM 输出中常见的 JSON 格式错误。"""
+    import re
+    text = text.strip()
+    
+    # 先尝试直接解析
+    try:
+        json.loads(text)
+        return text
+    except json.JSONDecodeError:
+        pass
+    
+    # 策略1: 修复 "key", {} → "key": {}
+    broken_kv = re.sub(r'"(\w+)"\s*,\s*\{', r'"\1": {', text)
+    if broken_kv != text:
+        try:
+            json.loads(broken_kv)
+            return broken_kv
+        except json.JSONDecodeError:
+            pass
+    
+    # 策略2: 修复 "key", [] → "key": []
+    broken_kv2 = re.sub(r'"(\w+)"\s*,\s*\[', r'"\1": [', broken_kv)
+    if broken_kv2 != broken_kv:
+        try:
+            json.loads(broken_kv2)
+            return broken_kv2
+        except json.JSONDecodeError:
+            pass
+    
+    # 策略3: 终极方案 - 从两端向中间扫描
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end != -1 and end > start:
+        candidate = text[start:end+1]
+        
+        for attempt in range(3):
+            if attempt == 0:
+                repaired = candidate
+            elif attempt == 1:
+                repaired = re.sub(r'"(\w+)"\s*,\s*\{', r'"\1": {', candidate)
+            else:
+                repaired = re.sub(r'"(\w+)"\s*,\s*\[', r'"\1": [', candidate)
+            
+            try:
+                result = json.loads(repaired)
+                return repaired
+            except json.JSONDecodeError:
+                continue
+    
+    # 策略4: 结构重建——从损坏文本中提取已知字段
+    result = {}
+    
+    # 提取 scene
+    m = re.search(r'"scene"\s*:\s*"([^"]*)"', text)
+    if m:
+        result['scene'] = m.group(1)
+    
+    # 提取 characters 数组
+    chars = re.findall(r'\{"name"\s*:\s*"([^"]*)"[^}]*"action"\s*:\s*"((?:[^"\\]|\\.)*)"[^}]*"dialogue"\s*:\s*"((?:[^"\\]|\\.)*)"[^}]*"thought"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}', text)
+    if chars:
+        result['characters'] = [{'name': c[0], 'action': c[1], 'dialogue': c[2], 'thought': c[3]} for c in chars]
+    
+    # 提取 suggestedReplies
+    sr_start = text.find('"suggestedReplies"')
+    if sr_start != -1:
+        arr_open = text.find('[', sr_start)
+        if arr_open != -1:
+            ed_pos = text.find('"emotionDelta"', arr_open)
+            first_close = text.find(']', arr_open)
+            
+            if first_close != -1 and first_close < ed_pos:
+                array_content = text[arr_open+1:first_close]
+            elif ed_pos != -1:
+                array_content = text[arr_open+1:ed_pos]
+            else:
+                array_content = text[arr_open+1:]
+            
+            options = []
+            i = 0
+            while i < len(array_content):
+                if array_content[i] == '"':
+                    j = i + 1
+                    s = ''
+                    while j < len(array_content):
+                        if array_content[j] == '\\' and j + 1 < len(array_content):
+                            s += array_content[j:j+2]
+                            j += 2
+                        elif array_content[j] == '"':
+                            break
+                        else:
+                            s += array_content[j]
+                            j += 1
+                    if s:
+                        options.append(s)
+                    i = j + 1
+                else:
+                    i += 1
+            
+            result['suggestedReplies'] = options[:5]
+    
+    # 提取 emotionDelta/dynamicAttrs/revealedInfo 等空对象
+    for key in ['emotionDelta', 'dynamicAttrs', 'revealedInfo']:
+        patterns = [
+            rf'"{key}"\s*:\s*\{{\s*\}}',
+            rf'"{key}"\s*,\s*\{{\s*\}}',
+            rf'"{key}"\s*,\s*\{{\s*\}}\s*,',
+        ]
+        for pat in patterns:
+            if re.search(pat, text):
+                result[key] = {}
+                break
+    
+    # 如果至少提取到了 scene 和 characters，就返回重建的 JSON
+    if 'scene' in result and 'characters' in result:
+        return json.dumps(result, ensure_ascii=False)
+    
+    return None
+
+
 def _extract_json_from_response(text):
     """从 LLM 响应中提取 JSON（处理 ```json 包裹等情况）"""
     text = text.strip()
+    
+    # 先尝试修复常见的 GLM JSON 格式错误
+    fixed = _fix_glm_json(text)
+    if fixed is not None:
+        try:
+            return json.loads(fixed)
+        except json.JSONDecodeError:
+            pass
+    
     # 尝试直接解析
     try:
         return json.loads(text)
@@ -1243,10 +1372,9 @@ def _call_glm_for_structured_output(system_prompt, story_content, schema_fields,
 
 @app.route('/api/structured-output', methods=['POST', 'OPTIONS'])
 def structured_output_api():
-    """结构化输出智能体端点
+    """统一的结构化输出智能体端点
     
-    前端传入 storyContent（非结构化内容）和 schema（字段定义），
-    后端调用 GLM-4-Flash 提取结构化数据。
+    前端传入完整的输入输出配置，后端调用 GLM-4-Flash 提取结构化数据。
     """
     if request.method == 'OPTIONS':
         return jsonify({'status': 'ok'})
@@ -1255,45 +1383,85 @@ def structured_output_api():
     if not data:
         return jsonify({'error': '请求体必须是 JSON'}), 400
 
-    story_content = data.get('storyContent', '').strip()
-    schema = data.get('schema', {})
+    # 解析输入配置
+    input_config = data.get('input', {})
+    output_config = data.get('output', {})
 
-    if not story_content:
-        return jsonify({'error': 'storyContent 不能为空'}), 400
-    if not schema or 'fields' not in schema:
-        return jsonify({'error': 'schema.fields 不能为空'}), 400
+    if not input_config or 'content' not in input_config:
+        return jsonify({'error': 'input.content 不能为空'}), 400
+    
+    if not output_config or 'schema' not in output_config:
+        return jsonify({'error': 'output.schema 不能为空'}), 400
 
-    fields = schema.get('fields', [])
-    if not fields:
-        return jsonify({'error': 'fields 数组不能为空'}), 400
+    # 处理输入内容
+    content = input_config['content'].strip()
+    content_format = input_config.get('format', 'text/plain')
+    context = input_config.get('context', {})
+    
+    if not content:
+        return jsonify({'error': 'input.content 不能为空'}), 400
+
+    # 解析输出配置
+    schema = output_config['schema']
+    output_format = output_config.get('format', 'application/json')
+    rules = output_config.get('rules', {})
 
     # 裁剪超长内容
-    truncated_content, was_truncated = _truncate_content(story_content, fields)
+    truncated_content, was_truncated = _truncate_content(content, schema)
     truncate_notice = STRUCTURED_OUTPUT_TRUNCATE_MSG if was_truncated else None
 
     # 构建 schema 描述文本
     schema_desc_lines = []
-    for f in fields:
+    for f in schema:
         fname = f.get('name', '?')
         fdesc = f.get('desc', '')
         ftype = f.get('type', 'string')
         schema_desc_lines.append(f"- **{fname}** ({ftype}): {fdesc}")
     schema_description = '\n'.join(schema_desc_lines)
 
-    # 构建 system prompt
-    system_prompt = _build_structured_prompt(schema_description, truncated_content, truncate_notice)
+    # 构建 context 信息文本
+    context_info = _build_context_info(context)
 
-    orig_len = len(story_content)
+    # 构建 system prompt
+    system_prompt = f"""你是一个专业的文本结构化专家。请根据提供的字段定义，将输入文本转换为结构化的 JSON 数据。
+
+【输出要求】
+1. 只输出合法的 JSON，不要输出任何其他文字
+2. 不要包含 JSON 代码块标记（如 ```json）
+3. 所有字符串字段的值必须是字符串类型，不要省略引号
+4. 数组字段如果是空的，返回空数组 []
+5. 对象字段如果是空的，返回空对象 {{}}
+6. 严格按照字段定义的类型和结构输出
+
+【字段定义】
+{schema_description}
+
+{context_info}
+
+【输入文本】
+{truncated_content}
+
+请生成完整的结构化 JSON 数据。"""
+
+    orig_len = len(content)
     trunc_len = len(truncated_content)
     status = f' (已裁剪 {orig_len}->{trunc_len} chars)' if was_truncated else ''
-    app.logger.info(f'📦 结构化输出请求: fields={[f["name"] for f in fields]}, content_len={orig_len}{status}')
+    app.logger.info(f'📦 统一结构化输出请求: schema={list(schema.keys()) if isinstance(schema, dict) else [f["name"] for f in schema]}, content_len={orig_len}{status}')
 
     # 调用 GLM
-    result = _call_glm_for_structured_output(system_prompt, truncated_content, fields)
+    result = _call_glm_for_structured_output(system_prompt, truncated_content, schema)
 
     if result is None:
         return jsonify({'error': '结构化输出失败，请重试'}), 500
 
+    # 验证输出数据
+    validated_data = _validate_output_data(result, schema, rules)
+    if not validated_data['valid']:
+        app.logger.error(f'❌ 输出数据验证失败: {validated_data["error"]}')
+        return jsonify({'error': f'输出数据验证失败: {validated_data["error"]}'}), 500
+
+    app.logger.info(f'✅ 统一结构化输出成功, schema={list(result.keys())}')
+    
     response_data = {
         'success': True,
         'structuredData': result
@@ -1394,11 +1562,12 @@ def roleplay_structure_api():
     context_info = data.get('contextInfo', '')
 
     # 通用结构化拆分提示词
-    final_prompt = f"""你是一个严格的数据拆分助手。你的唯一任务是从对话智能体的自然语言叙事中提取结构化 JSON。
+    final_prompt = f"""你是一个严格的数据拆分助手。你的唯一任务是从对话智能体的标准化标签格式中提取结构化 JSON。
 
-⚠️ 重要：对话智能体输出的是纯自然语言小说叙事，不是格式标记文本。
-不要期望找到 :角色名:、(动作)、[想法]、{{场景}}、<选项> 等格式标记。
-你需要从流畅的叙事文字中理解并提取各个要素。
+⚠️ 重要：对话智能体输出的是**标准化标签格式**，使用【标签名】独占一行的方式组织内容。
+你必须按标签精确提取，不要启发式猜测或从散文文字中推断。
+板块标签包括：【场景环境】【角色互动】【建议选项】
+角色子标签包括：【角色名】【动作】【语言】【内心】
 
 【字段规则】
 {field_schema}
@@ -1507,23 +1676,46 @@ def roleplay_structure_api():
 # ==================== 角色小传生成智能体 ====================
 # 职责：接收世界观 + 角色基本信息，并行调用 GLM-4-flash 生成每个角色的详细小传
 
-CHAR_BIO_MAX_RETRIES = 2
+CHAR_BIO_MAX_RETRIES = 3
 CHAR_BIO_TIMEOUT = 60  # 秒
 
 
-def _clean_tsv_output(text):
-    """清理 LLM 输出的 TSV 文本：去除 markdown 包裹、分割线等噪声"""
+def _parse_standardized_text(text):
+    """解析标准化文本格式（键值对），返回 bio dict
+    
+    支持格式：
+    name: 林婉清
+    gender: 女
+    age: 24
+    ...
+    """
     if not text:
-        return ''
-    # 清理 markdown 代码块包裹
-    text = text.strip()
-    text = re.sub(r'^```(?:tsv|csv|txt|text)?\s*\n', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\n```\s*$', '', text)
-    # 清理分割线
-    text = re.sub(r'^-{3,}\s*$', '', text, flags=re.MULTILINE).strip()
-    # 清理表头行（LLM 可能误输出，匹配多种可能的表头格式）
-    text = re.sub(r'^name\s*\|\s*(?:gender|age).*?\n', '', text, flags=re.MULTILINE)
-    return text.strip()
+        return {}
+    
+    bio = {}
+    lines = text.strip().split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        
+        # 尝试 key: value 格式
+        if ':' in line:
+            key, _, value = line.partition(':')
+            key = key.strip()
+            value = value.strip()
+            if key and value:
+                bio[key] = value
+        elif '|' in line:
+            # 兼容 | 分隔格式
+            key, _, value = line.partition('|')
+            key = key.strip()
+            value = value.strip()
+            if key and value:
+                bio[key] = value
+    
+    return bio
 
 
 def _generate_single_bio(worldview, char_basic):
@@ -1531,6 +1723,7 @@ def _generate_single_bio(worldview, char_basic):
     
     注意：小传只生成人物内核（personality/background/motivation/secret/speechStyle），
     外貌、声线、生图字段已在 Step 1 角色设计阶段生成，直接透传。
+    输出标准化文本格式（键值对），前端负责解析和合并。
     """
     import urllib.request
     import urllib.error
@@ -1538,6 +1731,31 @@ def _generate_single_bio(worldview, char_basic):
     system_prompt = (
         "你是资深角色编剧，擅长为虚构角色创作立体、有深度的背景故事。"
         "请根据世界观和角色基础信息，生成人物内核。"
+        "\n\n【输出格式要求】"
+        "请按以下标准化文本格式输出（每行一个字段，格式为 key: value）：\n"
+        "name: 角色名\n"
+        "gender: 性别\n"
+        "age: 年龄\n"
+        "personality: 性格特点（50 字以内，包含优点和缺点）\n"
+        "background: 背景故事（100 字以内）\n"
+        "motivation: 核心动机（20 字以内）\n"
+        "secret: 秘密（30 字以内）\n"
+        "speechStyle: 说话风格（20 字以内）\n"
+        "relationships: 角色关系网（30 字以内）\n"
+        "origin: 出身（50 字以内）\n"
+        "abilities: 能力与短板（30 字以内）\n"
+        "likes: 喜恶（20 字以内）\n"
+        "habits: 习惯癖好（20 字以内）\n"
+        "appearance: 外貌描述（直接从输入中复制，不要重新生成）\n"
+        "voice: 声线（直接从输入中复制，不要重新生成）\n"
+        "ttsPitch: TTS 音高参数（直接从输入中复制）\n"
+        "ttsRate: TTS 语速参数（直接从输入中复制）\n"
+        "imageFace: 面部生图描述（直接从输入中复制）\n"
+        "imageHair: 发型生图描述（直接从输入中复制）\n"
+        "imageBody: 身材生图描述（直接从输入中复制）\n"
+        "imageClothes: 服装生图描述（直接从输入中复制）\n"
+        "imageEnvironment: 场景环境生图描述（直接从输入中复制）\n"
+        "\n⚠️ 注意：appearance/voice/ttsPitch/ttsRate/imageFace/imageHair/imageBody/imageClothes/imageEnvironment 字段必须直接复制输入中的值，不要重新生成！"
     )
 
     char_name = char_basic.get('name', '?')
@@ -1565,7 +1783,7 @@ def _generate_single_bio(worldview, char_basic):
 
     user_content = (
         f"【世界观概要】\n{worldview}\n\n"
-        f"【角色基础信息（11项标准字段）】\n"
+        f"【角色基础信息】\n"
         f"- 姓名：{char_name}\n"
         f"- 性别：{char_gender}\n"
         f"- 年龄：{char_age}\n"
@@ -1577,21 +1795,19 @@ def _generate_single_bio(worldview, char_basic):
         f"- 核心动机：{motivation or '待生成'}\n"
         f"- 能力与短板：{abilities or '待生成'}\n"
         f"- 喜恶：{likes or '待生成'}\n"
-        f"- 习惯癖好：{habits or '待生成'}\n\n"
-        f"请为该角色生成人物内核档案，严格按以下 TSV 格式输出（用 | 分隔）：\n"
-        f"name|gender|age|appearance|voice|personality|relationships|origin|motivation|abilities|likes|habits|ttsPitch|ttsRate|imageFace|imageHair|imageBody|imageClothes|imageEnvironment\n\n"
-        f"要求：\n"
-        f"1. personality: 性格特点（50字以内，包含优点和缺点，基于外貌和关系设计）\n"
-        f"2. relationships: 角色关系网（30字以内，补充详细关系）\n"
-        f"3. origin: 出身（50字以内，补充成长环境细节）\n"
-        f"4. motivation: 核心动机（20字以内，深化动机层次）\n"
-        f"5. abilities: 能力与短板（30字以内，细化能力和弱点）\n"
-        f"6. likes: 喜恶（20字以内，补充具体喜好）\n"
-        f"7. habits: 习惯癖好（20字以内，补充具体小动作）\n\n"
-        f"⚠️ 重要：appearance/voice/ttsPitch/ttsRate/imageFace/imageHair/imageBody/imageClothes/imageEnvironment 字段必须直接复制上面的角色基础信息，不要重新生成！\n"
-        f"示例格式：\n"
-        f"{char_name}|{char_gender}|{char_age}|{appearance or '外貌'}|{voice or '声线'}|性格|关系网|出身|动机|能力|喜恶|习惯|{tts_pitch or 'pitch'}|{tts_rate or 'rate'}|{image_face or 'face'}|{image_hair or 'hair'}|{image_body or 'body'}|{image_clothes or 'clothes'}|{image_env or 'env'}\n\n"
-        f"注意：不要输出表头，直接输出数据行！不要使用 markdown 代码块包裹输出。"
+        f"- 习惯癖好：{habits or '待生成'}\n"
+        f"- TTS 音高：{tts_pitch or '未指定'}\n"
+        f"- TTS 语速：{tts_rate or '未指定'}\n"
+        f"- 面部生图：{image_face or '未指定'}\n"
+        f"- 发型生图：{image_hair or '未指定'}\n"
+        f"- 身材生图：{image_body or '未指定'}\n"
+        f"- 服装生图：{image_clothes or '未指定'}\n"
+        f"- 场景生图：{image_env or '未指定'}\n\n"
+        f"请为该角色生成人物内核档案。注意：\n"
+        f"1. personality/background/motivation/secret/speechStyle/relationships/origin/abilities/likes/habits 由你创作\n"
+        f"2. appearance/voice/ttsPitch/ttsRate/imageFace/imageHair/imageBody/imageClothes/imageEnvironment 必须直接复制上面的值\n"
+        f"3. 按标准化文本格式输出，每行一个字段，格式为 key: value\n"
+        f"4. 不要使用 markdown 代码块包裹输出，直接输出文本"
     )
 
     payload = {
@@ -1621,79 +1837,52 @@ def _generate_single_bio(worldview, char_basic):
                 result = json.loads(resp.read().decode('utf-8'))
                 reply = result.get('choices', [{}])[0].get('message', {}).get('content', '')
 
-                # 清理 LLM 输出中的 markdown 包裹、表头等噪声
-                cleaned = _clean_tsv_output(reply)
+                # 清理 markdown 包裹
+                reply = reply.strip()
+                reply = re.sub(r'^```(?:text|txt|markdown)?\s*\n', '', reply, flags=re.IGNORECASE)
+                reply = re.sub(r'\n```\s*$', '', reply)
 
-                # 解析 TSV 输出
-                parts = cleaned.split('|')
+                # 解析标准化文本
+                bio = _parse_standardized_text(reply)
 
-                if len(parts) < 19:
-                    app.logger.warning(f'⚠️ {char_name} 小传解析失败：字段数不足 ({len(parts)}/19), 原始输出: {reply[:500]}, 清理后: {cleaned[:500]}')
-                    retry_msg = (
-                        f"\n\n【强制修正】上次输出的字段数不足 19 列（实际 {len(parts)} 列）。"
-                        f"请严格输出恰好 19 个 | 分隔的字段，不要使用任何额外文字或格式标记。"
-                        f"直接输出数据行，不要输出表头。"
-                    )
-                    payload['messages'].append({"role": "user", "content": retry_msg})
-                    continue
-
-                # 提取并验证字段
-                bio = {
-                    'name': parts[0].strip(),
-                    'gender': parts[1].strip(),
-                    'age': int(parts[2].strip()) if parts[2].strip().isdigit() else 20,
-                    'appearance': parts[3].strip(),
-                    'voice': parts[4].strip(),
-                    'personality': parts[5].strip(),
-                    'relationships': parts[6].strip(),
-                    'origin': parts[7].strip(),
-                    'motivation': parts[8].strip(),
-                    'abilities': parts[9].strip(),
-                    'likes': parts[10].strip(),
-                    'habits': parts[11].strip(),
-                    'ttsPitch': parts[12].strip(),
-                    'ttsRate': parts[13].strip(),
-                    'imageFace': parts[14].strip(),
-                    'imageHair': parts[15].strip(),
-                    'imageBody': parts[16].strip(),
-                    'imageClothes': parts[17].strip(),
-                    'imageEnvironment': parts[18].strip()
-                }
-
-                # 基本字段校验
-                if not bio['name'] or bio['name'] == '?':
+                # 校验必要字段
+                if not bio.get('name') or bio['name'] == '?':
                     app.logger.warning(f'⚠️ {char_name} 小传校验失败：name 字段为空或无效')
                     continue
 
-                # 检查 gender 是否合法
-                if bio['gender'] not in ('男', '女', '未知'):
-                    app.logger.warning(f'⚠️ {char_name} 小传校验失败：gender="{bio["gender"]}" 不合法')
-                    if char_gender in ('男', '女'):
-                        bio['gender'] = char_gender
-                    else:
-                        bio['gender'] = '未知'
-
-                # 校验：外貌/声线/生图字段必须与 Step 1 一致
-                if appearance and bio['appearance'] != appearance:
-                    app.logger.warning(f'⚠️ {char_name} 小传外貌不一致，使用 Step 1 的值')
+                # 补全缺失字段（从 Step 1 透传）
+                if 'appearance' not in bio and appearance:
                     bio['appearance'] = appearance
-                if voice and bio['voice'] != voice:
-                    app.logger.warning(f'⚠️ {char_name} 小传声线不一致，使用 Step 1 的值')
+                if 'voice' not in bio and voice:
                     bio['voice'] = voice
                     bio['ttsPitch'] = tts_pitch
                     bio['ttsRate'] = tts_rate
-                if image_face and bio['imageFace'] != image_face:
+                if 'imageFace' not in bio and image_face:
                     bio['imageFace'] = image_face
-                if image_hair and bio['imageHair'] != image_hair:
+                if 'imageHair' not in bio and image_hair:
                     bio['imageHair'] = image_hair
-                if image_body and bio['imageBody'] != image_body:
+                if 'imageBody' not in bio and image_body:
                     bio['imageBody'] = image_body
-                if image_clothes and bio['imageClothes'] != image_clothes:
+                if 'imageClothes' not in bio and image_clothes:
                     bio['imageClothes'] = image_clothes
-                if image_env and bio['imageEnvironment'] != image_env:
+                if 'imageEnvironment' not in bio and image_env:
                     bio['imageEnvironment'] = image_env
 
-                app.logger.info(f'✅ {char_name} 小传生成成功 (attempt={attempt+1}), fields={len(parts)}')
+                # 设置默认值
+                bio.setdefault('gender', char_gender)
+                bio.setdefault('age', str(char_age))
+                bio.setdefault('personality', personality or '')
+                bio.setdefault('background', '')
+                bio.setdefault('motivation', motivation or '')
+                bio.setdefault('secret', '')
+                bio.setdefault('speechStyle', '')
+                bio.setdefault('relationships', relationships or '')
+                bio.setdefault('origin', origin or '')
+                bio.setdefault('abilities', abilities or '')
+                bio.setdefault('likes', likes or '')
+                bio.setdefault('habits', habits or '')
+
+                app.logger.info(f'✅ {char_name} 小传生成成功 (attempt={attempt+1}), fields={len(bio)}')
                 return {'name': char_name, 'bio': bio}
 
         except Exception as e:
@@ -1803,6 +1992,65 @@ def graceful_shutdown(signum, frame):
 
 signal.signal(signal.SIGTERM, graceful_shutdown)
 signal.signal(signal.SIGINT, graceful_shutdown)
+
+def _build_context_info(context):
+    """构建上下文信息文本"""
+    if not context:
+        return ""
+    
+    context_lines = ["【上下文信息】"]
+    for key, value in context.items():
+        if isinstance(value, dict):
+            context_lines.append(f"- {key}: {json.dumps(value, ensure_ascii=False)}")
+        elif isinstance(value, list):
+            context_lines.append(f"- {key}: {len(value)} 项")
+        else:
+            context_lines.append(f"- {key}: {value}")
+    
+    return '\n'.join(context_lines)
+
+def _validate_output_data(data, schema, rules):
+    """验证输出数据是否符合 schema 定义"""
+    if not rules:
+        return {'valid': True}
+    
+    # 检查必需字段
+    required_fields = rules.get('requiredFields', [])
+    if required_fields:
+        missing_fields = []
+        for field in required_fields:
+            if field not in data:
+                missing_fields.append(field)
+        if missing_fields:
+            return {'valid': False, 'error': f'缺少必需字段: {missing_fields}'}
+    
+    # 检查字段类型
+    field_types = rules.get('fieldTypes', {})
+    if field_types:
+        for field, expected_type in field_types.items():
+            if field in data:
+                actual_value = data[field]
+                if expected_type == 'array' and not isinstance(actual_value, list):
+                    return {'valid': False, 'error': f'字段 {field} 应该是数组类型'}
+                elif expected_type == 'object' and not isinstance(actual_value, dict):
+                    return {'valid': False, 'error': f'字段 {field} 应该是对象类型'}
+                elif expected_type == 'string' and not isinstance(actual_value, str):
+                    return {'valid': False, 'error': f'字段 {field} 应该是字符串类型'}
+    
+    # 检查不允许的额外字段
+    allow_extra_fields = rules.get('allowExtraFields', True)
+    if not allow_extra_fields:
+        defined_fields = set()
+        if isinstance(schema, list):
+            defined_fields = {f.get('name') for f in schema}
+        elif isinstance(schema, dict):
+            defined_fields = set(schema.keys())
+        
+        extra_fields = set(data.keys()) - defined_fields
+        if extra_fields:
+            return {'valid': False, 'error': f'不允许的额外字段: {extra_fields}'}
+    
+    return {'valid': True}
 
 if __name__ == '__main__':
     print(f"⚡ 频率限制: 每设备 {limiter.max_requests} 次/{limiter.window}秒")

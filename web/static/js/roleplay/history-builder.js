@@ -77,15 +77,28 @@ export function buildHistory(messages) {
             continue;
         }
 
-        // char 消息：保留对话内容，但过滤掉纯场景描述
+        // char 消息：保留对话内容，但过滤掉纯场景描述和结构化解析后的动作/神态/内心想法片段
         if (m.role === 'char') {
-            // 如果是多角色消息，保留
+            // 如果是多角色消息，需要过滤掉其中的动作/想法片段
             if (m.type === 'multi_char') {
-                filtered.push({ role: 'assistant', content: content, _source: 'char-multi' });
+                // 结构化解析后的消息，使用角色对话智能体提示词要求的标准化格式
+                // 格式：【角色名】xxx 【动作】xxx 【语言】xxx 【内心】xxx
+                // 移除【内心】标记，只保留角色名+动作+语言，但保留格式让 LLM 学习
+                let cleanContent = content
+                    .replace(/【内心】.*?/g, '')  // 移除【内心】xxx 标记
+                    .replace(/\s+/g, ' ')     // 合并多余空格
+                    .trim();
+
+                // 如果过滤后内容为空，说明全是标记，不入历史
+                if (!cleanContent) {
+                    totalFiltered++;
+                } else {
+                    filtered.push({ role: 'assistant', content: cleanContent, _source: 'char-multi' });
+                }
             } else if (m.type === 'text') {
                 // 普通文本消息：如果是场景描述（以括号开头或包含大量环境词），过滤
                 if (content.match(/^\(.*\)$/)) {
-                    // 纯动作描述，不入历史
+                    // 純动作描述，不入历史
                     totalFiltered++;
                 } else {
                     filtered.push({ role: 'assistant', content: content, _source: 'char-text' });

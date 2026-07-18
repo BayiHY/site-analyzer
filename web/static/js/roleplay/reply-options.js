@@ -37,6 +37,7 @@ App.generateReplyOptions = async function(userMessage, charResponse) {
     }
 
     // 构建系统提示，要求 LLM 生成推动剧情的回复选项
+    // 注意：此格式与对话智能体 format-requirements.js 中的建议选项格式保持一致
     const systemPrompt = `你是回复选项生成器，不是角色扮演角色。你的唯一任务是为用户生成3-4条可选回复按钮文案。
 
 【绝对禁止】
@@ -47,8 +48,9 @@ App.generateReplyOptions = async function(userMessage, charResponse) {
 
 【必须做的事】
 - 生成 3-4 条简短回复选项（每条 ≤20 字）
-- 选项之间用 | 分隔
-- 只输出选项文本，不要输出任何其他内容
+- 每条单独一行，以"→ "开头
+- 选项必须是玩家视角的具体行动/语言，以"我"为主语
+- 选项要对剧情有推进作用，不能是口水词（如"好的"、"嗯"、"然后呢"等无效回复）
 
 【选项类型要求】
 1. 探索型：追问细节、原因或背后故事
@@ -57,7 +59,9 @@ App.generateReplyOptions = async function(userMessage, charResponse) {
 4. （可选）沉默/观望型：选择不说话或等待
 
 【示例输出】
-深入了解这个秘密|主动提出帮忙|质问对方真相|暂时保持沉默
+→ 我想询问酒馆老板关于失踪的事
+→ 我走向神秘女子坐下
+→ 我起身准备离开
 
 【当前上下文】
 活跃角色：${activeChar.name}，${activeChar.gender || '未知'}，${activeChar.age || '未知'}岁
@@ -76,21 +80,20 @@ App.generateReplyOptions = async function(userMessage, charResponse) {
         const raw = await App.agnesChat(messages);
         rpLog('INFO', 'REPLY-OPTS', `LLM 原始返回 (长度=${raw?.length || 0}): "${raw?.substring(0, 200)}..."`);
 
-        // 纯分隔符解析，不做 JSON 回退
-        const items = parseDelimited(raw);
-        rpLog('INFO', 'REPLY-OPTS', `parseDelimited 结果: ${JSON.stringify(items)}`);
-        if (items && Array.isArray(items) && items.length >= 3) {
-            rpLog('INFO', 'REPLY-OPTS', `选项结果: ${JSON.stringify(items)}`);
-            return items.slice(0, 4); // 最多 4 条
+        // 解析选项：优先提取以"→ "开头的行
+        const arrowLines = raw.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.startsWith('→ '))
+            .map(line => line.replace(/^→\s*/, '').trim())
+            .filter(line => line.length > 0);
+
+        if (arrowLines.length >= 2) {
+            rpLog('INFO', 'REPLY-OPTS', `✅ 提取到 ${arrowLines.length} 条 → 格式选项`);
+            rpLog('INFO', 'REPLY-OPTS', `选项结果: ${JSON.stringify(arrowLines)}`);
+            return arrowLines.slice(0, 4);
         }
 
-        // LLM 可能输出了少量选项（2条），也尝试提取
-        if (items && Array.isArray(items) && items.length >= 2) {
-            rpLog('WARN', 'REPLY-OPTS', `选项不足 ${items.length} 条，但已足够使用`);
-            return items.slice(0, 4);
-        }
-
-        // 尝试从原始文本中提取 | 分隔的项
+        // 兜底：尝试 | 分隔符（旧格式兼容）
         const pipeItems = raw.split('|').map(s => s.trim()).filter(s => s.length > 0);
         if (pipeItems.length >= 3) {
             rpLog('WARN', 'REPLY-OPTS', `parseDelimited 失败，但直接 | 分割找到 ${pipeItems.length} 项`);
@@ -99,7 +102,7 @@ App.generateReplyOptions = async function(userMessage, charResponse) {
 
         rpLog('WARN', 'REPLY-OPTS', '分隔符解析失败或选项不足，LLM 未按要求格式输出');
         rpLog('WARN', 'REPLY-OPTS', `LLM 原始返回: ${raw}`);
-        throw new Error(`快捷回复解析失败: LLM 未按要求 | 分隔符格式输出`);
+        throw new Error(`快捷回复解析失败: LLM 未按要求格式输出`);
     } catch (e) {
         rpLog('ERROR', 'REPLY-OPTS', `LLM 调用或解析失败: ${e.message}`);
         throw e;

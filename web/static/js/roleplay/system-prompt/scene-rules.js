@@ -15,8 +15,12 @@ export function buildSceneRules(allChars, state) {
         ? '\n【角色关系网】\n' + relationshipHints.join('\n')
         : '';
 
-    // 场景中角色状态
-    const inSceneNote = allChars.map(c => {
+    // 场景中角色状态 — 排除玩家角色，避免身份重叠
+    const playerName = state.player?.name || null;
+    const npcChars = playerName
+        ? allChars.filter(c => c.name !== playerName)
+        : allChars;
+    const inSceneNote = npcChars.map(c => {
         return `- ${c.name}（${c.gender}，${c.age}岁）— ${c.appearance ? '外貌：' + c.appearance.slice(0, 30) : ''}${c.relationship ? '，与主角：' + c.relationship : ''}`;
     }).join('\n');
 

@@ -27,14 +27,9 @@
         </p>
         <div class="form-wrapper">
             <div class="form-group api-key-group">
-                <label>对话 API Key <span style="color:var(--danger);">*</span></label>
-                <input type="password" id="setup-chat-key" placeholder="输入 Agnes 对话 API Key (sk-...) 或 GLM Key (hex.hex)">
+                <label>API Key <span style="color:var(--danger);">*</span></label>
+                <input type="password" id="setup-chat-key" placeholder="输入 Agnes API Key (sk-...)" autocomplete="off">
                 <button type="button" class="api-key-clear" onclick="clearApiKey('setup-chat-key')" title="清除">清除</button>
-            </div>
-            <div class="form-group api-key-group">
-                <label>生图 API Key <span style="color:#666;font-weight:normal;">（选填，用于生成角色头像）</span></label>
-                <input type="password" id="setup-image-key" placeholder="输入 Agnes 生图 API Key" oninput="App.onSetupImageKeyChange()">
-                <button type="button" class="api-key-clear" onclick="clearApiKey('setup-image-key')" title="清除">清除</button>
             </div>
             <div class="form-group">
                 <label>🎨 画面风格 <span style="color:#666;font-weight:normal;">（用于角色头像和场景图生成，留空则默认动漫风）</span></label>
@@ -75,6 +70,11 @@
             <div class="form-group">
                 <label>故事灵感 <span style="color:#666;font-weight:normal;">（选填）</span></label>
                 <textarea id="story-prompt" placeholder="例如：我想和一个温柔的外科医生青梅竹马的故事。&#10;&#10;留空则完全随机生成世界观和角色。" rows="4"></textarea>
+            </div>
+            <div class="form-group">
+                <label>玩家角色名 <span style="color:#666;font-weight:normal;">（选填，留空则使用默认名）</span></label>
+                <input type="text" id="setup-player-name" placeholder="输入你扮演的角色名字（如：林渊、无名旅者等）" maxlength="20">
+                <div class="setting-hint" style="font-size:0.75rem;color:var(--text-dim);margin-top:4px;">建议填写，用于区分玩家角色与NPC角色，避免身份混淆</div>
             </div>
             <div class="form-group">
                 <label>玩家性别 <span style="color:var(--danger);">*</span></label>
@@ -174,7 +174,9 @@
 <script src="/static/js/roleplay/create-flow.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/data-io.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/app-init.js?v={{ cb }}"></script>
+<script src="/static/js/roleplay/json-parser.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/structured-output.js?v={{ cb }}"></script>
+<script src="/static/js/roleplay/unified-structured-output.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/roleplay-structured-agent.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/aliases.js?v={{ cb }}"></script>
 

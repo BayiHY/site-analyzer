@@ -140,14 +140,9 @@ App.renderSettingsPanel = function() {
     const rateVal = parseInt(ns.rate?.replace('%','')) || 0;
     return `
         <div class="setting-item">
-            <label>对话 API Key</label>
-            <input type="password" id="setting-chat-key" value="${state.apiKeys.chat}" placeholder="输入 Agnes 对话 API Key">
-            <div class="setting-hint">用于角色对话的 LLM API 密钥</div>
-        </div>
-        <div class="setting-item">
-            <label>生图 API Key</label>
-            <input type="password" id="setting-image-key" value="${state.apiKeys.image}" placeholder="输入 Agnes 生图 API Key">
-            <div class="setting-hint">用于角色图片生成的 API 密钥</div>
+            <label>API Key</label>
+            <input type="password" id="setting-chat-key" value="${state.apiKeys.chat}" placeholder="输入 Agnes API Key">
+            <div class="setting-hint">用于角色对话和图片生成的 API 密钥</div>
         </div>
         <button class="btn btn-primary btn-sm" onclick="App.saveSettings()" style="margin-top:8px;">保存设置</button>
         <hr style="border-color:var(--border);margin:20px 0;">

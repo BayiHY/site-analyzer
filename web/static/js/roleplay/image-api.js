@@ -364,9 +364,9 @@ App.agnesImageGenerate = async function(options) {
         label = 'image'     // 日志标签
     } = options;
 
-    const apiKey = state.apiKeys.image;
+    const apiKey = state.apiKeys.chat;
     if (!apiKey) {
-        throw new Error('未配置生图 API Key');
+        throw new Error('未配置 API Key');
     }
 
     // 模型降级列表

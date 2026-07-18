@@ -7,7 +7,6 @@
 App.LLM_FALLBACK_CHAIN = [
     { model: 'agnes-2.0-flash', temperature: null, label: 'agnes-2.0-flash' },
     { model: 'agnes-1.5-flash', temperature: null, label: 'agnes-1.5-flash' },
-    { model: 'glm-4.5-flash', temperature: null, label: 'glm-4.5-flash' },
 ];
 
 /**
@@ -69,16 +68,9 @@ App.agnesChatWithFallback = async function(messages, options = {}) {
     
     // 构建当前 API key 对应的降级链
     const apiKey = state.apiKeys.chat;
-    const provider = App.detectProvider(apiKey);
     
     // 从配置中取降级链，允许外部覆盖
     let chain = options.fallbackChain || App.LLM_FALLBACK_CHAIN;
-    
-    // 如果是 glm key，glm-4.5-flash 应该在链首
-    if (provider === 'glm') {
-        chain = chain.filter(c => c.label !== 'agnes-2.0-flash' && c.label !== 'agnes-1.5-flash');
-        chain.unshift({ model: 'glm-4.5-flash', temperature: null, label: 'glm-4.5-flash' });
-    }
     
     let lastError = null;
     

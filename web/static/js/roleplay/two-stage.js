@@ -1,8 +1,12 @@
 // === Section: 两阶段流程编排 ===
 // 初始化故事（世界观→角色→序章→按出场顺序逐个生成头像+场景图→开场）
 
-App.initializeStory = async function(userInspiration, playerGender) {
-    rpLog('info', 'INIT', `开始两阶段故事生成流程，玩家性别: ${playerGender || state.player?.gender}`);
+App.initializeStory = async function(userInspiration, playerGender, playerName) {
+    if (playerName && state.player) {
+        state.player.name = playerName;
+    }
+    const displayName = state.player?.name || '无名旅者';
+    rpLog('info', 'INIT', `开始两阶段故事生成流程，玩家: ${displayName} (${playerGender || state.player?.gender})`);
     let openingRaw = '';
     let openingStructured = null;
 
@@ -72,7 +76,7 @@ App.initializeStory = async function(userInspiration, playerGender) {
     }
 
     // 角色生成完成后：先生成序章 → 渲染序章 → 按出场顺序逐个生成头像+场景图
-    if (state.apiKeys.image) {
+    if (state.apiKeys.chat) {
         rpLog('info', 'IMG', `━━━ 开始生图阶段（按出场顺序）: ${state.characters.length} 个角色 + 主角 ━━━`);
         rpLog('info', 'IMG', `  生图 API Key 已配置`);
         rpLog('info', 'IMG', `  角色列表: ${state.characters.map(c => `${c.name}(faceImgUrl=${!!c.faceImageUrl}, portraitImgUrl=${!!c.portraitImageUrl})`).join(', ')}`);

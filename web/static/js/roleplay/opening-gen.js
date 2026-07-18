@@ -16,10 +16,11 @@ App.generateOpeningScene = async function() {
     addSystemMessage('✍️ 正在生成序章场景...');
 
     // 加载与 chat-sender 相同的提示词模块
-    const [worldviewModule, cardModule, sceneModule, emotionModule, formatModule] = await Promise.all([
+    const [worldviewModule, cardModule, sceneModule, identityModule, emotionModule, formatModule] = await Promise.all([
         import('./system-prompt/worldview.js'),
         import('./system-prompt/character-card.js'),
         import('./system-prompt/scene-rules.js'),
+        import('./system-prompt/player-identity.js'),
         import('./system-prompt/emotion-guide.js'),
         import('./system-prompt/format-requirements.js'),
     ]);
@@ -35,6 +36,8 @@ ${worldviewModule.buildWorldview(state)}
 ${cardModule.buildCharacterCard(state)}
 
 ${sceneModule.buildSceneRules(allChars, state)}
+
+${identityModule.buildPlayerIdentity(state)}
 
 ${emotionModule.buildEmotionGuide(state)}
 
@@ -98,10 +101,11 @@ App.structuredToRawText = function(structured) {
         parts.push(structured.scene);
     }
     for (const charData of (structured.characters || [])) {
-        let line = `:${charData.name}:`;
-        if (charData.action) line += `(${charData.action})`;
-        if (charData.dialogue) line += charData.dialogue;
-        if (charData.thought) line += `[${charData.thought}]`;
+        // Build natural language paragraph — no format markers
+        let line = '';
+        if (charData.action) line += `${charData.action}。`;
+        if (charData.dialogue) line += `"${charData.dialogue}"`;
+        if (charData.thought) line += `（他心想：${charData.thought}）`;
         parts.push(line);
     }
     return parts.join('\n');

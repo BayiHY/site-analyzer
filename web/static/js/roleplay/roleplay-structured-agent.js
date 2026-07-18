@@ -8,18 +8,19 @@ const ROLEPLAY_API_BASE = '/api';
  * 对话智能体输出自然文本，结构化智能体负责拆分为 JSON
  */
 const FIELD_SCHEMA = `【数据结构定义】
-输入：对话智能体输出的自然语言叙事文本
+输入：对话智能体输出的标准化标签格式文本
 输出：JSON 对象，包含以下字段
 
 1. scene（string）: 场景环境描述
-   - 提取叙事中描写地点、时间、天气、环境氛围的内容
+   - 仅包含环境、氛围、时间、地点等非对话内容
+   - 从【场景环境】板块提取
    - 仅序章开场、场景变化、关键事件、角色高光时有内容
-   - 场景未变化时返回 ""
+   - 场景未变化时无此板块 → 返回 ""
 
 2. characters（array）: 在场角色消息列表，每项：
    - name（string）: 角色真实姓名
    - action（string）: 角色外部可见的动作/神态/表情
-   - dialogue（string）: 角色说出的话（引号内的内容）
+   - dialogue（string）: 角色说出的话
    - thought（string）: 角色的内心想法/感受/欲望/恐惧
 
 3. suggestedReplies（array）: 玩家应对选项
@@ -27,42 +28,57 @@ const FIELD_SCHEMA = `【数据结构定义】
 5. dynamicAttrs（object）: 动态属性
 6. revealedInfo（object）: 信息披露
 
-【板块标签映射】
-对话智能体使用以下标签明确标识各部分内容，结构化智能体按标签机械提取：
+【标签提取规则——核心优先级最高】
+对话智能体使用【标签名】独占一行的方式组织内容。
+你必须按以下规则精确提取，**优先使用标签匹配，不要启发式猜测**：
 
-板块标签（3个）：
-  【场景环境】→ scene 字段（场景描述全文）
-  【角色互动】→ characters 数组（逐角色提取）
-  【建议选项】→ suggestedReplies 数组（提取→开头的行）
+A) 板块标签识别：
+   - 【场景环境】→ 提取其后所有内容直到下一个板块标签 → scene
+   - 【角色互动】→ 进入角色解析模式
+   - 【建议选项】→ 提取其后以"→ "开头的行 → suggestedReplies
 
-角色子要素标签（每个角色4个）：
-  【角色名】xxx       → characters[n].name
-  【动作】xxx        → characters[n].action
-  【语言】xxx        → characters[n].dialogue
-  【内心】xxx        → characters[n].thought
+B) 角色解析规则（在【角色互动】板块内）：
+   - 找到【角色名】独占一行 → 其后内容为 name
+   - 找到【动作】独占一行 → 其后内容为 action
+   - 找到【语言】独占一行 → 其后内容为 dialogue
+   - 找到【内心】独占一行 → 其后内容为 thought
+   - 每个角色由一组连续的【角色名】【动作】【语言】【内心】组成
+   - 四个子标签必须按顺序出现，缺一不可
+   - 下一组【角色名】出现即表示上一个角色结束
 
-【提取规则】
-1. 找到【场景环境】标签，其后直到下一个标签前的全部内容 → scene
-2. 找到【角色互动】标签，逐角色解析：
-   - 【角色名】标签后的文本 → name（必须提取，不可为空）
-   - 【动作】标签后的文本 → action
-   - 【语言】标签后的文本 → dialogue
-   - 【内心】标签后的文本 → thought
-3. 找到【建议选项】标签，提取每条"→ xxx"，去掉"→ "前缀 → suggestedReplies
+C) 建议选项提取：
+   - 在【建议选项】板块内，找到所有以"→ "开头的行
+   - 提取 → 后面的文字 → suggestedReplies
+
+D) 场景 vs 角色边界：
+   - scene 仅来自【场景环境】板块的内容
+   - 角色 action/dialogue/thought 仅来自【角色互动】板块
+   - 两者严格分离，绝不交叉
+
+【提取流程（严格按顺序执行）】
+1. 扫描全文，定位所有【标签名】独占行的位置
+2. 提取【场景环境】板块内容 → scene
+3. 进入【角色互动】板块，按顺序解析角色块：
+   a) 遇到【角色名】→ 开始新角色
+   b) 依次读取【动作】【语言】【内心】→ 填充该角色字段
+   c) 遇到下一个【角色名】或板块结束 → 保存当前角色，开始下一组
+4. 提取【建议选项】板块内容 → suggestedReplies
+5. 如果缺少某个板块或标签，对应字段返回空字符串或空数组
 
 【互斥规则——严格执行】
 - action 中**不得包含** dialogue 和 thought 的内容
-- dialogue 中**不得包含** action 和 thought 的内容  
+- dialogue 中**不得包含** action 和 thought 的内容
 - thought 中**不得包含** action 和 dialogue 的内容
-- 每个标签只提取其后的内容，不要跨标签合并
+- scene 中**不得包含**任何角色的台词或内心活动
+- 每个角色的四个子标签内容严格来自各自标签后的文本行
 
 【基本原则】
-- 严格按标签提取，不要推测或编造
+- 严格按【标签名】提取，不要推测或编造
 - 如果某标签缺失，对应字段返回空字符串 ""
-- 如果某板块标签不存在（如【场景环境】），对应字段返回空字符串或空数组`;
+- 如果某板块不存在，对应字段返回空字符串或空数组`;
 
 /**
- * 调用后端结构化智能体拆分原始文本为 JSON
+ * 前端直接调用 Agnes LLM 拆分原始文本为 JSON
  * @param {string} rawText - 对话智能体输出的原始文本
  * @param {Object} context - 上下文信息
  * @param {Array} context.characters - 角色列表
@@ -84,34 +100,38 @@ App.structuredParseReply = async function(rawText, context = {}) {
     rpLog('info', 'STRUCTURED-PARSE', `characters=${characters.length}个, emotions=${Object.keys(emotions).length}个`);
 
     try {
-        const response = await fetch(`${ROLEPLAY_API_BASE}/roleplay-structure`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                rawText,
-                characters,
-                emotions,
-                dynamicAttrs,
-                revealedInfo,
-                fieldSchema: FIELD_SCHEMA,
-                contextInfo: `【上下文信息】
+        // 构建 system prompt：结构化提取规则
+        const systemPrompt = `你是一个结构化数据提取器。你的任务是将对话智能体输出的自然文本解析为严格的 JSON 对象。
+
+${FIELD_SCHEMA}
+
+【重要】你必须只输出合法的 JSON 对象，不要输出任何其他文字、解释或 markdown 标记。JSON 必须能被标准 JSON.parse() 解析。`;
+
+        // 构建 user message
+        const userMessage = `请解析以下对话内容：
+
+${rawText}
+
+【上下文信息】
 - 共有 ${characters.length} 个角色：${characters.map(c => c.name).join('、')}
 - 玩家姓名：${state.player?.name || '未知'}
-- 当前情感指标和动态属性已在下方提供，请在拆分时参考这些数据进行 emotionDelta 和 dynamicAttrs 的判断`
-            })
-        });
+- 当前情感指标和动态属性已在下方提供，请在拆分时参考这些数据进行 emotionDelta 和 dynamicAttrs 的判断`;
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+        ];
+
+        rpLog('info', 'STRUCTURED-PARSE', '调用 Agnes LLM 进行结构化拆分...');
+        const rawResponse = await App.agnesChat(messages, { temperature: 0.1 });
+        
+        rpLog('info', 'STRUCTURED-PARSE', `LLM 原始返回 (长度=${rawResponse?.length || 0}): "${rawResponse?.substring(0, 200)}..."`);
+
+        // 解析 JSON（处理中文引号、markdown 包裹等）
+        const data = App.parseJson(rawResponse);
+        if (!data) {
+            throw new Error(`JSON 解析失败，原始返回: ${rawResponse.substring(0, 200)}`);
         }
-
-        const result = await response.json();
-
-        if (!result.success) {
-            throw new Error(result.error || '结构化拆分失败');
-        }
-
-        const data = result.structuredData;
 
         rpLog('info', 'STRUCTURED-PARSE', `✅ 结构化拆分成功: scene=${(data.scene || '').length}字符, chars=${(data.characters || []).length}个, replies=${(data.suggestedReplies || []).length}条`);
         // 详细日志：每个角色的 thought 字段
@@ -131,7 +151,7 @@ App.structuredParseReply = async function(rawText, context = {}) {
             emotionDelta: data.emotionDelta || {},
             dynamicAttrs: data.dynamicAttrs || {},
             revealedInfo: data.revealedInfo || {},
-            truncated: !!result.truncated
+            truncated: false
         };
 
     } catch (error) {
@@ -178,8 +198,9 @@ App.generateReplyOptions = async function(params) {
 
 【必须做的事】
 - 生成 3-4 条简短回复选项（每条 ≤20 字）
-- 选项之间用 | 分隔
-- 只输出选项文本，不要输出任何其他内容
+- 每条单独一行，以"→ "开头
+- 选项必须是玩家视角的具体行动/语言，以"我"为主语
+- 选项要对剧情有推进作用，不能是口水词（如"好的"、"嗯"、"然后呢"等无效回复）
 
 【选项类型要求】
 1. 探索型：追问细节、原因或背后故事
@@ -188,7 +209,9 @@ App.generateReplyOptions = async function(params) {
 4. （可选）沉默/观望型：选择不说话或等待
 
 【示例输出】
-深入了解这个秘密|主动提出帮忙|质问对方真相|暂时保持沉默`;
+→ 我想询问酒馆老板关于失踪的事
+→ 我走向神秘女子坐下
+→ 我起身准备离开`;
 
         const messages = [
             { role: 'system', content: systemPrompt },
@@ -199,11 +222,23 @@ App.generateReplyOptions = async function(params) {
         const raw = await App.agnesChat(messages);
         rpLog('info', 'REPLY-OPTIONS', `LLM 原始返回 (长度=${raw?.length || 0}): "${raw?.substring(0, 200)}..."`);
 
-        // 解析选项：优先用 parseDelimited，兜底用 | 分割
-        const items = raw.split('|').map(s => s.trim()).filter(s => s.length > 0);
-        if (items.length >= 2) {
-            rpLog('info', 'REPLY-OPTIONS', `✅ 生成 ${items.length} 条选项`);
-            return items.slice(0, 4);
+        // 解析选项：优先提取以"→ "开头的行
+        const arrowLines = raw.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.startsWith('→ '))
+            .map(line => line.replace(/^→\s*/, '').trim())
+            .filter(line => line.length > 0);
+
+        if (arrowLines.length >= 2) {
+            rpLog('info', 'REPLY-OPTIONS', `✅ 生成 ${arrowLines.length} 条选项`);
+            return arrowLines.slice(0, 4);
+        }
+
+        // 兜底：尝试 | 分隔符（旧格式兼容）
+        const pipeItems = raw.split('|').map(s => s.trim()).filter(s => s.length > 0);
+        if (pipeItems.length >= 3) {
+            rpLog('info', 'REPLY-OPTIONS', `| 分割兜底找到 ${pipeItems.length} 项`);
+            return pipeItems.slice(0, 4);
         }
 
         rpLog('warn', 'REPLY-OPTIONS', `分隔符解析失败，退回降级选项`);
@@ -240,11 +275,14 @@ App.structuredToMessages = function(structured, messageId, options = {}) {
     // 角色消息
     if (!skipCharacters) {
         for (const charData of (structured.characters || [])) {
-            let fullContent = '';
-            if (charData.action) fullContent += `(${charData.action})`;
-            if (charData.dialogue) fullContent += charData.dialogue;
-            if (charData.thought) fullContent += `[${charData.thought}]`;
-            if (!fullContent) fullContent = charData.dialogue || '(无内容)';
+            // 保留原始标签格式，不要扁平化拼接
+            // 这样 LLM 在历史中也能看到清晰的【角色名】【动作】【语言】【内心】结构
+            let parts = [];
+            parts.push(`【角色名】${charData.name}`);
+            if (charData.action) parts.push(`【动作】${charData.action}`);
+            if (charData.dialogue) parts.push(`【语言】${charData.dialogue}`);
+            if (charData.thought) parts.push(`【内心】${charData.thought}`);
+            let formattedContent = parts.join(' ') || charData.dialogue || `${charData.name}(无内容)`;
 
             messages.push({
                 id: messageId + '-' + charData.name,
@@ -252,10 +290,11 @@ App.structuredToMessages = function(structured, messageId, options = {}) {
                 type: 'multi_char',
                 charName: charData.name,
                 charIndex: state.characters.findIndex(c => c.name === charData.name),
-                content: fullContent,
+                content: formattedContent,
                 action: charData.action || '',
                 dialogue: charData.dialogue || '',
-                thought: charData.thought || ''
+                thought: charData.thought || '',
+                timestamp: new Date().toISOString()
             });
         }
     }

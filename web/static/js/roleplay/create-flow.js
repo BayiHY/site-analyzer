@@ -16,9 +16,9 @@ App.addSystemMessage = function(text) {
 
 App.createCharacter = async function() {
     const chatKey = document.getElementById('setup-chat-key').value.trim();
-    const imageKey = document.getElementById('setup-image-key').value.trim();
     const storyPrompt = document.getElementById('story-prompt').value.trim();
     const playerGender = document.querySelector('input[name="player-gender"]:checked')?.value || '男';
+    const rawPlayerName = document.getElementById('setup-player-name')?.value.trim() || '';
 
     if (!chatKey) {
         alert('请先填写对话 API Key');
@@ -26,10 +26,22 @@ App.createCharacter = async function() {
     }
 
     state.apiKeys.chat = chatKey;
-    state.apiKeys.image = imageKey;
     localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
 
-    state.player = { gender: playerGender, faceImageUrl: '' };
+    // 从灵感中提取玩家名字（如"扮演林渊"），否则使用用户输入或默认名
+    const defaultName = '无名旅者';
+    let playerName = rawPlayerName;
+    if (!playerName) {
+        try {
+            const identityModule = await import('./system-prompt/player-identity.js');
+            playerName = identityModule.extractPlayerName(storyPrompt, defaultName);
+        } catch (e) {
+            playerName = defaultName;
+        }
+    }
+    if (!playerName) playerName = defaultName;
+
+    state.player = { name: playerName, gender: playerGender, faceImageUrl: '' };
     state.characters = [];
     state.activeCharIndex = 0;
     state.emotions = {};
@@ -96,8 +108,8 @@ App.createCharacter = async function() {
     state.story.imageStyle = imageStyle;
 
     try {
-        rpLog('info', 'CREATE', `开始两阶段初始化，玩家性别: ${playerGender}`);
-        await App.initializeStory(storyPrompt, playerGender);
+        rpLog('info', 'CREATE', `开始两阶段初始化，玩家: ${playerName} (${playerGender})`);
+        await App.initializeStory(storyPrompt, playerGender, playerName);
         rpLog('info', 'CREATE', '初始化完成，进入聊天阶段');
     } catch (err) {
         rpLog('error', 'CREATE', '初始化失败: ' + (err.message || String(err)));
@@ -120,7 +132,7 @@ App.generateCharactersAndStart = async function() {
         let openingRaw = '';
         let openingStructured = null;
 
-        if (state.apiKeys.image && chars.length > 0) {
+        if (state.apiKeys.chat && chars.length > 0) {
             rpLog('info', 'IMG', `━━━ 开始生图阶段（按出场顺序）: ${chars.length} 个角色 + 主角 ━━━`);
             rpLog('info', 'IMG', `  生图 API Key 已配置`);
             rpLog('info', 'IMG', `  角色列表: ${chars.map(c => `${c.name}(faceImgUrl=${!!c.faceImageUrl}, portraitImgUrl=${!!c.portraitImageUrl})`).join(', ')}`);
@@ -256,7 +268,7 @@ App.generateCharactersAndStart = async function() {
                 rpLog('error', 'IMG', '生图阶段失败: ' + imgErr.message);
                 addSystemMessage(`⚠️ 生图阶段失败: ${imgErr.message}`);
             }
-        } else if (!state.apiKeys.image) {
+        } else if (!state.apiKeys.chat) {
             // 没有生图 API Key，也生成序章
             try {
                 const openingResult = await App.generateOpeningScene();
@@ -359,7 +371,7 @@ App.regenerateCharacters = async function() {
         addSystemMessage(`✅ 角色重新生成完成！共 ${chars.length} 个角色。`);
         rpLog('info', 'CHARS', `regenerateCharacters 返回 chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
-        if (state.apiKeys.image && chars.length > 0) {
+        if (state.apiKeys.chat && chars.length > 0) {
             rpLog('info', 'IMG', `━━━ 开始重新生图阶段（按出场顺序）: ${chars.length} 个角色 + 主角 ━━━`);
             rpLog('info', 'IMG', `  生图 API Key 已配置`);
             rpLog('info', 'IMG', `  角色列表: ${chars.map(c => `${c.name}(faceImgUrl=${!!c.faceImageUrl}, portraitImgUrl=${!!c.portraitImageUrl})`).join(', ')}`);
@@ -495,7 +507,7 @@ App.regenerateCharacters = async function() {
                 rpLog('error', 'IMG', '生图阶段失败: ' + imgErr.message);
                 addSystemMessage(`⚠️ 生图阶段失败: ${imgErr.message}`);
             }
-        } else if (!state.apiKeys.image) {
+        } else if (!state.apiKeys.chat) {
             // 没有生图 API Key，也重新生成序章
             try {
                 const openingResult = await App.generateOpeningScene();

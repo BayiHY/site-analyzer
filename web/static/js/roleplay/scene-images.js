@@ -34,7 +34,7 @@ App.sceneToImagePrompt = function(sceneDesc, character, worldview, allCharacters
         }
         // 从 replyText 解析动作
         let charAction = '';
-        if (replyText) {
+        if (replyText && typeof replyText === 'string') {
             const cleaned = replyText.replace(/\{[^}]+\}/, '').replace(/<[^>]+>$/, '').trim();
             const actionPattern = new RegExp(`${character.name}[^\\s|:：]{0,10}[:：]\\(([^)]+)\\)`);
             const am = cleaned.match(actionPattern);
@@ -46,16 +46,18 @@ App.sceneToImagePrompt = function(sceneDesc, character, worldview, allCharacters
         base += '.' + charDesc;
     }
 
-    // 3. 其他在场角色：名字 + 外貌（不加动作，避免复杂化）
+    // 3. 其他在场角色：名字 + 外貌（明确标注谁是谁，保持角色一致性）
     if (allCharacters && allCharacters.length > 1) {
         const others = allCharacters.filter(c => c.name !== character?.name);
         if (others.length > 0) {
-            const otherDescs = others.map(c => {
-                let desc = `${c.name}`;
+            // 多角色时明确标注：图一、图二、图三
+            const otherDescs = others.map((c, index) => {
+                let desc = `${index + 1}. ${c.name}`;
                 if (c.appearance) desc += `, ${c.appearance}`;
                 return desc;
             }).join(', ');
-            base += ` Other characters present: ${otherDescs}.`;
+            base += ` Characters in scene: ${otherDescs}.`;
+            rpLog('info', 'SCENE', `📝 多角色场景: ${otherDescs}`);
         }
     }
 
@@ -109,18 +111,52 @@ App._getSceneCharacterFaceUrlsRegex = function(replyText, allCharacters) {
         cleaned = replyText.slice(sceneMatch[0].length);
     }
     cleaned = cleaned.replace(/<[^>]+>$/, '').trim();
-    
+
     const presentNames = new Set();
-    // 匹配 角色名:(动作) 或 角色名:对话
+    const charNameSet = new Set((allCharacters || []).map(c => c.name));
+
+    // 第一步：先提取所有「」内的台词内容，标记为已处理区域
+    // 这些区域内的任何 "词:" 都不是角色名，是台词的一部分
+    const dialogueRegions = [];
+    const quotePattern = /「([^」]*)」/g;
+    let qm;
+    while ((qm = quotePattern.exec(cleaned)) !== null) {
+        dialogueRegions.push({ start: qm.index, end: qm.index + qm[0].length });
+    }
+
+    // 辅助函数：检查一个位置是否在某个台词区域内
+    function isInDialogueRegion(pos) {
+        for (const region of dialogueRegions) {
+            if (pos >= region.start && pos < region.end) return true;
+        }
+        return false;
+    }
+
+    // 第二步：匹配 角色名:(动作) 或 角色名:对话
+    // 但跳过位于「」台词区域内的匹配
     const namePattern = /([^\s|:：]{1,10})[:：](?!\s*\()/g;
     let nm;
     while ((nm = namePattern.exec(cleaned)) !== null) {
+        // 如果匹配位置在台词区域内，跳过
+        if (isInDialogueRegion(nm.index)) continue;
         const name = nm[1].trim();
         if (name && /[^\s]/.test(name)) {
             presentNames.add(name);
         }
     }
-    // 也匹配无角色名的 (动作) 开头
+
+    // 第三步：也尝试匹配"角色名心想"、"角色名说"等中文引导词模式
+    // 格式：角色名 + （心想/思忖/暗想/嘟囔/开口/说道/回答）
+    const thoughtPattern = /([^\s「」]{1,10})(?:（心想|（思忖|（暗想|（嘟囔|（开口|（说道|（回答|（轻声|（笑道|（皱眉|（叹气)/g;
+    let tm;
+    while ((tm = thoughtPattern.exec(cleaned)) !== null) {
+        const name = tm[1].trim();
+        if (name && /[^\s]/.test(name)) {
+            presentNames.add(name);
+        }
+    }
+
+    // 第四步：也匹配无角色名的 (动作) 开头
     const loneAction = cleaned.match(/^\(([^)]+)\)/);
     if (!loneAction || presentNames.size === 0) {
         // 如果没有解析到命名角色，至少包含当前角色
@@ -128,10 +164,9 @@ App._getSceneCharacterFaceUrlsRegex = function(replyText, allCharacters) {
             presentNames.add(allCharacters[0].name);
         }
     }
-    
+
     // 关键验证：只保留在角色列表中实际存在的名字
     // 过滤掉误匹配的文本片段（如"空气凝固。你面临选择"）
-    const charNameSet = new Set((allCharacters || []).map(c => c.name));
     const validNames = new Set();
     for (const name of presentNames) {
         if (charNameSet.has(name)) {
@@ -222,9 +257,9 @@ App.generateInitialSceneImage = async function(openingScene, replyText, metadata
         rpLog('warn', 'SCENE', '❌ 场景描述为空，跳过');
         return;
     }
-    const apiKey = state.apiKeys.image;
+    const apiKey = state.apiKeys.chat;
     if (!apiKey) {
-        rpLog('warn', 'SCENE', '❌ 生图 API Key 未配置，跳过');
+        rpLog('warn', 'SCENE', '❌ API Key 未配置，跳过');
         return;
     }
 
@@ -292,9 +327,9 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText,
         rpLog('warn', 'SCENE', '❌ 场景描述为空，跳过');
         return;
     }
-    const apiKey = state.apiKeys.image;
+    const apiKey = state.apiKeys.chat;
     if (!apiKey) {
-        rpLog('warn', 'SCENE', '❌ 生图 API Key 未配置，跳过');
+        rpLog('warn', 'SCENE', '❌ API Key 未配置，跳过');
         return;
     }
 

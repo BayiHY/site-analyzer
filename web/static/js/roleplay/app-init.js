@@ -157,12 +157,7 @@ App.setupArtStyleOptions = function(detectedStyle) {
 };
 
 App.onSetupImageKeyChange = function() {
-    // 生图 key 变化时，如果灵感框有内容，重新检测画面风格
-    const storyPrompt = document.getElementById('story-prompt')?.value.trim() || '';
-    if (storyPrompt) {
-        const detectedStyle = App.detectVisualStyleFromInspiration(storyPrompt);
-        App.setupArtStyleOptions(detectedStyle);
-    }
+    // 已废弃：生图 key 不再单独配置
 };
 
 // 监听灵感输入框变化，实时更新画面风格预选（保留旧逻辑作为快速反馈，实际使用 LLM 检测）
@@ -216,9 +211,7 @@ App.resetStory = async function() {
 
 App.restoreApiKeysToInputs = function() {
     const chatInput = document.getElementById('setup-chat-key');
-    const imageInput = document.getElementById('setup-image-key');
     if (chatInput && state.apiKeys.chat) chatInput.value = state.apiKeys.chat;
-    if (imageInput && state.apiKeys.image) imageInput.value = state.apiKeys.image;
 }
 
 App.renderMessages = function() {
@@ -255,7 +248,6 @@ App.renderMessages = function() {
 
 App.saveSettings = function() {
     state.apiKeys.chat = document.getElementById('setting-chat-key').value.trim();
-    state.apiKeys.image = document.getElementById('setting-image-key').value.trim();
 
     // 保存环境旁白设置
     const narrEnabled = document.getElementById('setting-narration-enabled');
