@@ -164,7 +164,8 @@ App.generateCharactersAndStart = async function() {
         let openingStructured = null;
 
         if (state.apiKeys.chat && chars.length > 0) {
-            rpLog('info', 'IMG', `━━━ 立即生成面部特写: ${chars.length} 个角色 ━━━`);
+            // 面部特写改为后台异步生成，不阻塞序章生成
+            // 序章文本生成不依赖面部图片，两者可并行
             const faceTasks = chars.map(c => (async () => {
                 try {
                     rpLog('info', 'IMG', `📷 面部特写: ${c.name}`);
@@ -177,11 +178,10 @@ App.generateCharactersAndStart = async function() {
                     rpLog('warn', 'IMG', `${c.name} 面部特写失败: ${e.message}`);
                 }
             })());
-            await Promise.allSettled(faceTasks);
-            rpLog('info', 'IMG', '所有面部特写完成');
+            rpLog('info', 'IMG', `━━━ 面部特写已后台启动 (${chars.length} 个)，不阻塞序章生成 ━━━`);
 
             try {
-                // 第一步：生成序章
+                // 第一步：生成序章（不再等待面部特写）
                 rpLog('info', 'OPENING', '开始生成序章');
                 addSystemMessage('✍️ 正在生成序章...');
                 
@@ -403,7 +403,8 @@ App.regenerateCharacters = async function() {
         rpLog('info', 'CHARS', `regenerateCharacters 返回 chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
         if (state.apiKeys.chat && chars.length > 0) {
-            rpLog('info', 'IMG', `━━━ 立即生成面部特写: ${chars.length} 个角色 ━━━`);
+            // 面部特写改为后台异步生成，不阻塞序章生成
+            // 序章文本生成不依赖面部图片，两者可并行
             const faceTasks = chars.map(c => (async () => {
                 try {
                     rpLog('info', 'IMG', `📷 面部特写: ${c.name}`);
@@ -416,11 +417,10 @@ App.regenerateCharacters = async function() {
                     rpLog('warn', 'IMG', `${c.name} 面部特写失败: ${e.message}`);
                 }
             })());
-            await Promise.allSettled(faceTasks);
-            rpLog('info', 'IMG', '所有面部特写完成');
+            rpLog('info', 'IMG', `━━━ 面部特写已后台启动 (${chars.length} 个)，不阻塞序章生成 ━━━`);
 
             try {
-                // 第一步：生成序章
+                // 第一步：生成序章（不再等待面部特写）
                 rpLog('info', 'OPENING', '开始生成序章');
                 addSystemMessage('✍️ 正在生成序章...');
                 
