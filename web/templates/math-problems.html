@@ -10,18 +10,16 @@
         :root {
             --primary: #4f8a8b;
             --primary-dark: #3a6b6c;
-            --accent: #ffd700;
             --bg: #0f1419;
             --bg2: #1a2332;
             --bg3: #243044;
             --text: #e8eaed;
             --text-dim: #9aa0a6;
             --border: #2d3a4a;
-            --card-hover: rgba(79,138,139,0.12);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
@@ -79,16 +77,9 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .btn-primary {
-            background: var(--primary);
-            color: #fff;
-        }
+        .btn-primary { background: var(--primary); color: #fff; }
         .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
-        .btn-secondary {
-            background: var(--bg3);
-            color: var(--text);
-            border: 1px solid var(--border);
-        }
+        .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
         .btn-secondary:hover { border-color: var(--primary); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
@@ -159,7 +150,7 @@
 
     <div class="header">
         <h1>📐 三位数计算练习题生成器</h1>
-        <p>随机生成加法、减法、混合运算练习题，导出 A4 PDF 打印</p>
+        <p>随机生成加法、减法、混合运算练习题，预览后直接下载 A4 PDF 打印</p>
     </div>
 
     <!-- 配置 -->
@@ -167,16 +158,16 @@
         <h2>⚙️ 题目配置</h2>
         <div class="form-row">
             <div class="form-group">
-                <label>加法题数</label>
-                <input type="number" id="addCount" value="6" min="1" max="20">
+                <label>加法题数（每页）</label>
+                <input type="number" id="addCount" value="6" min="1" max="30">
             </div>
             <div class="form-group">
-                <label>减法题数</label>
-                <input type="number" id="subCount" value="6" min="1" max="20">
+                <label>减法题数（每页）</label>
+                <input type="number" id="subCount" value="6" min="1" max="30">
             </div>
             <div class="form-group">
-                <label>混合题数</label>
-                <input type="number" id="mixCount" value="8" min="1" max="20">
+                <label>混合题数（每页）</label>
+                <input type="number" id="mixCount" value="8" min="1" max="30">
             </div>
         </div>
         <div class="form-row">
@@ -185,10 +176,11 @@
                 <select id="pageCount">
                     <option value="1">1 页</option>
                     <option value="2" selected>2 页</option>
+                    <option value="3">3 页</option>
                 </select>
             </div>
             <div class="form-group">
-                <label>每行题数（加法/减法）</label>
+                <label>每行题数（加/减）</label>
                 <select id="addSubCols">
                     <option value="2">2 道/行</option>
                     <option value="3" selected>3 道/行</option>
@@ -214,7 +206,7 @@
         </div>
         <div class="btn-row">
             <button class="btn btn-primary" onclick="generateAndPreview()">🎲 生成预览</button>
-            <button class="btn btn-secondary" onclick="downloadPDF()">📥 下载 PDF</button>
+            <button class="btn btn-secondary" onclick="downloadPDF()" id="downloadBtn">📥 下载 PDF</button>
         </div>
         <div id="status" class="status"></div>
     </div>
@@ -229,7 +221,7 @@
 <script>
 // ===== 工具函数 =====
 function randInt(min, max) {
-    if (min >= max) return min; // 范围无效时返回最小值，避免产生非法数
+    if (min >= max) return min;
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -246,8 +238,6 @@ function shuffle(arr) {
 function genAddition(n, minN, maxN) {
     const results = [];
     for (let i = 0; i < n; i++) {
-        // a + b <= maxN，且 a,b >= minN
-        // a 最大只能到 maxN - minN
         const maxA = maxN - minN;
         const a = randInt(minN, maxA);
         const b = randInt(minN, maxN - a);
@@ -259,8 +249,6 @@ function genAddition(n, minN, maxN) {
 function genSubtraction(n, minN, maxN) {
     const results = [];
     for (let i = 0; i < n; i++) {
-        // a - b >= minN，即 b <= a - minN
-        // a 至少为 minN * 2，保证 b 有合法范围
         const minA = Math.max(minN * 2, minN + 100);
         const a = randInt(minA, maxN);
         const b = randInt(minN, a - minN);
@@ -278,7 +266,6 @@ function genMixed(n, minN, maxN) {
     }
     shuffle(patternList).slice(0, n).forEach(pattern => {
         if (pattern === '++') {
-            // a + b + c <= maxN, 每个数 >= minN
             let a, b, c;
             do {
                 a = randInt(minN, Math.floor(maxN / 3));
@@ -287,7 +274,6 @@ function genMixed(n, minN, maxN) {
             } while (c < minN || a + b + c > maxN);
             results.push({ a, b, c, op1: '+', op2: '+' });
         } else if (pattern === '--') {
-            // a - b - c >= minN
             let a, b, c;
             do {
                 a = randInt(Math.max(minN * 3, minN + 200), maxN);
@@ -297,7 +283,6 @@ function genMixed(n, minN, maxN) {
             } while (c < minN || a - b - c < minN);
             results.push({ a, b, c, op1: '-', op2: '-' });
         } else if (pattern === '+-') {
-            // a - b + c: 中间结果 a-b >= minN, 最终结果 a-b+c <= maxN
             let a, b, c, diff;
             do {
                 a = randInt(Math.max(minN * 2, minN + 100), maxN);
@@ -306,8 +291,7 @@ function genMixed(n, minN, maxN) {
                 c = randInt(minN, maxN - diff);
             } while (c < minN || diff + c > maxN);
             results.push({ a, b, c, op1: '-', op2: '+' });
-        } else { // -+
-            // a + b - c: 最终结果 a+b-c >= minN
+        } else {
             let a, b, c, sum;
             do {
                 a = randInt(minN, Math.floor(maxN / 2));
@@ -324,23 +308,6 @@ function genMixed(n, minN, maxN) {
 function fmtAdd(e) { return `${e.a} + ${e.b} =`; }
 function fmtSub(e) { return `${e.a} − ${e.b} =`; }
 function fmtMix(e) { return `${e.a} ${e.op1} ${e.b} ${e.op2} ${e.c} =`; }
-
-// ===== 验证 =====
-function verifyAll(adds, subs, mixes, label) {
-    for (const e of adds) {
-        if (e.a + e.b > 999) throw new Error(`${label} 加法超范围: ${e.a}+${e.b}`);
-    }
-    for (const e of subs) {
-        if (e.a - e.b < 0) throw new Error(`${label} 减法为负: ${e.a}-${e.b}`);
-    }
-    for (const e of mixes) {
-        const mid = e.op1 === '+' ? e.a + e.b : e.a - e.b;
-        if (mid < 0) throw new Error(`${label} 中间结果为负: ${mid}`);
-        const final = e.op2 === '+' ? mid + e.c : mid - e.c;
-        if (final < 0) throw new Error(`${label} 最终结果为负: ${final}`);
-    }
-    return true;
-}
 
 // ===== 全局状态 =====
 let currentProblems = null;
@@ -362,7 +329,6 @@ function generateAll() {
     const subs = genSubtraction(totalSubs, minN, maxN);
     const mixes = genMixed(totalMixes, minN, maxN);
 
-    // 按页分配
     const pages = [];
     for (let p = 0; p < perPage; p++) {
         pages.push({
@@ -402,6 +368,8 @@ function renderPreview(pages) {
     });
 
     container.classList.add('visible');
+}
+
 // ===== 生成并预览 =====
 async function generateAndPreview() {
     const status = document.getElementById('status');
@@ -418,21 +386,24 @@ async function generateAndPreview() {
 // ===== 下载 PDF =====
 async function downloadPDF() {
     const status = document.getElementById('status');
+    const downloadBtn = document.getElementById('downloadBtn');
+
     if (!currentProblems || currentProblems.length === 0) {
         showStatus(status, 'error', '⚠️ 请先生成预览');
         return;
     }
 
     try {
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = '⏳ 生成中...';
+
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
         const PAGE_W = 210;
-        const PAGE_H = 297;
         const MARGIN_L = 15;
         const MARGIN_R = 15;
         const MARGIN_T = 20;
-        const MARGIN_B = 15;
         const FONT_SIZE = 14;
         const usableW = PAGE_W - MARGIN_L - MARGIN_R;
 
@@ -445,7 +416,6 @@ async function downloadPDF() {
             doc.setFontSize(18);
             doc.text(`第 ${idx + 1} 页 · 三位数计算练习`, PAGE_W / 2, y, { align: 'center' });
             y += 12;
-            // 分割线
             doc.setLineWidth(0.5);
             doc.line(MARGIN_L, y, PAGE_W - MARGIN_R, y);
             y += 10;
@@ -467,6 +437,9 @@ async function downloadPDF() {
         showStatus(status, 'success', `✅ PDF 已下载: ${filename}`);
     } catch (e) {
         showStatus(status, 'error', `❌ PDF 生成失败: ${e.message}`);
+    } finally {
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = '📥 下载 PDF';
     }
 }
 
