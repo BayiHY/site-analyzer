@@ -93,6 +93,9 @@
         <button class="btn btn-primary" id="btn-create" type="button" onclick="App.createCharacter()">
             开始冒险
         </button>
+        <button class="btn btn-outline" id="btn-import-archive" type="button" onclick="App.importArchive()" style="margin-top:8px;">
+            📂 导入存档
+        </button>
     </div>
 </div>
 
@@ -145,6 +148,18 @@
 
 <!-- 页内日志面板 — 内容由 logger.js renderLogPanel() 动态渲染 -->
 <div id="rp-log-panel" style="display:none;"></div>
+
+<!-- ===== 导入存档确认弹窗 ===== -->
+<div class="import-modal-overlay" id="import-modal" style="display:none;">
+    <div class="import-modal-box">
+        <h3 id="import-modal-title"></h3>
+        <p id="import-modal-desc"></p>
+        <div class="import-modal-actions">
+            <button class="btn btn-primary" id="import-btn-continue" onclick="App.importArchiveChoice('continue')">继续故事</button>
+            <button class="btn btn-outline" id="import-btn-prologue" onclick="App.importArchiveChoice('prologue')">从序章开始</button>
+        </div>
+    </div>
+</div>
 
 
 
