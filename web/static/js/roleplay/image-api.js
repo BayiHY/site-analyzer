@@ -1,4 +1,78 @@
 // === Section: 图片 API 封装 ===
+// === 生图失败类型分类 ===
+// 根据 API 响应判断失败原因，用于前端消息展示
+App.classifyImageError = function(statusCode, errorMessage) {
+    const msg = (errorMessage || '').toLowerCase();
+    
+    // 超时 (AbortSignal.timeout)
+    if (msg.includes('abort') || msg.includes('timed out') || msg.includes('network_error') || msg.includes('failed to fetch')) {
+        return {
+            type: 'timeout',
+            emoji: '⏱️',
+            title: '生图超时',
+            detail: '请求超过 120 秒未响应，可能是服务器繁忙或网络问题。请重试。'
+        };
+    }
+    
+    // 400 内容审核拦截
+    if (statusCode === 400 && (msg.includes('content policy') || msg.includes('unable to generate') || msg.includes('safety') || msg.includes('filtered'))) {
+        return {
+            type: 'policy',
+            emoji: '🚫',
+            title: '触发内容审核',
+            detail: '提示词中包含被审核系统拦截的内容，请尝试修改场景描述后重试。'
+        };
+    }
+    
+    // 400 其他客户端错误
+    if (statusCode === 400) {
+        return {
+            type: 'client_error',
+            emoji: '❌',
+            title: '生图参数错误',
+            detail: '提示词格式不符合要求，请检查后重试。'
+        };
+    }
+    
+    // 429 限流
+    if (statusCode === 429 || msg.includes('rate limit') || msg.includes('too many requests')) {
+        return {
+            type: 'rate_limit',
+            emoji: '🐌',
+            title: '请求过于频繁',
+            detail: 'API 限流中，请稍后再试。'
+        };
+    }
+    
+    // 503 + queue full / service busy — 排队中
+    if ((msg.includes('queue is full') || msg.includes('retry later') || msg.includes('service busy')) && statusCode === 503) {
+        return {
+            type: 'queue_full',
+            emoji: '📋',
+            title: '生图队列已满',
+            detail: '当前排队人数较多，请稍后再试。建议等待 1-2 分钟后重试。'
+        };
+    }
+    
+    // 5xx 服务端错误
+    if (statusCode >= 500) {
+        return {
+            type: 'server_error',
+            emoji: '⚠️',
+            title: '服务器错误',
+            detail: '生图服务暂时不可用，请稍后重试。'
+        };
+    }
+    
+    // 默认未知错误
+    return {
+        type: 'unknown',
+        emoji: '❓',
+        title: '生图失败',
+        detail: `错误信息: ${errorMessage || '未知原因'}`
+    };
+};
+
 // 生图 API 调用 + prompt 清洗 + 风格后缀 + 模块化三级降级
 
 // 艺术风格后缀映射（27 个细分关键词，4 大板块，无歧义无重叠）
@@ -484,14 +558,23 @@ App.agnesImageGenerate = async function(options) {
 
             if (!resp.ok) {
                 let errMsg = `生图错误 (${resp.status})`;
+                let errorDetail = null;
                 try {
                     const errData = await resp.json();
                     errMsg = errData.error?.message || errData.message || errMsg;
+                    errorDetail = { statusCode: resp.status, message: errMsg };
                 } catch(e) {
                     errMsg = `生图错误 (${resp.status}): ${await resp.text()}`;
+                    errorDetail = { statusCode: resp.status, message: errMsg };
                 }
                 rpLog('warn', 'IMG', `${label} 失败 (${currentModel}): ${errMsg}`);
-                lastError = new Error(errMsg);
+                const classified = App.classifyImageError(resp.status, errMsg);
+                rpLog('info', 'IMG', `  失败类型: ${classified.type} - ${classified.title}`);
+                lastError = Object.assign(new Error(`${classified.emoji} ${classified.title}: ${classified.detail}`), {
+                    _errorClassified: true,
+                    _errorType: classified.type,
+                    _errorDetail: errorDetail
+                });
                 continue; // 尝试降级模型
             }
 
@@ -509,13 +592,21 @@ App.agnesImageGenerate = async function(options) {
         } catch (err) {
             // 超时或其他网络错误
             rpLog('warn', 'IMG', `${label} 异常 (${currentModel}): ${err.message}`);
-            lastError = err;
+            const classified = App.classifyImageError(0, err.message);
+            rpLog('info', 'IMG', `  失败类型: ${classified.type} - ${classified.title}`);
+            lastError = Object.assign(new Error(`${classified.emoji} ${classified.title}: ${classified.detail}`), {
+                _errorClassified: true,
+                _errorType: classified.type
+            });
             continue; // 尝试降级模型
         }
     }
 
     // 所有模型都失败了
     rpLog('error', 'IMG', `❌ ${label} 全部失败: ${lastError?.message}`);
+    if (lastError && lastError._errorType) {
+        rpLog('error', 'IMG', `  最终失败类型: ${lastError._errorType}`);
+    }
     throw lastError;
 };
 

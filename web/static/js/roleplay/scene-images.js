@@ -17,58 +17,173 @@ App.isSceneChanged = function(charName, sceneDesc) {
     return lastEntry.sceneDesc !== sceneDesc;
 }
 
-// === 场景 → 生图 prompt ===
-// 只包含：环境 + 角色形象 + 角色动作，去除对话、世界观等冗余内容
-App.sceneToImagePrompt = function(sceneDesc, character, worldview, allCharacters, replyText) {
-    // 1. 环境描述：从 sceneDesc 中提取纯环境部分，去掉引号内的对话
-    let envDesc = sceneDesc
-        .replace(/[""”“]/g, '')           // 去掉引号
-        .trim();
-    let base = `Cinematic scene illustration: ${envDesc}.`;
-
-    // 2. 当前角色：名字 + 外貌 + 动作
-    if (character) {
-        let charDesc = `${character.name} is present in the scene`;
-        if (character.appearance) {
-            charDesc += `, ${character.appearance}`;
+// === 场景 → 生图 prompt (LLM 智能体模式) ===
+// 输入中文场景描述+角色信息，输出符合 Agnes AI 要求的英文 prompt
+App.buildSceneImagePrompt = async function(sceneDesc, character, worldview, allCharacters, replyText) {
+    // 1. 准备结构化输入数据
+    const inputParts = [];
+    
+    // 环境描述
+    if (sceneDesc) {
+        let envClean = sceneDesc
+            .replace(/["""""]'/g, '')
+            .replace(/\([^)]*\)/g, '')
+            .trim();
+        if (envClean) {
+            inputParts.push(`场景环境: ${envClean}`);
         }
-        // 从 replyText 解析动作
-        let charAction = '';
-        if (replyText && typeof replyText === 'string') {
-            const cleaned = replyText.replace(/\{[^}]+\}/, '').replace(/<[^>]+>$/, '').trim();
-            const actionPattern = new RegExp(`${character.name}[^\\s|:：]{0,10}[:：]\\(([^)]+)\\)`);
-            const am = cleaned.match(actionPattern);
-            if (am) charAction = am[1];
-        }
-        if (charAction) {
-            charDesc += `, doing: ${charAction}`;
-        }
-        base += '.' + charDesc;
     }
-
-    // 3. 其他在场角色：名字 + 外貌（明确标注谁是谁，保持角色一致性）
+    
+    // 当前角色信息
+    if (character) {
+        let charInfo = `当前角色: ${character.name}`;
+        if (character.appearance) charInfo += `, 外貌: ${character.appearance}`;
+        if (character.gender) charInfo += `, 性别: ${character.gender}`;
+        inputParts.push(charInfo);
+    }
+    
+    // 从 replyText 解析动作
+    if (replyText && character) {
+        const cleaned = replyText.replace(/\{[^}]+\}/, '').replace(/<[^>]+>$/, '').trim();
+        const actionPattern = new RegExp(`${character.name}[^\\s|:：]{0,10}[:：]\\(([^)]+)\\)`);
+        const am = cleaned.match(actionPattern);
+        if (am && am[1]) {
+            inputParts.push(`当前角色动作: ${am[1]}`);
+        }
+    }
+    
+    // 其他在场角色
     if (allCharacters && allCharacters.length > 1) {
         const others = allCharacters.filter(c => c.name !== character?.name);
         if (others.length > 0) {
-            // 多角色时明确标注：图一、图二、图三
-            const otherDescs = others.map((c, index) => {
-                let desc = `${index + 1}. ${c.name}`;
-                if (c.appearance) desc += `, ${c.appearance}`;
-                return desc;
-            }).join(', ');
-            base += ` Characters in scene: ${otherDescs}.`;
-            rpLog('info', 'SCENE', `📝 多角色场景: ${otherDescs}`);
+            const otherInfos = others.map((c, i) => {
+                let info = `${i + 1}. ${c.name}`;
+                if (c.appearance) info += `, 外貌: ${c.appearance}`;
+                return info;
+            });
+            inputParts.push(`其他在场角色: ${otherInfos.join('；')}`);
         }
     }
-
-    // 4. 背景约束
-    base += ' Background: empty or blurred, NO other people clearly visible.';
-    base += '. High quality, detailed lighting, atmospheric.';
-    const finalPrompt = App.appendArtStyle(base);
     
-    rpLog('info', 'SCENE', `📝 场景图 Prompt (${finalPrompt.length}字): ${finalPrompt}`);
-    return finalPrompt;
-}
+    // 世界观氛围
+    if (worldview) {
+        inputParts.push(`世界观氛围: ${worldview}`);
+    }
+    
+    const sceneInput = inputParts.join('\n');
+    
+    // 2. 构建提示词生成系统提示词
+    const systemPrompt = `你是一个专业的 AI 绘图 prompt 工程师。你的任务是将中文场景描述转换为适合 Agnes AI 图像生成模型的英文 prompt。
+
+## 核心规则
+1. **必须输出纯英文**，不要包含任何中文
+2. **必须包含**：场景环境、角色外貌特征、角色动作/姿态
+3. **必须包含**：画面风格（根据世界观推断）、光影氛围、构图
+4. **必须添加**质量约束词：high quality, detailed lighting, cinematic composition, atmospheric
+5. **必须添加**背景约束：Background should be clean or blurred, focus on main characters
+6. **必须添加**审核安全词：modest clothing, tasteful composition, non-explicit content
+7. **禁止**：完全裸露描述、过度暴露的衣物、性暗示词汇
+8. **必须**包含服装描述（至少 casual clothing 或 appropriate attire）
+9. 长度控制在 150-300 个英文单词之间
+10. 使用逗号分隔的短语格式，不是完整句子
+
+## 输出格式
+只输出一个完整的英文 prompt 字符串，不要加引号、不要解释、不要 markdown 格式。
+
+## 示例输出
+A cyberpunk underground city with neon signs reflecting off wet pavement, sulfur smell in the air, massive holographic billboards flickering above. A young man with silver messy hair stands at an abandoned subway entrance, his left eye glowing red from a cybernetic implant, neural interface scars visible on his face, thin but tall build, wearing a worn leather jacket over dark clothes, looking up at the holographic displays with a thoughtful expression. Cinematic low-angle shot, moody blue and orange lighting, rain-soaked atmosphere, shallow depth of field focusing on the character. High quality, detailed lighting, cinematic composition, atmospheric. Background blurred, focus on main character. Modest clothing, tasteful composition.
+
+现在请转换以下场景：`;
+
+    // 3. 调用 LLM
+    try {
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: sceneInput }
+        ];
+        
+        rpLog('info', 'SCENE', `🤖 调用提示词生成智能体...`);
+        rpLog('debug', 'SCENE', `输入数据: ${sceneInput.slice(0, 200)}...`);
+        
+        const rawPrompt = await App.agnesChat(messages, { route: 'default', temperature: 0.3 });
+        
+        // 清洗：去掉可能的 markdown 和多余空白
+        let cleanedPrompt = rawPrompt
+            .replace(/^```[\s\S]*?\n/, '')
+            .replace(/```$/, '')
+            .replace(/^["']|["']$/g, '')
+            .trim();
+        
+        // 追加风格后缀
+        const finalPrompt = App.appendArtStyle(cleanedPrompt);
+        
+        rpLog('info', 'SCENE', `✅ 提示词生成成功 (${finalPrompt.length}字)`);
+        rpLog('debug', 'SCENE', `生成 prompt: ${finalPrompt.slice(0, 200)}...`);
+        
+        return finalPrompt;
+        
+    } catch (err) {
+        rpLog('warn', 'SCENE', `⚠️ 提示词生成智能体失败: ${err.message}，使用降级方案`);
+        // 降级：直接拼接英文模板
+        return App._fallbackScenePrompt(sceneDesc, character, allCharacters, replyText);
+    }
+};
+
+// 降级方案：纯字符串拼接（当 LLM 不可用时）
+App._fallbackScenePrompt = function(sceneDesc, character, allCharacters, replyText) {
+    // 简单的 ASCII 过滤（保留基础标点）
+    function keepAscii(text) {
+        if (!text) return '';
+        return text.split('').filter(c => c.charCodeAt(0) < 128).join('');
+    }
+    
+    let base = 'Cinematic scene illustration.';
+    
+    if (sceneDesc) {
+        let env = keepAscii(sceneDesc.replace(/["""""]'/g, '').replace(/\([^)]*\)/g, ''));
+        if (env.length > 10) {
+            base += ` ${env}.`;
+        }
+    }
+    
+    if (character) {
+        let name = keepAscii(character.name || 'character');
+        let charDesc = `${name} is present in the scene`;
+        let appearance = keepAscii(character.appearance || '');
+        if (appearance) charDesc += `, ${appearance}`;
+        else charDesc += ', wearing casual clothing';
+        
+        if (replyText) {
+            const cleaned = replyText.replace(/\{[^}]+\}/, '').replace(/<[^>]+>$/, '').trim();
+            const actionPattern = new RegExp(`${keepAscii(character.name)}[^\\s|:：]{0,10}[:：]\\(([^)]+)\\)`);
+            const am = cleaned.match(actionPattern);
+            if (am && am[1]) {
+                charDesc += `, doing: ${keepAscii(am[1])}`;
+            }
+        }
+        base += '.' + charDesc;
+    }
+    
+    if (allCharacters && allCharacters.length > 1) {
+        const others = allCharacters.filter(c => c.name !== character?.name);
+        if (others.length > 0) {
+            const otherDescs = others.map((c, i) => {
+                let desc = `${i + 1}. ${keepAscii(c.name || 'character')}`;
+                let app = keepAscii(c.appearance || '');
+                if (app) desc += `, ${app}`;
+                else desc += ', wearing casual clothing';
+                return desc;
+            }).filter(d => d.length > 5);
+            if (otherDescs.length > 0) {
+                base += ` Characters in scene: ${otherDescs.join(', ')}.`;
+            }
+        }
+    }
+    
+    base += ' Background: empty or blurred, NO other people clearly visible. High quality, detailed lighting, atmospheric. Modest clothing, tasteful composition, non-explicit content.';
+    
+    return App.appendArtStyle(base);
+};
 
 // === 获取场景中出现的所有角色（参考图） ===
 // 优先使用结构化元数据中的 presentCharacters，fallback 到正则解析
@@ -267,8 +382,9 @@ App.generateInitialSceneImage = async function(openingScene, replyText, metadata
     const worldview = state.story?.worldview || '';
     rpLog('info', 'SCENE', `活跃角色: ${activeChar?.name || '无'}, 角色数: ${state.characters?.length || 0}`);
 
-    const prompt = App.sceneToImagePrompt(openingScene, activeChar, worldview, state.characters, replyText);
-    rpLog('info', 'SCENE', `场景提示词长度: ${prompt?.length || 0}`);
+    // 调用 LLM 智能体生成英文 prompt（异步）
+    const prompt = await App.buildSceneImagePrompt(openingScene, activeChar, worldview, state.characters, replyText);
+    rpLog('info', 'SCENE', `✅ 提示词生成完成 (${prompt?.length || 0}字)`);
 
     try {
         rpLog('info', 'SCENE', '=== 初始场景图生成开始 ===');
@@ -335,8 +451,9 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText,
     }
 
     try {
-        const prompt = App.sceneToImagePrompt(sceneDesc, charObj, state.story?.worldview || '', state.characters, replyText);
-        rpLog('info', 'SCENE', `场景提示词长度: ${prompt?.length || 0}`);
+        // 调用 LLM 智能体生成英文 prompt（异步）
+        const prompt = await App.buildSceneImagePrompt(sceneDesc, charObj, state.story?.worldview || '', state.characters, replyText);
+        rpLog('info', 'SCENE', `✅ 提示词生成完成 (${prompt?.length || 0}字)`);
 
         rpLog('info', 'SCENE', '=== 场景图生成开始 ===');
         rpLog('info', 'SCENE', `角色: ${charName}`);
