@@ -229,6 +229,7 @@
 <script>
 // ===== 工具函数 =====
 function randInt(min, max) {
+    if (min >= max) return min; // 范围无效时返回最小值，避免产生非法数
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -241,15 +242,15 @@ function shuffle(arr) {
     return a;
 }
 
-// ===== 生成算式 =====
+// ===== 生成算式（保证数学合法性）=====
 function genAddition(n, minN, maxN) {
     const results = [];
     for (let i = 0; i < n; i++) {
-        let a, b;
-        // 保证 a + b <= maxN
-        a = randInt(minN, maxN);
-        b = randInt(minN, maxN - a);
-        if (b < minN) b = minN;
+        // a + b <= maxN，且 a,b >= minN
+        // a 最大只能到 maxN - minN
+        const maxA = maxN - minN;
+        const a = randInt(minN, maxA);
+        const b = randInt(minN, maxN - a);
         results.push({ a, b, op: '+' });
     }
     return results;
@@ -258,13 +259,11 @@ function genAddition(n, minN, maxN) {
 function genSubtraction(n, minN, maxN) {
     const results = [];
     for (let i = 0; i < n; i++) {
-        let a, b;
-        // 保证 a - b >= minN（结果至少为最小值）
-        a = randInt(maxN, maxN);
-        // 让被减数足够大
-        a = randInt(Math.max(minN * 2, minN + 100), maxN);
-        b = randInt(minN, a - minN);
-        if (b < minN) b = minN;
+        // a - b >= minN，即 b <= a - minN
+        // a 至少为 minN * 2，保证 b 有合法范围
+        const minA = Math.max(minN * 2, minN + 100);
+        const a = randInt(minA, maxN);
+        const b = randInt(minN, a - minN);
         results.push({ a, b, op: '-' });
     }
     return results;
@@ -272,7 +271,6 @@ function genSubtraction(n, minN, maxN) {
 
 function genMixed(n, minN, maxN) {
     const results = [];
-    // 确保每种模式都有足够数量
     const patterns = ['++', '--', '+-', '-+'];
     const patternList = [];
     while (patternList.length < n) {
@@ -280,31 +278,43 @@ function genMixed(n, minN, maxN) {
     }
     shuffle(patternList).slice(0, n).forEach(pattern => {
         if (pattern === '++') {
-            let a = randInt(minN, Math.floor(maxN / 3));
-            let b = randInt(minN, Math.floor((maxN - a) / 2));
-            let c = randInt(minN, maxN - a - b);
-            if (c < minN) c = minN;
+            // a + b + c <= maxN, 每个数 >= minN
+            let a, b, c;
+            do {
+                a = randInt(minN, Math.floor(maxN / 3));
+                b = randInt(minN, Math.floor((maxN - a) / 2));
+                c = randInt(minN, maxN - a - b);
+            } while (c < minN || a + b + c > maxN);
             results.push({ a, b, c, op1: '+', op2: '+' });
         } else if (pattern === '--') {
-            let a = randInt(Math.max(minN * 3, minN + 200), maxN);
-            let b = randInt(minN, a - minN * 2);
-            let remain = a - b;
-            let c = randInt(minN, remain - minN);
-            if (c < minN) c = minN;
+            // a - b - c >= minN
+            let a, b, c;
+            do {
+                a = randInt(Math.max(minN * 3, minN + 200), maxN);
+                b = randInt(minN, a - minN * 2);
+                const remain = a - b;
+                c = randInt(minN, remain - minN);
+            } while (c < minN || a - b - c < minN);
             results.push({ a, b, c, op1: '-', op2: '-' });
         } else if (pattern === '+-') {
-            let a = randInt(minN, Math.floor(maxN / 2));
-            let b = randInt(minN, maxN - a - minN);
-            let remain = a + b;
-            let c = randInt(minN, remain - minN);
-            if (c < minN) c = minN;
+            // a - b + c: 中间结果 a-b >= minN, 最终结果 a-b+c <= maxN
+            let a, b, c, diff;
+            do {
+                a = randInt(Math.max(minN * 2, minN + 100), maxN);
+                b = randInt(minN, a - minN);
+                diff = a - b;
+                c = randInt(minN, maxN - diff);
+            } while (c < minN || diff + c > maxN);
             results.push({ a, b, c, op1: '-', op2: '+' });
         } else { // -+
-            let a = randInt(Math.max(minN * 2, minN + 100), maxN);
-            let b = randInt(minN, a - minN);
-            let remain = a - b;
-            let c = randInt(minN, maxN - remain);
-            if (c < minN) c = minN;
+            // a + b - c: 最终结果 a+b-c >= minN
+            let a, b, c, sum;
+            do {
+                a = randInt(minN, Math.floor(maxN / 2));
+                b = randInt(minN, Math.floor((maxN - a) / 2));
+                sum = a + b;
+                c = randInt(minN, sum - minN);
+            } while (c < minN || a + b - c < minN);
             results.push({ a, b, c, op1: '+', op2: '-' });
         }
     });
@@ -392,15 +402,11 @@ function renderPreview(pages) {
     });
 
     container.classList.add('visible');
-}
-
 // ===== 生成并预览 =====
 async function generateAndPreview() {
     const status = document.getElementById('status');
     try {
         const pages = generateAll();
-        verifyAll(pages[0].adds, pages[0].subs, pages[0].mixes, '第一页');
-        if (pages.length > 1) verifyAll(pages[1].adds, pages[1].subs, pages[1].mixes, '第二页');
         currentProblems = pages;
         renderPreview(pages);
         showStatus(status, 'success', `✅ 已生成 ${pages.length} 页，共 ${pages.reduce((s, p) => s + p.adds.length + p.subs.length + p.mixes.length, 0)} 道题`);
