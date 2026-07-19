@@ -6,6 +6,7 @@
     <title>三位数计算练习题生成器</title>
     <link rel="canonical" href="https://www.bayihy.cn/tools/math-problems">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
             --primary: #4f8a8b;
@@ -383,7 +384,7 @@ async function generateAndPreview() {
     }
 }
 
-// ===== 下载 PDF =====
+// ===== 下载 PDF（用 html2canvas 截图渲染后的预览，解决 jsPDF 不支持中文的问题）=====
 async function downloadPDF() {
     const status = document.getElementById('status');
     const downloadBtn = document.getElementById('downloadBtn');
@@ -395,42 +396,57 @@ async function downloadPDF() {
 
     try {
         downloadBtn.disabled = true;
-        downloadBtn.textContent = '⏳ 生成中...';
+        downloadBtn.textContent = '⏳ 生成 PDF 中...';
+
+        // 创建临时打印容器
+        const printContainer = document.createElement('div');
+        printContainer.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#fff;color:#000;font-family:"Times New Roman",serif;padding:20px;';
+        document.body.appendChild(printContainer);
 
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        const doc = new jsPDF({ orientation: 'p', unit: 'px', format: [794, 1123] }); // A4 @ 96dpi
 
-        const PAGE_W = 210;
-        const MARGIN_L = 15;
-        const MARGIN_R = 15;
-        const MARGIN_T = 20;
-        const FONT_SIZE = 14;
-        const usableW = PAGE_W - MARGIN_L - MARGIN_R;
+        const pages = currentProblems;
+        for (let idx = 0; idx < pages.length; idx++) {
+            if (idx > 0) doc.addPage([794, 1123]);
 
-        currentProblems.forEach((page, idx) => {
-            if (idx > 0) doc.addPage();
+            const pageDiv = document.createElement('div');
+            pageDiv.style.cssText = 'width:794px;padding:60px 80px 60px 80px;box-sizing:border-box;';
+            pageDiv.innerHTML = `
+                <div style="text-align:center;font-size:24px;font-weight:bold;margin-bottom:20px;padding-bottom:10px;border-bottom:3px solid #000;">第 ${idx + 1} 页 · 三位数计算练习</div>
+                <div style="text-align:center;font-size:18px;font-weight:bold;margin-top:20px;margin-bottom:10px;">一、加法</div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">${pages[idx].adds.map(fmtAdd).map(s => `<div style="text-align:center;font-size:20px;padding:6px 0;letter-spacing:2px;">${s}</div>`).join('')}</div>
+                <div style="text-align:center;font-size:18px;font-weight:bold;margin-top:30px;margin-bottom:10px;">二、减法</div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">${pages[idx].subs.map(fmtSub).map(s => `<div style="text-align:center;font-size:20px;padding:6px 0;letter-spacing:2px;">${s}</div>`).join('')}</div>
+                <div style="text-align:center;font-size:18px;font-weight:bold;margin-top:30px;margin-bottom:10px;">三、混合运算</div>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;">${pages[idx].mixes.map(fmtMix).map(s => `<div style="text-align:center;font-size:20px;padding:6px 0;letter-spacing:2px;">${s}</div>`).join('')}</div>
+            `;
+            printContainer.appendChild(pageDiv);
+        }
 
-            let y = MARGIN_T;
+        // 等待字体加载后截图
+        await document.fonts.ready;
+        await new Promise(r => setTimeout(r, 300));
 
-            // 标题
-            doc.setFontSize(18);
-            doc.text(`第 ${idx + 1} 页 · 三位数计算练习`, PAGE_W / 2, y, { align: 'center' });
-            y += 12;
-            doc.setLineWidth(0.5);
-            doc.line(MARGIN_L, y, PAGE_W - MARGIN_R, y);
-            y += 10;
+        for (let idx = 0; idx < pages.length; idx++) {
+            const pageDiv = printContainer.children[idx + 1];
+            const canvas = await html2canvas(pageDiv, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                width: 794,
+                height: 1123,
+                windowWidth: 794,
+                windowHeight: 1123,
+            });
 
-            // 加法
-            y = drawSection(doc, y, '一、加法', page.adds, 3, FONT_SIZE, usableW, MARGIN_L, fmtAdd, 3);
-            y += 6;
+            const imgData = canvas.toDataURL('image/png');
+            const pageW = doc.internal.pageSize.getWidth();
+            const pageH = doc.internal.pageSize.getHeight();
+            doc.addImage(imgData, 'PNG', 0, 0, pageW, pageH);
+        }
 
-            // 减法
-            y = drawSection(doc, y, '二、减法', page.subs, 3, FONT_SIZE, usableW, MARGIN_L, fmtSub, 3);
-            y += 6;
-
-            // 混合
-            y = drawSection(doc, y, '三、混合运算', page.mixes, 2, FONT_SIZE, usableW, MARGIN_L, fmtMix, 6);
-        });
+        document.body.removeChild(printContainer);
 
         const filename = `三位数计算练习题_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.pdf`;
         doc.save(filename);
@@ -441,31 +457,6 @@ async function downloadPDF() {
         downloadBtn.disabled = false;
         downloadBtn.textContent = '📥 下载 PDF';
     }
-}
-
-function drawSection(doc, y, title, problems, cols, fontSize, usableW, marginL, formatter, lineMultiplier) {
-    doc.setFontSize(fontSize + 2);
-    doc.text(title, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' });
-    y += 8;
-
-    doc.setFontSize(fontSize);
-    const colWidth = usableW / cols;
-    const lineH = fontSize * 1.5;
-    const sectionLineH = lineH * lineMultiplier;
-
-    problems.forEach((expr, i) => {
-        const text = formatter(expr);
-        const row = Math.floor(i / cols);
-        const col = i % cols;
-        const x = marginL + col * colWidth;
-        const textWidth = doc.getTextWidth(text);
-        const centerX = x + (colWidth - textWidth) / 2;
-        doc.text(text, centerX, y);
-    });
-
-    const rows = Math.ceil(problems.length / cols);
-    y += sectionLineH * rows;
-    return y;
 }
 
 function showStatus(el, type, msg) {
