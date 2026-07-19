@@ -370,17 +370,13 @@ function renderPreview(pages) {
         const div = document.createElement('div');
         div.className = 'preview-page';
         div.innerHTML = `
-            <div class="preview-page-header">Math Problems - Page ${idx + 1}</div>
-            <div class="preview-section-title">Addition</div>
             <div class="preview-problems cols-3">
                 ${page.adds.map(fmtAdd).map(s => `<div class="preview-problem">${s}</div>`).join('')}
             </div>
-            <div class="preview-section-title" style="margin-top:16px;">Subtraction</div>
-            <div class="preview-problems cols-3">
+            <div class="preview-problems cols-3" style="margin-top:24px;">
                 ${page.subs.map(fmtSub).map(s => `<div class="preview-problem">${s}</div>`).join('')}
             </div>
-            <div class="preview-section-title" style="margin-top:16px;">Mixed Operations</div>
-            <div class="preview-problems cols-2">
+            <div class="preview-problems cols-2" style="margin-top:24px;">
                 ${page.mixes.map(fmtMix).map(s => `<div class="preview-problem">${s}</div>`).join('')}
             </div>
         `;
