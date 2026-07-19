@@ -728,6 +728,10 @@ App.computeFinalParams = function(character, msg) {
 }
 
 // ===== 生成语音（带情绪参数）=====
+// 重试机制：HTTP 502/503/504 或网络错误自动重试最多 3 次，指数退避
+const TTS_MAX_RETRIES = 3;
+const TTS_RETRY_BASE_DELAY = 1000; // ms
+
 App.generateTTS = async function(text, voice, rate='+0%', volume='+0%', pitch='+0Hz') {
     if (!text || !voice) return null;
 
@@ -751,44 +755,62 @@ App.generateTTS = async function(text, voice, rate='+0%', volume='+0%', pitch='+
         rpLog('info', 'TTS', `Cache API 读取失败: ${e.message}`);
     }
 
-    // 2. 调后端生成
+    // 2. 调后端生成（带重试）
     rpLog('info', 'TTS', `GEN text="${text.substring(0, 30)}..." voice=${voice} pitch=${pitch} rate=${rate} vol=${volume}`);
-    try {
-        const resp = await fetch('/api/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, voice, rate, volume, pitch })
-        });
-
-        if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
-            throw new Error(err.error || `HTTP ${resp.status}`);
-        }
-
-        const arrayBuffer = await resp.arrayBuffer();
-        rpLog('info', 'TTS', `FETCH resp ok=${resp.ok} status=${resp.status} arrayBuffer.byteLength=${arrayBuffer.byteLength}`);
-        
-        // 存入 Cache API（存原始 ArrayBuffer）
+    for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
         try {
-            const cache = await App.getTtsCache();
-            const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-            await cache.put(cacheKey, new Response(blob, {
-                headers: { 'Content-Type': 'audio/mpeg' }
-            }));
-            rpLog('info', 'TTS', `已缓存: ${text.substring(0, 30)}...`);
-        } catch (e) {
-            rpLog('info', 'TTS', `缓存写入失败: ${e.message}`);
-        }
+            const resp = await fetch('/api/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, voice, rate, volume, pitch })
+            });
 
-        return {
-            type: 'arraybuffer',
-            data: arrayBuffer,
-            mimeType: 'audio/mpeg'
-        };
-    } catch (e) {
-        rpLog('info', 'TTS', `生成失败: ${e.message}`);
-        return null;
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                const errMsg = err.error || `HTTP ${resp.status}`;
+                // 5xx 服务端错误可重试
+                if (resp.status >= 500 && attempt < TTS_MAX_RETRIES) {
+                    const delay = TTS_RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
+                    rpLog('warn', 'TTS', `生成失败 (${errMsg})，${delay}ms 后重试 (${attempt}/${TTS_MAX_RETRIES})`);
+                    await new Promise(r => setTimeout(r, delay));
+                    continue;
+                }
+                throw new Error(errMsg);
+            }
+
+            const arrayBuffer = await resp.arrayBuffer();
+            rpLog('info', 'TTS', `FETCH resp ok=${resp.ok} status=${resp.status} arrayBuffer.byteLength=${arrayBuffer.byteLength}`);
+            
+            // 存入 Cache API（存原始 ArrayBuffer）
+            try {
+                const cache = await App.getTtsCache();
+                const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+                await cache.put(cacheKey, new Response(blob, {
+                    headers: { 'Content-Type': 'audio/mpeg' }
+                }));
+                rpLog('info', 'TTS', `已缓存: ${text.substring(0, 30)}...`);
+            } catch (e) {
+                rpLog('info', 'TTS', `缓存写入失败: ${e.message}`);
+            }
+
+            return {
+                type: 'arraybuffer',
+                data: arrayBuffer,
+                mimeType: 'audio/mpeg'
+            };
+        } catch (e) {
+            // 网络错误（超时、DNS 等）也可重试
+            if (attempt < TTS_MAX_RETRIES) {
+                const delay = TTS_RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
+                rpLog('warn', 'TTS', `生成异常 (${e.message})，${delay}ms 后重试 (${attempt}/${TTS_MAX_RETRIES})`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            rpLog('info', 'TTS', `生成失败: ${e.message}`);
+            return null;
+        }
     }
+    return null;
 }
 
 // ===== 为角色消息自动匹配音色 =====
@@ -842,42 +864,58 @@ App.generateNarrationTTS = async function(text) {
         rpLog('info', 'TTS', `旁白 Cache API 读取失败: ${e.message}`);
     }
 
-    // 2. 调后端生成
+    // 2. 调后端生成（带重试）
     rpLog('info', 'TTS', `旁白生成 text="${text.substring(0, 30)}..." voice=${NARRATION_VOICE} rate=${rate}`);
-    try {
-        const resp = await fetch('/api/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, voice: NARRATION_VOICE, rate, volume, pitch })
-        });
-
-        if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
-            throw new Error(err.error || `HTTP ${resp.status}`);
-        }
-
-        const arrayBuffer = await resp.arrayBuffer();
-
-        // 存入 Cache API
+    for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
         try {
-            const cache = await App.getTtsCache();
-            const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-            await cache.put(cacheKey, new Response(blob, {
-                headers: { 'Content-Type': 'audio/mpeg' }
-            }));
-        } catch (e) {
-            rpLog('info', 'TTS', `旁白缓存写入失败: ${e.message}`);
-        }
+            const resp = await fetch('/api/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, voice: NARRATION_VOICE, rate, volume, pitch })
+            });
 
-        return {
-            type: 'arraybuffer',
-            data: arrayBuffer,
-            mimeType: 'audio/mpeg'
-        };
-    } catch (e) {
-        rpLog('info', 'TTS', `旁白生成失败: ${e.message}`);
-        return null;
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                const errMsg = err.error || `HTTP ${resp.status}`;
+                if (resp.status >= 500 && attempt < TTS_MAX_RETRIES) {
+                    const delay = TTS_RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
+                    rpLog('warn', 'TTS', `旁白生成失败 (${errMsg})，${delay}ms 后重试 (${attempt}/${TTS_MAX_RETRIES})`);
+                    await new Promise(r => setTimeout(r, delay));
+                    continue;
+                }
+                throw new Error(errMsg);
+            }
+
+            const arrayBuffer = await resp.arrayBuffer();
+
+            // 存入 Cache API
+            try {
+                const cache = await App.getTtsCache();
+                const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+                await cache.put(cacheKey, new Response(blob, {
+                    headers: { 'Content-Type': 'audio/mpeg' }
+                }));
+            } catch (e) {
+                rpLog('info', 'TTS', `旁白缓存写入失败: ${e.message}`);
+            }
+
+            return {
+                type: 'arraybuffer',
+                data: arrayBuffer,
+                mimeType: 'audio/mpeg'
+            };
+        } catch (e) {
+            if (attempt < TTS_MAX_RETRIES) {
+                const delay = TTS_RETRY_BASE_DELAY * Math.pow(2, attempt - 1);
+                rpLog('warn', 'TTS', `旁白生成异常 (${e.message})，${delay}ms 后重试 (${attempt}/${TTS_MAX_RETRIES})`);
+                await new Promise(r => setTimeout(r, delay));
+                continue;
+            }
+            rpLog('info', 'TTS', `旁白生成失败: ${e.message}`);
+            return null;
+        }
     }
+    return null;
 }
 
 /**

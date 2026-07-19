@@ -254,21 +254,28 @@ App.generateReplyOptions = async function(params) {
 /**
  * 将结构化数据转换为消息对象（供渲染层消费）
  * @param {Object} structured - 结构化数据
- * @param {string} messageId - 消息 ID
+ * @param {string} messageIdPrefix - 消息 ID 前缀（如 'msg_1784378515489'）
+ * @param {Object} options - 选项
+ * @param {string} [options.timestamp] - 共享时间戳（ISO 格式），同批消息共用同一时间戳保证排序正确
+ * @param {boolean} [options.skipCharacters=false] - 跳过角色消息
  * @returns {Array<Object>} 消息数组
  */
-App.structuredToMessages = function(structured, messageId, options = {}) {
+App.structuredToMessages = function(structured, messageIdPrefix, options = {}) {
     const messages = [];
-    const { skipCharacters = false } = options;
+    const { skipCharacters = false, timestamp } = options;
+
+    // 统一时间戳：同批消息共享同一时间戳，避免排序时交错
+    const nowTs = timestamp || new Date().toISOString();
 
     // 场景消息
     if (structured.scene) {
         messages.push({
-            id: messageId,
+            id: messageIdPrefix,
             role: 'scene',
             type: 'scene',
             content: structured.scene,
-            isScene: true
+            isScene: true,
+            timestamp: nowTs
         });
     }
 
@@ -285,7 +292,7 @@ App.structuredToMessages = function(structured, messageId, options = {}) {
             let formattedContent = parts.join(' ') || charData.dialogue || `${charData.name}(无内容)`;
 
             messages.push({
-                id: messageId + '-' + charData.name,
+                id: messageIdPrefix + '-' + charData.name,
                 role: 'char',
                 type: 'multi_char',
                 charName: charData.name,
@@ -294,7 +301,7 @@ App.structuredToMessages = function(structured, messageId, options = {}) {
                 action: charData.action || '',
                 dialogue: charData.dialogue || '',
                 thought: charData.thought || '',
-                timestamp: new Date().toISOString()
+                timestamp: nowTs
             });
         }
     }

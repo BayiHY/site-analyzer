@@ -60,22 +60,55 @@ ${formatModule.buildFormatRequirements()}`;
         const elapsed = Date.now() - startTime;
         rpLog('info', 'TIMEOUT', `LLM 请求完成: opening_scene, 耗时 ${elapsed}ms, 输出长度: ${response?.length || 0}`);
 
-        // 调用结构化智能体拆分
-        rpLog('info', 'TIMEOUT', '调用结构化智能体拆分序章回复...');
-        const structStart = Date.now();
-        const structuredResult = await App.structuredParseReply(response, {
-            characters: allChars,
-            emotions: state.emotions || {},
-            dynamicAttrs: Object.fromEntries(
-                allChars.map(c => [c.name, {
-                    perception: c.perception || '',
-                    secret: c.secret || '',
-                    currentMood: c.currentMood || ''
-                }])
-            ),
-            revealedInfo: state.revealed || {}
-        });
-        rpLog('info', 'TIMEOUT', `结构化拆分完成: 耗时 ${Date.now()-structStart}ms, scene=${(structuredResult.scene || '').length}字符, chars=${(structuredResult.characters || []).length}个`);
+        let structuredResult;
+
+        // 优先尝试直接解析对话智能体返回的结构化 JSON
+        rpLog('info', 'TIMEOUT', '尝试直接解析对话智能体返回的 JSON...');
+        const directJson = App.parseJson(response);
+        if (directJson && typeof directJson === 'object' && !Array.isArray(directJson)) {
+            const hasReplies = Array.isArray(directJson.suggestedReplies) && directJson.suggestedReplies.length >= 2;
+            const hasChars = Array.isArray(directJson.characters) && directJson.characters.length > 0;
+            if (hasReplies || hasChars) {
+                rpLog('info', 'TIMEOUT', `✅ 直接 JSON 解析成功: scene=${(directJson.scene||'').length}字, chars=${(directJson.characters||[]).length}个, replies=${(directJson.suggestedReplies||[]).length}条`);
+                structuredResult = {
+                    scene: directJson.scene || '',
+                    characters: (directJson.characters || []).map(c => ({
+                        name: c.name || '',
+                        action: c.action || '',
+                        dialogue: c.dialogue || '',
+                        thought: c.thought || ''
+                    })),
+                    suggestedReplies: (directJson.suggestedReplies || []).slice(0, 4),
+                    emotionDelta: directJson.emotionDelta || {},
+                    dynamicAttrs: directJson.dynamicAttrs || {},
+                    revealedInfo: directJson.revealedInfo || {},
+                    truncated: false
+                };
+            } else {
+                rpLog('warn', 'TIMEOUT', '直接 JSON 缺少 characters/suggestedReplies，走结构化拆分');
+            }
+        } else {
+            rpLog('info', 'TIMEOUT', '直接 JSON 解析失败，走结构化拆分');
+        }
+
+        // 如果直接解析未成功，走结构化智能体拆分
+        if (!structuredResult) {
+            rpLog('info', 'TIMEOUT', '调用结构化智能体拆分序章回复...');
+            const structStart = Date.now();
+            structuredResult = await App.structuredParseReply(response, {
+                characters: allChars,
+                emotions: state.emotions || {},
+                dynamicAttrs: Object.fromEntries(
+                    allChars.map(c => [c.name, {
+                        perception: c.perception || '',
+                        secret: c.secret || '',
+                        currentMood: c.currentMood || ''
+                    }])
+                ),
+                revealedInfo: state.revealed || {}
+            });
+            rpLog('info', 'TIMEOUT', `结构化拆分完成: 耗时 ${Date.now()-structStart}ms, scene=${(structuredResult.scene || '').length}字符, chars=${(structuredResult.characters || []).length}个`);
+        }
 
         rpLog('info', 'OPENING', `序章生成完成（对话智能体模式）: scene=${(structuredResult.scene || '').length}字符, chars=${structuredResult.characters?.length || 0}`);
         // 生成 rawText 供场景图生成使用（create-flow.js / two-stage.js 取 result.rawText）

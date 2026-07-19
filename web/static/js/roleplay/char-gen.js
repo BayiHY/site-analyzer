@@ -298,8 +298,8 @@ ${worldview}
             }
         }
 
-        const hasModuleFields = rawKeys.some(k => k.startsWith('imageFace'));
-        if (!hasModuleFields) {
+        const hasModules = sampleChar.__modules__ && Object.values(sampleChar.__modules__).some(v => v && v.trim().length > 0);
+        if (!hasModules) {
             rpLog('warn', 'CHARS', '角色数据中没有模块化字段，头像将使用备用 prompt');
         } else {
             rpLog('info', 'CHARS', '检测到模块化字段，将使用模块化三级降级生图');

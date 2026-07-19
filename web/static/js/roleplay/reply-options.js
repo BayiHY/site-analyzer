@@ -4,6 +4,36 @@
 
 App.replyOptionsPromise = null;
 
+/**
+ * 渲染序章阶段的建议回复选项
+ * 直接使用 LLM 结构化输出的 suggestedReplies，不足则跳过（用户可重新生成）
+ * @param {Object} openingStructured - 序章结构化结果
+ * @param {string} openingRaw - 序章原始文本（暂不使用）
+ */
+App.renderOpeningReplyOptions = function(openingStructured, openingRaw) {
+    try {
+        const openingMsgId = (state.messages && state.messages.length > 0)
+            ? (state.messages[state.messages.length - 1]?.id || 'msg_opening_prologue')
+            : 'msg_opening_prologue';
+
+        const openingReplies = Array.isArray(openingStructured?.suggestedReplies)
+            ? openingStructured.suggestedReplies
+                .filter(s => s && String(s).trim().length > 0)
+                .map(s => String(s).trim())
+                .slice(0, 4)
+            : [];
+
+        if (openingReplies.length >= 2) {
+            rpLog('info', 'INIT-REPLY', `渲染序章建议选项 ${openingReplies.length} 条`);
+            App.renderReplyOptions(openingReplies, openingMsgId);
+        } else {
+            rpLog('info', 'INIT-REPLY', `序章结构化建议选项不足（${openingReplies.length} 条），跳过渲染（用户可重新生成）`);
+        }
+    } catch (err) {
+        rpLog('error', 'INIT-REPLY', `序章建议选项渲染失败: ${err.message}`);
+    }
+};
+
 App.generateReplyOptions = async function(userMessage, charResponse) {
     rpLog('INFO', 'REPLY-OPTS', '开始生成快捷回复选项');
     rpLog('INFO', 'REPLY-OPTS', `用户消息: "${String(userMessage?.content || userMessage).substring(0, 100)}..."`);
@@ -117,7 +147,7 @@ App.getDefaultReplyOptions = function(activeChar, charMsg, userMsg) {
     const charContent = charMsg?.content || '';
 
     // 序章场景（以【开头、以】结尾的纯场景描述）：生成场景引导选项
-    const isPrologue = /^【.+】$/.test(charContent.trim());
+    const isPrologue = /^【[\s\S]+】$/.test(charContent.trim());
     if (isPrologue) {
         const sceneText = charContent.replace(/【|】/g, '').trim();
         

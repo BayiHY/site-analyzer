@@ -292,7 +292,8 @@ App.generateInitialSceneImage = async function(openingScene, replyText, metadata
         const imgUrl = await App.agnesImageGenerate({
             prompt,
             refImages: sceneRefs,
-            size: '256x341',
+            size: '1K',
+            ratio: '9:16',
             model: 'agnes-image-2.1-flash',
             label: 'initial_scene'
         });
@@ -358,7 +359,8 @@ App.generateSceneImage = async function(charName, sceneDesc, charObj, replyText,
         const imgUrl = await App.agnesImageGenerate({
             prompt,
             refImages: sceneRefs,
-            size: '256x341',
+            size: '1K',
+            ratio: '9:16',
             model: 'agnes-image-2.1-flash',
             label: `chat_scene_${charName}`
         });

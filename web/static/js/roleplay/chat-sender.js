@@ -135,32 +135,17 @@ ${formatModule.buildFormatRequirements()}`;
                     console.warn('场景图生成失败:', e);
                 }
             })(),
-            // 后处理 2: 优先使用结构化智能体提取的建议选项，仅在为空时异步生成
+            // 后处理 2: 优先使用结构化智能体提取的建议选项，仅在充足时渲染，不足则跳过（用户可重新生成）
             (async () => {
                 try {
                     rpLog('info', 'TIMEOUT', '后处理[2/3] 建议回复处理开始');
                     
-                    // 优先使用结构化智能体提取的 suggestedReplies
                     const structuredReplies = structuredResult.suggestedReplies;
                     if (structuredReplies && Array.isArray(structuredReplies) && structuredReplies.length >= 2) {
                         rpLog('info', 'TIMEOUT', `后处理[2/3] 使用结构化提取的 ${structuredReplies.length} 条建议选项`);
                         App.renderReplyOptions(structuredReplies.slice(0, 4), state.messages[state.messages.length - 1]?.id || 'unknown');
                     } else {
-                        // 结构化结果为空或不足，异步生成
-                        rpLog('info', 'TIMEOUT', '后处理[2/3] 结构化选项不足，异步生成建议回复');
-                        await new Promise(r => setTimeout(r, 500));
-                        const lastCharDialog = structuredResult.characters?.[0]?.dialogue || '';
-                        const opts = await App.generateReplyOptions({
-                            lastUserMessage: text,
-                            lastCharResponse: lastCharDialog,
-                            recentMessages: state.messages.filter(m => m.role !== 'system').slice(-6)
-                        });
-                        if (opts && opts.length >= 2) {
-                            App.renderReplyOptions(opts, state.messages[state.messages.length - 1]?.id || 'unknown');
-                            rpLog('info', 'TIMEOUT', `后处理[2/3] 异步建议回复完成 (${opts.length} 条)`);
-                        } else {
-                            rpLog('warn', 'TIMEOUT', `后处理[2/3] 异步生成选项不足 (${opts?.length || 0} 条)`);
-                        }
+                        rpLog('info', 'TIMEOUT', `后处理[2/3] 结构化选项不足（${structuredReplies?.length || 0} 条），跳过渲染（用户可重新生成）`);
                     }
                 } catch (e) {
                     console.warn('建议回复处理失败:', e);

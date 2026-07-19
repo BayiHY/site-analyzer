@@ -78,45 +78,59 @@ App.createCharacter = async function() {
     document.getElementById('send-btn').disabled = true;
     addSystemMessage('正在初始化故事世界...');
 
-    // LLM 语义识别画面风格（异步，失败则 fallback 到用户选择）
-    let detectedStyle = null;
-    try {
-        detectedStyle = await App.extractStyleFromInspiration(storyPrompt, userSelectedStyle);
-    } catch (e) {
-        rpLog('warn', 'STYLE', `LLM 风格识别异常: ${e.message}，使用用户选择`);
-    }
-    
-    // 优先级链：灵感检测（LLM 返回的任何结果都直接用） > 用户手动选择 > 默认随机
-    // 只要灵感中强调了画风/画面风格，LLM 返回的结果就是有效识别，不视为 fallback
-    let imageStyle;
-    if (detectedStyle) {
-        // LLM 从灵感中识别到了风格，直接使用
-        imageStyle = detectedStyle;
-        rpLog('info', 'STYLE', `从灵感中检测到画面风格: ${detectedStyle}`);
-        if (userSelectedStyle && userSelectedStyle !== detectedStyle) {
-            rpLog('info', 'STYLE', `用户手动选择 "${userSelectedStyle}" 被灵感检测结果 "${detectedStyle}" 覆盖（灵感优先）`);
+    // ===== 并行执行：风格识别 + 故事初始化（互不阻塞）=====
+    const storyPromise = (async () => {
+        try {
+            rpLog('info', 'CREATE', `开始两阶段初始化，玩家: ${playerName} (${playerGender})`);
+            await App.initializeStory(storyPrompt, playerGender, playerName);
+            rpLog('info', 'CREATE', '初始化完成，进入聊天阶段');
+        } catch (err) {
+            rpLog('error', 'CREATE', '初始化失败: ' + (err.message || String(err)));
+            addSystemMessage('❌ 初始化失败: ' + (err.message || String(err)));
         }
-    } else {
-        // LLM 未能识别（灵感为空或无法判断） → 使用用户选择或默认随机
-        imageStyle = userSelectedStyle || '';
-        if (!imageStyle) {
-            rpLog('info', 'STYLE', `灵感未检测到风格且用户未选择，使用随机`);
-        } else {
-            rpLog('info', 'STYLE', `灵感未检测到风格，使用用户选择: ${imageStyle}`);
-        }
-    }
-    state.story.imageStyle = imageStyle;
+    })();
 
-    try {
-        rpLog('info', 'CREATE', `开始两阶段初始化，玩家: ${playerName} (${playerGender})`);
-        await App.initializeStory(storyPrompt, playerGender, playerName);
-        rpLog('info', 'CREATE', '初始化完成，进入聊天阶段');
-    } catch (err) {
-        rpLog('error', 'CREATE', '初始化失败: ' + (err.message || String(err)));
-        addSystemMessage('❌ 初始化失败: ' + (err.message || String(err)));
-    } finally {
-        document.getElementById('send-btn').disabled = false;
-    }
+    const stylePromise = (async () => {
+        // LLM 语义识别画面风格（异步，失败则 fallback 到用户选择）
+        let detectedStyle = null;
+        try {
+            detectedStyle = await App.extractStyleFromInspiration(storyPrompt, userSelectedStyle);
+        } catch (e) {
+            rpLog('warn', 'STYLE', `LLM 风格识别异常: ${e.message}，使用用户选择`);
+        }
+        
+        // 优先级链：灵感检测（LLM 返回的任何结果都直接用） > 用户手动选择 > 默认随机
+        // 只要灵感中强调了画风/画面风格，LLM 返回的结果就是有效识别，不视为 fallback
+        let imageStyle;
+        if (detectedStyle) {
+            imageStyle = detectedStyle;
+            rpLog('info', 'STYLE', `从灵感中检测到画面风格: ${detectedStyle}`);
+            if (userSelectedStyle && userSelectedStyle !== detectedStyle) {
+                rpLog('info', 'STYLE', `用户手动选择 "${userSelectedStyle}" 被灵感检测结果 "${detectedStyle}" 覆盖（灵感优先）`);
+            }
+        } else {
+            imageStyle = userSelectedStyle || '';
+            if (!imageStyle) {
+                rpLog('info', 'STYLE', `灵感未检测到风格且用户未选择，使用随机`);
+            } else {
+                rpLog('info', 'STYLE', `灵感未检测到风格，使用用户选择: ${imageStyle}`);
+            }
+        }
+        state.story.imageStyle = imageStyle;
+
+        // ⭐ 画风识别完成后立即启动锚点校准，不等待故事初始化/角色生成
+        try {
+            if (typeof App.startStyleCalibrationBg === 'function' && !state.story?.styleAnchor) {
+                App.startStyleCalibrationBg('', imageStyle);
+                rpLog('info', 'STYLE', `🚀 风格校准已启动（不依赖场景描述）`);
+            }
+        } catch (e) {
+            rpLog('warn', 'STYLE', `风格校准启动异常: ${e.message}`);
+        }
+    })();
+
+    // 并行等待两个任务完成
+    await Promise.all([storyPromise, stylePromise]);
 };
 
 App.generateCharactersAndStart = async function() {
@@ -133,13 +147,25 @@ App.generateCharactersAndStart = async function() {
         let openingStructured = null;
 
         if (state.apiKeys.chat && chars.length > 0) {
-            rpLog('info', 'IMG', `━━━ 开始生图阶段（按出场顺序）: ${chars.length} 个角色 + 主角 ━━━`);
-            rpLog('info', 'IMG', `  生图 API Key 已配置`);
-            rpLog('info', 'IMG', `  角色列表: ${chars.map(c => `${c.name}(faceImgUrl=${!!c.faceImageUrl}, portraitImgUrl=${!!c.portraitImageUrl})`).join(', ')}`);
+            rpLog('info', 'IMG', `━━━ 立即生成面部特写: ${chars.length} 个角色 ━━━`);
+            const faceTasks = chars.map(c => (async () => {
+                try {
+                    rpLog('info', 'IMG', `📷 面部特写: ${c.name}`);
+                    const url = await App.generateCharacterFaceOnly(c);
+                    if (url) {
+                        rpLog('info', 'IMG', `✅ ${c.name} 面部特写完成`);
+                        addSystemMessage(`✅ ${c.name} 头像已生成`);
+                    }
+                } catch (e) {
+                    rpLog('warn', 'IMG', `${c.name} 面部特写失败: ${e.message}`);
+                }
+            })());
+            await Promise.allSettled(faceTasks);
+            rpLog('info', 'IMG', '所有面部特写完成');
 
             try {
-                // 第一步：生成序章（不生成头像，头像等出场后再生成）
-                rpLog('info', 'OPENING', '开始生成序章（头像延迟到出场时生成）');
+                // 第一步：生成序章
+                rpLog('info', 'OPENING', '开始生成序章');
                 addSystemMessage('✍️ 正在生成序章...');
                 
                 const openingResult = await App.generateOpeningScene();
@@ -147,9 +173,8 @@ App.generateCharactersAndStart = async function() {
                 openingStructured = openingResult?.structured || null;
 
                 if (openingRaw) {
-                    rpLog('info', 'OPENING', '序章生成完成，立即渲染序章场景消息（不渲染角色消息）');
-                    
-                    // 只渲染场景消息，不渲染角色消息（角色头像生成后再渲染）
+                    rpLog('info', 'OPENING', '序章生成完成，立即渲染序章场景消息');
+
                     let parsedMessages = [];
                     if (openingStructured) {
                         parsedMessages = App.structuredToMessages(openingStructured, 'msg_opening_', { skipCharacters: true });
@@ -164,12 +189,10 @@ App.generateCharactersAndStart = async function() {
                     rpLog('warn', 'OPENING', '序章生成返回空');
                 }
 
-                // 第二步：先渲染所有角色消息（用首字母占位头像），然后异步并行生成头像
-
-                // 2a. 立即渲染所有角色消息（不等待头像）
+                // 第二步：渲染角色消息 + 异步并行生成全身/半身（含序章动作描写）
                 if (openingStructured && openingStructured.characters?.length > 0) {
                     const appearingChars = openingStructured.characters;
-                    rpLog('info', 'OPENING', `序章出场 ${appearingChars.length} 个角色，立即渲染消息（头像异步生成）`);
+                    rpLog('info', 'OPENING', `序章出场 ${appearingChars.length} 个角色`);
 
                     for (const charData of appearingChars) {
                         let fullContent = '';
@@ -191,15 +214,11 @@ App.generateCharactersAndStart = async function() {
                         };
                         state.messages.push(charMsgObj);
                         renderMessage(charMsgObj);
-                        rpLog('info', 'OPENING', `${charData.name} 角色消息已渲染（头像待生成）`);
+                        rpLog('info', 'OPENING', `${charData.name} 角色消息已渲染`);
                     }
                     saveMessages().catch(() => {});
                     rpLog('info', 'TIMING', '✅ 所有角色消息已渲染');
-                }
 
-                // 2b. 异步并行生成主角头像 + 所有出场角色头像（不阻塞对话）
-                if (openingStructured && openingStructured.characters?.length > 0) {
-                    const appearingChars = openingStructured.characters;
                     const avatarTasks = [];
 
                     // 主角头像
@@ -214,55 +233,47 @@ App.generateCharactersAndStart = async function() {
                         }
                     })());
 
-                    // 每个出场角色的头像
+                    // 每个出场角色的全身/半身 — 用序章动作描写注入 prompt
                     for (const charInfo of appearingChars) {
                         const charName = charInfo.name;
                         const charObj = chars.find(c => c.name === charName);
                         if (!charObj) continue;
 
-                        rpLog('info', 'IMG', `后台生成 ${charName} 头像`);
+                        const actionText = charInfo.action ? charInfo.action.replace(/[（(].*?[）)]/g, '').trim() : '';
+                        rpLog('info', 'IMG', `后台生成 ${charName} 全身/半身（动作: ${actionText || '默认站立'}）`);
                         avatarTasks.push((async () => {
                             try {
-                                addSystemMessage(`🎨 正在生成 ${charName} 的头像...`);
-                                const result = await App.generateCharacterFaceSilent(charObj);
+                                addSystemMessage(`🎨 正在生成 ${charName} 的角色形象...`);
+                                const result = await App.generateCharacterImage(charObj, actionText, true);
                                 if (result) {
-                                    rpLog('info', 'IMG', `${charName} 头像生成成功`);
-                                    addSystemMessage(`✅ ${charName} 头像生成完成`);
+                                    rpLog('info', 'IMG', `${charName} 全身/半身生成成功`);
+                                    addSystemMessage(`✅ ${charName} 角色形象生成完成`);
                                     App.updateAvatarInExistingMessages(charName, result);
                                 } else {
-                                    rpLog('warn', 'IMG', `${charName} 头像生成失败`);
+                                    rpLog('warn', 'IMG', `${charName} 全身/半身生成失败`);
                                 }
                             } catch (e) {
-                                rpLog('error', 'IMG', `${charName} 头像生成异常: ${e.message}`);
+                                rpLog('error', 'IMG', `${charName} 全身/半身生成异常: ${e.message}`);
                             }
                         })());
                     }
 
-                    // 场景图也异步生成
-                    for (const charInfo of appearingChars) {
-                        const charName = charInfo.name;
-                        const charObj = chars.find(c => c.name === charName);
-                        if (!charObj) continue;
+                    const allCharNames = appearingChars.map(c => c.name);
+                    const allCharObjs = allCharNames.map(name => chars.find(c => c.name === name)).filter(Boolean);
+                    const metadata = { presentCharacters: allCharNames };
 
-                        rpLog('info', 'SCENE', `后台为 ${charName} 生成场景图`);
-                        avatarTasks.push((async () => {
-                            try {
-                                const sceneForImage = openingStructured.scene || openingRaw;
-                                const metadata = openingStructured ? {
-                                    presentCharacters: [charName]
-                                } : null;
-                                App.generateSceneImage(charName, sceneForImage, charObj, openingRaw, metadata).catch(e => {
-                                    rpLog('error', 'SCENE', `${charName} 场景图生成失败: ${e.message}`);
-                                });
-                            } catch (e) {
-                                rpLog('error', 'SCENE', `${charName} 场景图生成失败: ${e.message}`);
-                            }
-                        })());
-                    }
-
-                    Promise.allSettled(avatarTasks).then(() => {
-                        rpLog('info', 'IMG', '所有头像/场景图生成完成');
+                    const sceneTask = Promise.allSettled(avatarTasks).then(() => {
+                        const sceneRefUrls = allCharObjs.map(c => c.faceImageUrl || c.portraitImageUrl).filter(Boolean);
+                        if (sceneRefUrls.length > 0) {
+                            rpLog('info', 'SCENE', `所有头像就绪 (${allCharNames.join(', ')})，开始生成统一场景图`);
+                            return App.generateSceneImage('opening', openingStructured.scene || openingRaw, allCharObjs[0], openingRaw, metadata);
+                        } else {
+                            rpLog('warn', 'SCENE', '头像全部生成失败，跳过场景图');
+                        }
+                    }).catch(e => {
+                        rpLog('error', 'SCENE', `场景图生成异常: ${e.message}`);
                     });
+                    avatarTasks.push(sceneTask);
                 }
             } catch (imgErr) {
                 rpLog('error', 'IMG', '生图阶段失败: ' + imgErr.message);
@@ -298,6 +309,9 @@ App.generateCharactersAndStart = async function() {
             addSystemMessage('⚠️ 序章生成失败，请重试');
         }
         // 如果 openingRaw 非空，上面已经渲染过了，不再重复
+
+        // 渲染序章建议选项（此前未渲染，导致玩家在序章后看不到快捷回复按钮）
+        App.renderOpeningReplyOptions(openingStructured, openingRaw);
 
         rpLog('info', 'CHARS', '角色生成完成，进入聊天阶段');
     } catch (err) {
@@ -372,13 +386,25 @@ App.regenerateCharacters = async function() {
         rpLog('info', 'CHARS', `regenerateCharacters 返回 chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
         if (state.apiKeys.chat && chars.length > 0) {
-            rpLog('info', 'IMG', `━━━ 开始重新生图阶段（按出场顺序）: ${chars.length} 个角色 + 主角 ━━━`);
-            rpLog('info', 'IMG', `  生图 API Key 已配置`);
-            rpLog('info', 'IMG', `  角色列表: ${chars.map(c => `${c.name}(faceImgUrl=${!!c.faceImageUrl}, portraitImgUrl=${!!c.portraitImageUrl})`).join(', ')}`);
+            rpLog('info', 'IMG', `━━━ 立即生成面部特写: ${chars.length} 个角色 ━━━`);
+            const faceTasks = chars.map(c => (async () => {
+                try {
+                    rpLog('info', 'IMG', `📷 面部特写: ${c.name}`);
+                    const url = await App.generateCharacterFaceOnly(c);
+                    if (url) {
+                        rpLog('info', 'IMG', `✅ ${c.name} 面部特写完成`);
+                        addSystemMessage(`✅ ${c.name} 头像已生成`);
+                    }
+                } catch (e) {
+                    rpLog('warn', 'IMG', `${c.name} 面部特写失败: ${e.message}`);
+                }
+            })());
+            await Promise.allSettled(faceTasks);
+            rpLog('info', 'IMG', '所有面部特写完成');
 
             try {
-                // 第一步：生成序章（不生成头像，头像等出场后再生成）
-                rpLog('info', 'OPENING', '开始生成序章（头像延迟到出场时生成）');
+                // 第一步：生成序章
+                rpLog('info', 'OPENING', '开始生成序章');
                 addSystemMessage('✍️ 正在生成序章...');
                 
                 const openingResult = await App.generateOpeningScene();
@@ -386,9 +412,8 @@ App.regenerateCharacters = async function() {
                 openingStructured = openingResult?.structured || null;
 
                 if (openingRaw) {
-                    rpLog('info', 'OPENING', '序章重新生成完成，立即渲染序章场景消息（不渲染角色消息）');
-                    
-                    // 只渲染场景消息，不渲染角色消息（角色头像生成后再渲染）
+                    rpLog('info', 'OPENING', '序章重新生成完成，立即渲染序章场景消息');
+
                     let parsedMessages = [];
                     if (openingStructured) {
                         parsedMessages = App.structuredToMessages(openingStructured, 'msg_opening_', { skipCharacters: true });
@@ -403,12 +428,10 @@ App.regenerateCharacters = async function() {
                     rpLog('warn', 'OPENING', '序章重新生成返回空');
                 }
 
-                // 第二步：先渲染所有角色消息（用首字母占位头像），然后异步并行生成头像
-
-                // 2a. 立即渲染所有角色消息（不等待头像）
+                // 第二步：渲染角色消息 + 异步并行生成全身/半身（含序章动作描写）
                 if (openingStructured && openingStructured.characters?.length > 0) {
                     const appearingChars = openingStructured.characters;
-                    rpLog('info', 'OPENING', `序章出场 ${appearingChars.length} 个角色，立即渲染消息（头像异步生成）`);
+                    rpLog('info', 'OPENING', `序章出场 ${appearingChars.length} 个角色`);
 
                     for (const charData of appearingChars) {
                         let fullContent = '';
@@ -430,19 +453,15 @@ App.regenerateCharacters = async function() {
                         };
                         state.messages.push(charMsgObj);
                         renderMessage(charMsgObj);
-                        rpLog('info', 'OPENING', `${charData.name} 角色消息已渲染（头像待生成）`);
+                        rpLog('info', 'OPENING', `${charData.name} 角色消息已渲染`);
                     }
                     saveMessages().catch(() => {});
                     rpLog('info', 'TIMING', '✅ 所有角色消息已渲染');
-                }
 
-                // 2b. 异步并行生成主角头像 + 所有出场角色头像（不阻塞对话）
-                if (openingStructured && openingStructured.characters?.length > 0) {
-                    const appearingChars = openingStructured.characters;
                     const avatarTasks = [];
 
                     // 主角头像
-                    rpLog('info', 'IMG', '后台生成主角头像');
+                    rpLog('info', 'IMG', '后台重生成主角头像');
                     avatarTasks.push((async () => {
                         try {
                             const playerUrl = await App.generatePlayerAvatar();
@@ -453,55 +472,47 @@ App.regenerateCharacters = async function() {
                         }
                     })());
 
-                    // 每个出场角色的头像
+                    // 每个出场角色的全身/半身 — 用序章动作描写注入 prompt
                     for (const charInfo of appearingChars) {
                         const charName = charInfo.name;
                         const charObj = chars.find(c => c.name === charName);
                         if (!charObj) continue;
 
-                        rpLog('info', 'IMG', `后台生成 ${charName} 头像`);
+                        const actionText = charInfo.action ? charInfo.action.replace(/[（(].*?[）)]/g, '').trim() : '';
+                        rpLog('info', 'IMG', `后台重生成 ${charName} 全身/半身（动作: ${actionText || '默认站立'}）`);
                         avatarTasks.push((async () => {
                             try {
-                                addSystemMessage(`🎨 正在生成 ${charName} 的头像...`);
-                                const result = await App.generateCharacterFaceSilent(charObj);
+                                addSystemMessage(`🎨 正在生成 ${charName} 的角色形象...`);
+                                const result = await App.generateCharacterImage(charObj, actionText, true);
                                 if (result) {
-                                    rpLog('info', 'IMG', `${charName} 头像重新生成成功`);
-                                    addSystemMessage(`✅ ${charName} 头像重新生成完成`);
+                                    rpLog('info', 'IMG', `${charName} 全身/半身重新生成成功`);
+                                    addSystemMessage(`✅ ${charName} 角色形象重新生成完成`);
                                     App.updateAvatarInExistingMessages(charName, result);
                                 } else {
-                                    rpLog('warn', 'IMG', `${charName} 头像重新生成失败`);
+                                    rpLog('warn', 'IMG', `${charName} 全身/半身重新生成失败`);
                                 }
                             } catch (e) {
-                                rpLog('error', 'IMG', `${charName} 头像重新生成异常: ${e.message}`);
+                                rpLog('error', 'IMG', `${charName} 全身/半身重新生成异常: ${e.message}`);
                             }
                         })());
                     }
 
-                    // 场景图也异步生成
-                    for (const charInfo of appearingChars) {
-                        const charName = charInfo.name;
-                        const charObj = chars.find(c => c.name === charName);
-                        if (!charObj) continue;
+                    const allCharNames = appearingChars.map(c => c.name);
+                    const allCharObjs = allCharNames.map(name => chars.find(c => c.name === name)).filter(Boolean);
+                    const metadata = { presentCharacters: allCharNames };
 
-                        rpLog('info', 'SCENE', `后台为 ${charName} 生成场景图`);
-                        avatarTasks.push((async () => {
-                            try {
-                                const sceneForImage = openingStructured.scene || openingRaw;
-                                const metadata = openingStructured ? {
-                                    presentCharacters: [charName]
-                                } : null;
-                                App.generateSceneImage(charName, sceneForImage, charObj, openingRaw, metadata).catch(e => {
-                                    rpLog('error', 'SCENE', `${charName} 场景图重新生成失败: ${e.message}`);
-                                });
-                            } catch (e) {
-                                rpLog('error', 'SCENE', `${charName} 场景图重新生成失败: ${e.message}`);
-                            }
-                        })());
-                    }
-
-                    Promise.allSettled(avatarTasks).then(() => {
-                        rpLog('info', 'IMG', '所有头像/场景图生成完成');
+                    const sceneTask = Promise.allSettled(avatarTasks).then(() => {
+                        const sceneRefUrls = allCharObjs.map(c => c.faceImageUrl || c.portraitImageUrl).filter(Boolean);
+                        if (sceneRefUrls.length > 0) {
+                            rpLog('info', 'SCENE', `所有头像就绪 (${allCharNames.join(', ')})，开始生成统一场景图`);
+                            return App.generateSceneImage('opening', openingStructured.scene || openingRaw, allCharObjs[0], openingRaw, metadata);
+                        } else {
+                            rpLog('warn', 'SCENE', '头像全部生成失败，跳过场景图');
+                        }
+                    }).catch(e => {
+                        rpLog('error', 'SCENE', `场景图生成异常: ${e.message}`);
                     });
+                    avatarTasks.push(sceneTask);
                 }
             } catch (imgErr) {
                 rpLog('error', 'IMG', '生图阶段失败: ' + imgErr.message);
@@ -536,6 +547,9 @@ App.regenerateCharacters = async function() {
             addSystemMessage('⚠️ 序章生成失败，请重试');
         }
         // 如果 openingRaw 非空，上面已经渲染过了，不再重复
+
+        // 渲染序章建议选项（此前未渲染，导致玩家在序章后看不到快捷回复按钮）
+        App.renderOpeningReplyOptions(openingStructured, openingRaw);
 
         rpLog('info', 'REGEN', '角色重新生成完成，进入聊天阶段');
     } catch (err) {

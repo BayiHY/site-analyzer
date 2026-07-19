@@ -58,7 +58,8 @@ App.appendArtStyle = function(prompt) {
 // level 0: 全身 (face+hair+body+clothes+environment) → 从头到脚全身
 // level 1: 半身 (face+hair+body+clothes) → 腰部以上半身
 // level 2: 特写 (face+hair) → 面部特写到锁骨
-App.buildModularPrompt = function(character, level) {
+// actionText: 可选，序章中的角色动作描写，注入到 pose/framing 提示词
+App.buildModularPrompt = function(character, level, actionText) {
     const parts = [];
     const mods = character.__modules__ || {};
 
@@ -96,9 +97,18 @@ App.buildModularPrompt = function(character, level) {
         // 去掉可能与一致性产生冲突的提示词（如表情、光影、构图等），由参考图承担面部特征
         base += ', consistent facial features with character reference, matching face shape and hairstyle and makeup, ';
         if (level === 0) {
-            base += 'full body shot from head to toe, standing pose, complete figure';
+            base += 'full body shot from head to toe, ';
         } else {
-            base += 'medium shot from waist up, upper body portrait';
+            base += 'medium shot from waist up, ';
+        }
+        // 注入序章动作描写到 pose 提示词
+        if (actionText) {
+            base += `${actionText}, `;
+        }
+        if (level === 0) {
+            base += 'complete figure';
+        } else {
+            base += 'upper body portrait';
         }
     }
 
@@ -160,9 +170,50 @@ App.buildBackupPrompt = function(character) {
     return `Character portrait, ${gender}, ${character.age || 20} years old, friendly expression, soft lighting, detailed character design, professional concept art` + App.getArtStyleSuffix();
 };
 
+// === 仅面部特写生成（不等序章，角色生成完立即调用） ===
+// 只用 imageFace + imageHair，不依赖序章动作描写
+App.generateCharacterFaceOnly = async function(character) {
+    if (!character || !character.name) {
+        return null;
+    }
+
+    const mods = App.extractModules(character);
+    const hasModules = mods.imageFace || mods.imageHair;
+    if (!hasModules) {
+        rpLog('warn', 'IMG', `角色 ${character.name} 无面部模块数据，跳过面部特写`);
+        return null;
+    }
+
+    rpLog('info', 'IMG', `📷 面部特写: ${character.name}`);
+    const facePrompt = App.buildModularPrompt(character, 2); // level 2 = 特写
+    rpLog('debug', 'IMG', `面部特写 Prompt: ${facePrompt.slice(0, 150)}...`);
+
+    const faceModels = ['agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
+    let faceImageUrl;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const model = faceModels[attempt % faceModels.length];
+            rpLog('info', 'IMG', `面部特写尝试 ${attempt + 1}/3 (model=${model}): ${character.name}`);
+            faceImageUrl = await App.agnesImageGen(facePrompt, '256x341', model);
+            rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
+            character.faceImageUrl = faceImageUrl;
+            await saveState();
+            return faceImageUrl;
+        } catch (e) {
+            rpLog('warn', 'IMG', `面部特写失败 (尝试 ${attempt + 1}/3): ${e.message}`);
+            if (attempt === 2) {
+                rpLog('error', 'IMG', `面部特写全部重试失败: ${character.name}`);
+            }
+        }
+    }
+    return null;
+};
+
 // 两阶段生图：一阶段面部特写（无降级）→ 二阶段全身/半身（三级降级）
 // 新流程：先生成面部特写（level 2），再用 img2img 从特写生成全身/半身
-App.generateCharacterImage = async function(character) {
+// actionText: 可选，序章中的角色动作描写，注入到全身/半身 prompt 的 pose 中
+// skipFace: 如果为 true，跳过面部特写生成（假设已存在），直接做全身/半身
+App.generateCharacterImage = async function(character, actionText, skipFace) {
     if (!character || !character.name) {
         throw new Error('无效的角色对象，无法生成图片');
     }
@@ -174,28 +225,33 @@ App.generateCharacterImage = async function(character) {
     const hasModules = mods.imageFace || mods.imageHair || mods.imageBody || mods.imageClothes || mods.imageEnvironment;
 
     let imageUrl;
+    let faceImageUrl = null;
 
     if (hasModules) {
-        // === 第一步：生成面部特写（一阶段，失败自动用 2.0-flash 重试，最多两次） ===
-        rpLog('info', 'IMG', `📷 第一步：生成面部特写: ${character.name}`);
-        const facePrompt = App.buildModularPrompt(character, 2); // level 2 = 特写
-        rpLog('debug', 'IMG', `面部特写 Prompt: ${facePrompt.slice(0, 150)}...`);
-        
-        let faceImageUrl;
-        const faceModels = ['agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
-        for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-                const model = faceModels[attempt % faceModels.length];
-                rpLog('info', 'IMG', `面部特写尝试 ${attempt + 1}/3 (model=${model}): ${character.name}`);
-                faceImageUrl = await App.agnesImageGen(facePrompt, '256x341', model);
-                rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
-                character.faceImageUrl = faceImageUrl;
-                await saveState();
-                break;
-            } catch (e) {
-                rpLog('warn', 'IMG', `面部特写失败 (尝试 ${attempt + 1}/3): ${e.message}`);
-                if (attempt === 2) {
-                    rpLog('error', 'IMG', `面部特写全部重试失败: ${character.name}`);
+        // === 第一步：面部特写（除非 skipFace=true 且已有 faceImageUrl） ===
+        if (skipFace && character.faceImageUrl) {
+            rpLog('info', 'IMG', `⏭️ 面部特写已存在，跳过: ${character.name}`);
+            faceImageUrl = character.faceImageUrl;
+        } else {
+            rpLog('info', 'IMG', `📷 第一步：生成面部特写: ${character.name}`);
+            const facePrompt = App.buildModularPrompt(character, 2); // level 2 = 特写
+            rpLog('debug', 'IMG', `面部特写 Prompt: ${facePrompt.slice(0, 150)}...`);
+            
+            const faceModels = ['agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    const model = faceModels[attempt % faceModels.length];
+                    rpLog('info', 'IMG', `面部特写尝试 ${attempt + 1}/3 (model=${model}): ${character.name}`);
+                    faceImageUrl = await App.agnesImageGen(facePrompt, '256x341', model);
+                    rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
+                    character.faceImageUrl = faceImageUrl;
+                    await saveState();
+                    break;
+                } catch (e) {
+                    rpLog('warn', 'IMG', `面部特写失败 (尝试 ${attempt + 1}/3): ${e.message}`);
+                    if (attempt === 2) {
+                        rpLog('error', 'IMG', `面部特写全部重试失败: ${character.name}`);
+                    }
                 }
             }
         }
@@ -209,7 +265,7 @@ App.generateCharacterImage = async function(character) {
         for (const tier of levels) {
             try {
                 rpLog('info', 'IMG', `第二步: 尝试 ${tier.name} 生图（基于面部特写）: ${character.name}`);
-                const prompt = App.buildModularPrompt(character, tier.level);
+                const prompt = App.buildModularPrompt(character, tier.level, actionText);
                 
                 // 如果有面部特写，用 img2img 确保面部一致性
                 if (faceImageUrl) {
@@ -300,6 +356,7 @@ App.generateCharacterFaceSilent = async function(character, imagePrompt) {
             console.error('[并行] 头像生成失败:', character.name);
             return null;
         }
+        character.faceImageUrl = imageUrl;
         character.portraitImageUrl = imageUrl;
         await saveState();
 
@@ -358,11 +415,22 @@ App.agnesImageGenerate = async function(options) {
     const {
         prompt,           // 文本提示词（必填）
         refImages = [],   // 参考图 URL 数组（可选，非空则走 img2img 模式）
-        size = '256x341', // 图片尺寸
+        size = '1K', // 图片尺寸（2.1 档位：1K/2K/3K/4K，或兼容旧的精确像素）
+        ratio,            // 宽高比（2.1 档位：1:1, 3:4, 4:3, 16:9, 9:16, 2:3, 3:2, 21:9）
         model = 'agnes-image-2.1-flash', // 首选模型
         timeoutMs = 120000, // 超时时间（毫秒）
         label = 'image'     // 日志标签
     } = options;
+
+    // ⭐ 所有生图都需要等 styleAnchor 就绪
+    let effectivePrompt = prompt;
+    if (label !== 'style_anchor' && typeof App.awaitStyleReady === 'function') {
+        await App.awaitStyleReady();
+        // 将 prompt 中的占位符替换为真正的 styleAnchor
+        if (typeof App.resolveStyleInPrompt === 'function') {
+            effectivePrompt = App.resolveStyleInPrompt(prompt);
+        }
+    }
 
     const apiKey = state.apiKeys.chat;
     if (!apiKey) {
@@ -382,11 +450,16 @@ App.agnesImageGenerate = async function(options) {
         try {
             const requestBody = {
                 model: currentModel,
-                prompt: prompt,
+                prompt: effectivePrompt,
                 size: size,
                 n: 1,
                 extra_body: { response_format: 'url' }
             };
+
+            // 2.1 档位式宽高比
+            if (ratio) {
+                requestBody.ratio = ratio;
+            }
 
             // img2img 模式：加入参考图
             if (refImages && refImages.length > 0) {
