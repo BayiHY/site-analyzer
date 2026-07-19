@@ -14,13 +14,14 @@ App.classifyImageError = function(statusCode, errorMessage) {
         };
     }
     
-    // 400 内容审核拦截
+    // 400 内容审核拦截 — 不可重试（同 prompt 永远过不了）
     if (statusCode === 400 && (msg.includes('content policy') || msg.includes('unable to generate') || msg.includes('safety') || msg.includes('filtered'))) {
         return {
             type: 'policy',
             emoji: '🚫',
             title: '触发内容审核',
-            detail: '提示词中包含被审核系统拦截的内容，请尝试修改场景描述后重试。'
+            detail: '提示词中包含被审核系统拦截的内容，请尝试修改场景描述后重试。',
+            retryable: false
         };
     }
     
@@ -30,37 +31,44 @@ App.classifyImageError = function(statusCode, errorMessage) {
             type: 'client_error',
             emoji: '❌',
             title: '生图参数错误',
-            detail: '提示词格式不符合要求，请检查后重试。'
+            detail: '提示词格式不符合要求，请检查后重试。',
+            retryable: false
         };
     }
     
-    // 429 限流
+    // 429 限流 — 可退避重试
     if (statusCode === 429 || msg.includes('rate limit') || msg.includes('too many requests')) {
         return {
             type: 'rate_limit',
             emoji: '🐌',
             title: '请求过于频繁',
-            detail: 'API 限流中，请稍后再试。'
+            detail: 'API 限流中，请稍后再试。',
+            retryable: true,
+            backoffMs: 10000
         };
     }
     
-    // 503 + queue full / service busy — 排队中
+    // 503 + queue full / service busy — 排队中，可退避重试
     if ((msg.includes('queue is full') || msg.includes('retry later') || msg.includes('service busy')) && statusCode === 503) {
         return {
             type: 'queue_full',
             emoji: '📋',
             title: '生图队列已满',
-            detail: '当前排队人数较多，请稍后再试。建议等待 1-2 分钟后重试。'
+            detail: '当前排队人数较多，请稍后再试。建议等待 1-2 分钟后重试。',
+            retryable: true,
+            backoffMs: 15000
         };
     }
     
-    // 5xx 服务端错误
+    // 5xx 服务端错误 — 可退避重试
     if (statusCode >= 500) {
         return {
             type: 'server_error',
             emoji: '⚠️',
             title: '服务器错误',
-            detail: '生图服务暂时不可用，请稍后重试。'
+            detail: '生图服务暂时不可用，请稍后重试。',
+            retryable: true,
+            backoffMs: 8000
         };
     }
     
@@ -69,8 +77,44 @@ App.classifyImageError = function(statusCode, errorMessage) {
         type: 'unknown',
         emoji: '❓',
         title: '生图失败',
-        detail: `错误信息: ${errorMessage || '未知原因'}`
+        detail: `错误信息: ${errorMessage || '未知原因'}`,
+        retryable: true,
+        backoffMs: 5000
     };
+};
+
+// 退避等待工具函数
+App.sleep = function(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+};
+
+// 智能重试包装器：对可重试错误自动退避，对不可重试错误立即返回
+App.withSmartRetry = async function(fn, options = {}) {
+    const maxRetries = options.maxRetries ?? 3;
+    const baseBackoff = options.baseBackoff ?? 5000;
+    let lastError = null;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (e) {
+            lastError = e;
+            const classified = e._errorClassified ? e : App.classifyImageError(0, e.message);
+            
+            // 不可重试的错误：立即抛出，不浪费时间在重试上
+            if (!classified.retryable || attempt >= maxRetries) {
+                rpLog('warn', 'IMG', `不可重试/已达上限 (${attempt + 1}/${maxRetries + 1}): ${classified.title}`);
+                throw e;
+            }
+            
+            // 可重试：退避等待
+            const backoff = classified.backoffMs || baseBackoff * Math.pow(2, attempt);
+            rpLog('info', 'IMG', `  退避 ${backoff}ms 后重试 (${attempt + 1}/${maxRetries})...`);
+            await App.sleep(backoff);
+        }
+    }
+    
+    throw lastError;
 };
 
 // 生图 API 调用 + prompt 清洗 + 风格后缀 + 模块化三级降级
@@ -264,18 +308,31 @@ App.generateCharacterFaceOnly = async function(character) {
 
     const faceModels = ['agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
     let faceImageUrl;
+    
     for (let attempt = 0; attempt < 3; attempt++) {
         try {
             const model = faceModels[attempt % faceModels.length];
             rpLog('info', 'IMG', `面部特写尝试 ${attempt + 1}/3 (model=${model}): ${character.name}`);
+            
             faceImageUrl = await App.agnesImageGen(facePrompt, '256x341', model);
             rpLog('info', 'IMG', `✅ 面部特写生成成功: ${character.name}`);
             character.faceImageUrl = faceImageUrl;
             await saveState();
             return faceImageUrl;
         } catch (e) {
+            // 快速失败：不可重试的错误不再浪费时间在重试上
+            if (e._errorType === 'policy' || e._errorType === 'client_error') {
+                rpLog('warn', 'IMG', `面部特写策略违规/参数错误，不再重试: ${character.name}`);
+                throw e;
+            }
+            
             rpLog('warn', 'IMG', `面部特写失败 (尝试 ${attempt + 1}/3): ${e.message}`);
-            if (attempt === 2) {
+            if (attempt < 2) {
+                // 退避等待后再试
+                const backoff = e._errorType === 'queue_full' ? 15000 : 5000;
+                rpLog('info', 'IMG', `  退避 ${backoff}ms 后重试...`);
+                await App.sleep(backoff);
+            } else {
                 rpLog('error', 'IMG', `面部特写全部重试失败: ${character.name}`);
             }
         }
@@ -322,8 +379,18 @@ App.generateCharacterImage = async function(character, actionText, skipFace) {
                     await saveState();
                     break;
                 } catch (e) {
+                    // 不可重试的错误立即退出，不浪费时间
+                    if (e._errorType === 'policy' || e._errorType === 'client_error') {
+                        rpLog('warn', 'IMG', `面部特写策略违规/参数错误，不再重试: ${character.name}`);
+                        throw e;
+                    }
+                    
                     rpLog('warn', 'IMG', `面部特写失败 (尝试 ${attempt + 1}/3): ${e.message}`);
-                    if (attempt === 2) {
+                    if (attempt < 2) {
+                        const backoff = e._errorType === 'queue_full' ? 15000 : 5000;
+                        rpLog('info', 'IMG', `  退避 ${backoff}ms 后重试...`);
+                        await App.sleep(backoff);
+                    } else {
                         rpLog('error', 'IMG', `面部特写全部重试失败: ${character.name}`);
                     }
                 }
@@ -355,6 +422,12 @@ App.generateCharacterImage = async function(character, actionText, skipFace) {
                     return imageUrl;
                 }
             } catch (e) {
+                // 不可重试的错误立即退出，不浪费时间
+                if (e._errorType === 'policy' || e._errorType === 'client_error') {
+                    rpLog('warn', 'IMG', `${tier.name} 策略违规/参数错误，不再重试: ${character.name}`);
+                    break;
+                }
+                
                 rpLog('warn', 'IMG', `${tier.name} 失败 (${e.message})`);
             }
         }
