@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>三位数计算练习题生成器</title>
+    <title>Math Problems Generator</title>
     <link rel="canonical" href="https://www.bayihy.cn/tools/math-problems">
     <style>
         :root {
@@ -169,71 +169,71 @@
     <a href="/tools/toolsbox" class="back-link">← 返回工具箱</a>
 
     <div class="header">
-        <h1>📐 三位数计算练习题生成器</h1>
-        <p>随机生成加法、减法、混合运算练习题，预览后直接下载 A4 PDF 打印</p>
+        <h1>📐 Math Problems Generator</h1>
+        <p>Generate addition, subtraction, and mixed operation exercises for A4 printing</p>
     </div>
 
-    <!-- 配置 -->
+    <!-- Configuration -->
     <div class="card">
-        <h2>⚙️ 题目配置</h2>
+        <h2>⚙️ Settings</h2>
         <div class="form-row">
             <div class="form-group">
-                <label>加法题数（每页）</label>
+                <label>Addition count (per page)</label>
                 <input type="number" id="addCount" value="6" min="1" max="30">
             </div>
             <div class="form-group">
-                <label>减法题数（每页）</label>
+                <label>Subtraction count (per page)</label>
                 <input type="number" id="subCount" value="6" min="1" max="30">
             </div>
             <div class="form-group">
-                <label>混合题数（每页）</label>
+                <label>Mixed count (per page)</label>
                 <input type="number" id="mixCount" value="8" min="1" max="30">
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>页数</label>
+                <label>Pages</label>
                 <select id="pageCount">
-                    <option value="1">1 页</option>
-                    <option value="2" selected>2 页</option>
-                    <option value="3">3 页</option>
+                    <option value="1">1 page</option>
+                    <option value="2" selected>2 pages</option>
+                    <option value="3">3 pages</option>
                 </select>
             </div>
             <div class="form-group">
-                <label>每行题数（加/减）</label>
+                <label>Columns per row (add/sub)</label>
                 <select id="addSubCols">
-                    <option value="2">2 道/行</option>
-                    <option value="3" selected>3 道/行</option>
+                    <option value="2">2 per row</option>
+                    <option value="3" selected>3 per row</option>
                 </select>
             </div>
             <div class="form-group">
-                <label>每行题数（混合）</label>
+                <label>Columns per row (mixed)</label>
                 <select id="mixCols">
-                    <option value="1">1 道/行</option>
-                    <option value="2" selected>2 道/行</option>
+                    <option value="1">1 per row</option>
+                    <option value="2" selected>2 per row</option>
                 </select>
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>数字范围（最小值）</label>
+                <label>Min number</label>
                 <input type="number" id="minNum" value="100" min="10" max="900">
             </div>
             <div class="form-group">
-                <label>数字范围（最大值）</label>
+                <label>Max number</label>
                 <input type="number" id="maxNum" value="999" min="100" max="9999">
             </div>
         </div>
         <div class="btn-row">
-            <button class="btn btn-primary" onclick="generateAndPreview()">🎲 生成预览</button>
-            <button class="btn btn-secondary" onclick="downloadPDF()" id="downloadBtn">📥 下载 PDF</button>
+            <button class="btn btn-primary" onclick="generateAndPreview()">🎲 Generate Preview</button>
+            <button class="btn btn-secondary" onclick="downloadPDF()" id="downloadBtn">📥 Download PDF</button>
         </div>
         <div id="status" class="status"></div>
     </div>
 
-    <!-- 预览 -->
+    <!-- Preview -->
     <div class="card">
-        <h2>👁️ 预览</h2>
+        <h2>👁️ Preview</h2>
         <div id="preview" class="preview"></div>
     </div>
 </div>
@@ -370,16 +370,16 @@ function renderPreview(pages) {
         const div = document.createElement('div');
         div.className = 'preview-page';
         div.innerHTML = `
-            <div class="preview-page-header">第 ${idx + 1} 页 · 三位数计算练习</div>
-            <div class="preview-section-title">一、加法</div>
+            <div class="preview-page-header">Math Problems - Page ${idx + 1}</div>
+            <div class="preview-section-title">Addition</div>
             <div class="preview-problems cols-3">
                 ${page.adds.map(fmtAdd).map(s => `<div class="preview-problem">${s}</div>`).join('')}
             </div>
-            <div class="preview-section-title" style="margin-top:16px;">二、减法</div>
+            <div class="preview-section-title" style="margin-top:16px;">Subtraction</div>
             <div class="preview-problems cols-3">
                 ${page.subs.map(fmtSub).map(s => `<div class="preview-problem">${s}</div>`).join('')}
             </div>
-            <div class="preview-section-title" style="margin-top:16px;">三、混合运算</div>
+            <div class="preview-section-title" style="margin-top:16px;">Mixed Operations</div>
             <div class="preview-problems cols-2">
                 ${page.mixes.map(fmtMix).map(s => `<div class="preview-problem">${s}</div>`).join('')}
             </div>
