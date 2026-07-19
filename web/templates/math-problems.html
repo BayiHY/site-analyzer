@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Math Problems Generator</title>
+    <title>三位数计算练习题生成器</title>
     <link rel="canonical" href="https://www.bayihy.cn/tools/math-problems">
     <style>
         :root {
@@ -373,10 +373,12 @@ function renderPreview(pages) {
             <div class="preview-problems cols-3">
                 ${page.adds.map(fmtAdd).map(s => `<div class="preview-problem">${s}</div>`).join('')}
             </div>
-            <div class="preview-problems cols-3" style="margin-top:24px;">
+            <div style="height:24px;"></div>
+            <div class="preview-problems cols-3">
                 ${page.subs.map(fmtSub).map(s => `<div class="preview-problem">${s}</div>`).join('')}
             </div>
-            <div class="preview-problems cols-2" style="margin-top:24px;">
+            <div style="height:24px;"></div>
+            <div class="preview-problems cols-2">
                 ${page.mixes.map(fmtMix).map(s => `<div class="preview-problem">${s}</div>`).join('')}
             </div>
         `;
