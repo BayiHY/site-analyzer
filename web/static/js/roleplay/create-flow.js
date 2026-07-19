@@ -21,11 +21,12 @@ App.createCharacter = async function() {
     const rawPlayerName = document.getElementById('setup-player-name')?.value.trim() || '';
 
     if (!chatKey) {
-        alert('请先填写对话 API Key');
+        App.showErrorModal('请先填写对话 API Key', '⚠️ 提示');
         return;
     }
 
     // 校验 API Key 有效性
+    App.showKeyCheckOverlay();
     try {
         const resp = await fetch('https://apihub.agnes-ai.com/v1/chat/completions', {
             method: 'POST',
@@ -41,12 +42,16 @@ App.createCharacter = async function() {
             signal: AbortSignal.timeout(15000)
         });
         if (!resp.ok) {
-            alert('API Key 无效，请检查后重试');
+            App.hideKeyCheckOverlay();
+            App.showErrorModal('API Key 无效，请检查后重试', '❌ 校验失败');
             return;
         }
     } catch (e) {
-        alert('API Key 校验失败，请检查网络连接或 Key 是否正确');
+        App.hideKeyCheckOverlay();
+        App.showErrorModal('API Key 校验失败，请检查网络连接或 Key 是否正确', '❌ 网络错误');
         return;
+    } finally {
+        App.hideKeyCheckOverlay();
     }
 
     state.apiKeys.chat = chatKey;

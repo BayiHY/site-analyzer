@@ -74,35 +74,118 @@ App.validateApiKey = async function(apiKey) {
 };
 
 /**
+ * 显示通用错误弹窗（替代 alert）
+ * @param {string} message - 错误信息
+ * @param {string} [title='⚠️ 提示'] - 弹窗标题
+ * @param {Array<{label:string, action:Function, className?:string}>} [buttons] - 自定义按钮
+ */
+App.showErrorModal = function(message, title = '⚠️ 提示', buttons = null) {
+    const overlay = document.createElement('div');
+    overlay.className = 'error-modal-overlay';
+
+    let buttonsHtml = '';
+    if (buttons && buttons.length > 0) {
+        buttonsHtml = '<div class="error-modal-actions">';
+        buttons.forEach((btn, i) => {
+            const cls = btn.className || 'btn btn-primary';
+            buttonsHtml += `<button class="${cls}" id="err-btn-${i}">${btn.label}</button>`;
+        });
+        buttonsHtml += '</div>';
+    }
+
+    overlay.innerHTML = `
+        <div class="error-modal-box">
+            <h3>${title}</h3>
+            <p>${message}</p>
+            ${buttonsHtml}
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 绑定按钮事件
+    if (buttons && buttons.length > 0) {
+        buttons.forEach((btn, i) => {
+            const el = document.getElementById(`err-btn-${i}`);
+            if (el) {
+                el.addEventListener('click', () => {
+                    overlay.remove();
+                    btn.action();
+                });
+            }
+        });
+    } else {
+        // 无按钮则点击遮罩关闭
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.remove();
+        });
+    }
+};
+
+/**
  * 显示 Key 校验失败的提示
  */
 App.showKeyError = function(message) {
+    App.showErrorModal(
+        '请输入有效的 API Key 后继续。<br><br>' +
+        '还没有 Key？<a href="https://platform.agnes-ai.com/settings/apiKeys" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">点击申请 →</a>',
+        '🔑 需要 API Key',
+        [{ label: '输入 Key', action: App.promptForKeyInput }]
+    );
+};
+
+/**
+ * 弹出 Key 输入框
+ */
+App.promptForKeyInput = function() {
     const overlay = document.createElement('div');
-    overlay.className = 'import-modal-overlay';
+    overlay.className = 'error-modal-overlay';
     overlay.innerHTML = `
-        <div class="import-modal-box">
-            <h3>⚠️ ${message}</h3>
-            <p>请输入有效的 API Key 后继续。<br><br>还没有 Key？<a href="https://platform.agnes-ai.com/settings/apiKeys" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">点击申请 →</a></p>
-            <div class="form-group" style="margin-bottom:12px;">
-                <input type="password" id="import-api-key-input" placeholder="输入 API Key (sk-...)" style="width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;outline:none;">
+        <div class="error-modal-box">
+            <h3>🔑 输入 API Key</h3>
+            <div style="margin-bottom:12px;">
+                <input type="password" id="inline-api-key-input" placeholder="输入 API Key (sk-...)" style="width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;outline:none;">
             </div>
-            <div class="import-modal-actions">
-                <button class="btn btn-primary" onclick="App.submitImportApiKey()">校验并继续</button>
-                <button class="btn btn-outline" onclick="App.cancelImportApiKey()">取消</button>
+            <div class="error-modal-actions">
+                <button class="btn btn-primary" id="inline-key-submit">校验并继续</button>
+                <button class="btn btn-outline" id="inline-key-cancel">取消</button>
             </div>
         </div>
     `;
     document.body.appendChild(overlay);
-    setTimeout(() => {
-        const input = document.getElementById('import-api-key-input');
-        if (input) {
-            input.focus();
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') App.submitImportApiKey();
-                if (e.key === 'Escape') App.cancelImportApiKey();
-            });
+
+    const input = document.getElementById('inline-api-key-input');
+    if (input) input.focus();
+
+    document.getElementById('inline-key-submit').addEventListener('click', async () => {
+        const apiKey = input?.value.trim();
+        if (!apiKey) {
+            App.showErrorModal('请输入 API Key', '⚠️ 提示');
+            return;
         }
-    }, 50);
+        overlay.remove();
+        const valid = await App.validateApiKey(apiKey);
+        if (!valid) {
+            App.showErrorModal('API Key 无效，请检查后重试', '⚠️ 校验失败');
+            return;
+        }
+        state.apiKeys.chat = apiKey;
+        localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
+        // 重新执行存档加载
+        if (_pendingImportData) {
+            App.startFromArchive(_pendingImportData.data, _pendingImportData.mode || 'continue');
+        }
+    });
+
+    document.getElementById('inline-key-cancel').addEventListener('click', () => {
+        overlay.remove();
+    });
+
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('inline-key-submit')?.click();
+            if (e.key === 'Escape') overlay.remove();
+        });
+    }
 };
 
 /**
@@ -165,7 +248,7 @@ App.importArchive = async function() {
                     await App.startFromArchive(data, _pendingImportData.mode);
                 }
             } catch (err) {
-                alert('导入失败: 不是有效的 JSON 文件 (' + err.message + ')');
+                App.showErrorModal('导入失败: 不是有效的 JSON 文件 (' + err.message + ')', '❌ 错误');
             }
         };
         reader.readAsText(file);
@@ -288,7 +371,7 @@ App.startFromArchive = async function(data, mode = 'continue') {
             }
         }
     } catch (err) {
-        alert('导入失败: ' + err.message);
+        App.showErrorModal('导入失败: ' + err.message, '❌ 错误');
     }
 }
 
@@ -307,7 +390,7 @@ App.importData = async function() {
             return;
         }
     } catch (e) {
-        alert('API Key 校验失败，请检查后重试');
+        App.showErrorModal('API Key 校验失败，请检查后重试', '❌ 网络错误');
         return;
     } finally {
         App.hideKeyCheckOverlay();
@@ -350,7 +433,7 @@ App.importData = async function() {
                     await App.startFromArchive(data, _pendingImportData.mode);
                 }
             } catch (err) {
-                alert('导入失败: 不是有效的 JSON 文件 (' + err.message + ')');
+                App.showErrorModal('导入失败: 不是有效的 JSON 文件 (' + err.message + ')', '❌ 错误');
             }
         };
         reader.readAsText(file);
@@ -363,38 +446,4 @@ App.importData = async function() {
  */
 App.promptForApiKey = function() {
     App.showKeyError('此存档未包含 API Key');
-}
-
-App.submitImportApiKey = async function() {
-    const input = document.getElementById('import-api-key-input');
-    if (!input || !input.value.trim()) {
-        alert('请输入 API Key');
-        return;
-    }
-    const apiKey = input.value.trim();
-
-    // 校验 key 有效性
-    const valid = await App.validateApiKey(apiKey);
-    if (!valid) {
-        alert('API Key 无效，请检查后重试');
-        return;
-    }
-
-    state.apiKeys.chat = apiKey;
-    localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
-
-    // 移除模态框并重新加载
-    const overlay = document.querySelector('.import-modal-overlay');
-    if (overlay) overlay.remove();
-
-    // 重新执行存档加载
-    if (_pendingImportData) {
-        App.startFromArchive(_pendingImportData.data, _pendingImportData.mode || 'continue');
-    }
-}
-
-App.cancelImportApiKey = function() {
-    const overlay = document.querySelector('.import-modal-overlay');
-    if (overlay) overlay.remove();
-    _pendingImportData = null;
 }
