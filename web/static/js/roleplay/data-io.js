@@ -49,7 +49,9 @@ App.hideKeyCheckOverlay = function() {
 
 /**
  * 校验 API Key 是否有效（发送一个最小请求测试）
- * @returns {Promise<boolean>}
+ * 实测最快方案：无 system prompt，仅 user + temp:0 + max_tokens:1，耗时 ~7s
+ * @param {string} apiKey - API Key
+ * @returns {Promise<boolean>} 是否有效
  */
 App.validateApiKey = async function(apiKey) {
     if (!apiKey) return false;
@@ -63,9 +65,10 @@ App.validateApiKey = async function(apiKey) {
             body: JSON.stringify({
                 model: 'agnes-2.0-flash',
                 messages: [{ role: 'user', content: 'ok' }],
+                temperature: 0,
                 max_tokens: 1
             }),
-            signal: AbortSignal.timeout(15000)
+            signal: AbortSignal.timeout(12000)
         });
         return resp.ok;
     } catch (e) {
@@ -191,32 +194,47 @@ App.promptForKeyInput = function() {
 /**
  * 导入存档并直接继续游戏：恢复角色、图片、对话记录，跳到聊天界面
  */
-App.importArchive = async function() {
-    // 先校验当前已有的 key
-    const existingKey = state.apiKeys.chat || localStorage.getItem('rp_apiKeys');
-    if (existingKey) {
-        App.showKeyCheckOverlay();
-        try {
-            const isValid = await App.validateApiKey(existingKey);
-            if (!isValid) {
-                App.hideKeyCheckOverlay();
-                App.showKeyError('API Key 无效');
-                return;
-            }
-        } finally {
-            App.hideKeyCheckOverlay();
-        }
-    } else {
-        App.showKeyError('请先填写 API Key');
+App.importArchive = function() {
+    // 从输入框获取 key
+    const chatKey = document.getElementById('setup-chat-key').value.trim();
+    if (!chatKey) {
+        App.showErrorModal('请先填写对话 API Key', '⚠️ 提示');
         return;
     }
 
+    // 先创建文件选择器并同步触发（必须在用户手势上下文中，不能在 await 之后）
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
     input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
+
+        // 校验 API Key 有效性（复用 validateApiKey）
+        App.showKeyCheckOverlay();
+        try {
+            const valid = await App.validateApiKey(chatKey);
+            if (!valid) {
+                App.hideKeyCheckOverlay();
+                App.showErrorModal('API Key 无效，请检查后重试', '❌ 校验失败');
+                return;
+            }
+        } catch (e) {
+            App.hideKeyCheckOverlay();
+            App.showErrorModal('API Key 校验失败，请检查网络连接或 Key 是否正确', '❌ 网络错误');
+            return;
+        } finally {
+            App.hideKeyCheckOverlay();
+        }
+
+        // Key 校验通过，保存 key
+        state.apiKeys.chat = chatKey;
+        localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
+
+        // 读取文件
         const reader = new FileReader();
         reader.onload = async (ev) => {
             try {
@@ -253,7 +271,10 @@ App.importArchive = async function() {
         };
         reader.readAsText(file);
     };
+
+    // 同步触发文件选择器（在用户手势上下文中）
     input.click();
+    document.body.removeChild(input);
 }
 
 /**

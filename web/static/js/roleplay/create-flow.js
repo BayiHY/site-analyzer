@@ -25,23 +25,11 @@ App.createCharacter = async function() {
         return;
     }
 
-    // 校验 API Key 有效性
+    // 校验 API Key 有效性（复用 validateApiKey）
     App.showKeyCheckOverlay();
     try {
-        const resp = await fetch('https://apihub.agnes-ai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${chatKey}`
-            },
-            body: JSON.stringify({
-                model: 'agnes-2.0-flash',
-                messages: [{ role: 'user', content: 'ok' }],
-                max_tokens: 1
-            }),
-            signal: AbortSignal.timeout(15000)
-        });
-        if (!resp.ok) {
+        const valid = await App.validateApiKey(chatKey);
+        if (!valid) {
             App.hideKeyCheckOverlay();
             App.showErrorModal('API Key 无效，请检查后重试', '❌ 校验失败');
             return;
