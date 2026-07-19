@@ -76,9 +76,8 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
         throw err;
     }
 
-    // ===== 角色生成完成后：立即生成面部特写（不等序章）=====
+    // ===== 角色生成完成后：面部特写后台异步启动，不阻塞序章 =====
     if (state.apiKeys.chat && chars.length > 0) {
-        rpLog('info', 'IMG', `━━━ 立即生成面部特写: ${chars.length} 个角色 ━━━`);
         const faceTasks = chars.map(c => (async () => {
             try {
                 rpLog('info', 'IMG', `📷 面部特写: ${c.name}`);
@@ -91,8 +90,7 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
                 rpLog('warn', 'IMG', `${c.name} 面部特写失败: ${e.message}`);
             }
         })());
-        await Promise.allSettled(faceTasks);
-        rpLog('info', 'IMG', '所有面部特写完成');
+        rpLog('info', 'IMG', `━━━ 面部特写已后台启动 (${chars.length} 个)，不阻塞序章生成 ━━━`);
     }
 
     // ===== 生成序章 → 渲染序章 → 按出场顺序生成全身/半身（含动作描写）=====
