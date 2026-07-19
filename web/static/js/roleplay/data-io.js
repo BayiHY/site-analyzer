@@ -25,6 +25,29 @@ App.exportData = function() {
 let _pendingImportData = null;
 
 /**
+ * 显示 Key 校验加载遮罩
+ */
+App.showKeyCheckOverlay = function() {
+    let el = document.getElementById('key-check-overlay');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'key-check-overlay';
+        el.className = 'key-check-overlay';
+        el.innerHTML = '<div class="key-check-spinner"></div><span>正在校验 API Key…</span>';
+        document.body.appendChild(el);
+    }
+    el.style.display = 'flex';
+}
+
+/**
+ * 隐藏 Key 校验加载遮罩
+ */
+App.hideKeyCheckOverlay = function() {
+    const el = document.getElementById('key-check-overlay');
+    if (el) el.style.display = 'none';
+}
+
+/**
  * 校验 API Key 是否有效（发送一个最小请求测试）
  * @returns {Promise<boolean>}
  */
@@ -89,10 +112,16 @@ App.importArchive = async function() {
     // 先校验当前已有的 key
     const existingKey = state.apiKeys.chat || localStorage.getItem('rp_apiKeys');
     if (existingKey) {
-        const isValid = await App.validateApiKey(existingKey);
-        if (!isValid) {
-            App.showKeyError('API Key 无效');
-            return;
+        App.showKeyCheckOverlay();
+        try {
+            const isValid = await App.validateApiKey(existingKey);
+            if (!isValid) {
+                App.hideKeyCheckOverlay();
+                App.showKeyError('API Key 无效');
+                return;
+            }
+        } finally {
+            App.hideKeyCheckOverlay();
         }
     } else {
         App.showKeyError('请先填写 API Key');
@@ -271,6 +300,7 @@ App.importData = async function() {
         return;
     }
     try {
+        App.showKeyCheckOverlay();
         const isValid = await App.validateApiKey(existingKey);
         if (!isValid) {
             App.showKeyError('API Key 无效');
@@ -279,6 +309,8 @@ App.importData = async function() {
     } catch (e) {
         alert('API Key 校验失败，请检查后重试');
         return;
+    } finally {
+        App.hideKeyCheckOverlay();
     }
 
     const input = document.createElement('input');
