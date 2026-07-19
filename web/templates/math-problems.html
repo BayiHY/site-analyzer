@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三位数计算练习题生成器</title>
+    <link rel="canonical" href="https://www.bayihy.cn/tools/math-problems">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #4f8a8b;
+            --primary-dark: #3a6b6c;
+            --accent: #ffd700;
+            --bg: #0f1419;
+            --bg2: #1a2332;
+            --bg3: #243044;
+            --text: #e8eaed;
+            --text-dim: #9aa0a6;
+            --border: #2d3a4a;
+            --card-hover: rgba(79,138,139,0.12);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 720px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 32px; }
+        .header h1 { font-size: 1.8rem; color: var(--primary); margin-bottom: 8px; }
+        .header p { color: var(--text-dim); font-size: 0.9rem; }
+        .back-link { display: inline-block; margin-bottom: 16px; color: var(--primary); text-decoration: none; font-size: 0.85rem; }
+        .back-link:hover { text-decoration: underline; }
+
+        .card {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .card h2 { font-size: 1.1rem; color: var(--primary); margin-bottom: 16px; }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .btn-secondary {
+            background: var(--bg3);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { border-color: var(--primary); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .preview {
+            background: #fff;
+            color: #1a1a1a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Times New Roman', serif;
+            display: none;
+        }
+        .preview.visible { display: block; }
+        .preview-page {
+            page-break-after: always;
+            margin-bottom: 24px;
+        }
+        .preview-page:last-child { margin-bottom: 0; }
+        .preview-section-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        .preview-problems {
+            display: grid;
+            gap: 8px;
+        }
+        .preview-problems.cols-3 { grid-template-columns: repeat(3, 1fr); }
+        .preview-problems.cols-2 { grid-template-columns: repeat(2, 1fr); }
+        .preview-problem {
+            font-size: 1.2rem;
+            text-align: center;
+            padding: 6px 0;
+            letter-spacing: 1px;
+        }
+        .preview-page-header {
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #333;
+        }
+
+        .status {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: none;
+        }
+        .status.success { display: block; background: rgba(76,175,80,0.15); color: #81c784; border: 1px solid rgba(76,175,80,0.3); }
+        .status.error { display: block; background: rgba(244,67,54,0.15); color: #e57373; border: 1px solid rgba(244,67,54,0.3); }
+        .status.info { display: block; background: rgba(79,138,139,0.15); color: #80cbc4; border: 1px solid rgba(79,138,139,0.3); }
+
+        @media (max-width: 600px) {
+            .form-row { grid-template-columns: 1fr; }
+            .btn-row { flex-direction: column; }
+            .btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="/tools/toolsbox" class="back-link">← 返回工具箱</a>
+
+    <div class="header">
+        <h1>📐 三位数计算练习题生成器</h1>
+        <p>随机生成加法、减法、混合运算练习题，导出 A4 PDF 打印</p>
+    </div>
+
+    <!-- 配置 -->
+    <div class="card">
+        <h2>⚙️ 题目配置</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label>加法题数</label>
+                <input type="number" id="addCount" value="6" min="1" max="20">
+            </div>
+            <div class="form-group">
+                <label>减法题数</label>
+                <input type="number" id="subCount" value="6" min="1" max="20">
+            </div>
+            <div class="form-group">
+                <label>混合题数</label>
+                <input type="number" id="mixCount" value="8" min="1" max="20">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>页数</label>
+                <select id="pageCount">
+                    <option value="1">1 页</option>
+                    <option value="2" selected>2 页</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>每行题数（加法/减法）</label>
+                <select id="addSubCols">
+                    <option value="2">2 道/行</option>
+                    <option value="3" selected>3 道/行</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>每行题数（混合）</label>
+                <select id="mixCols">
+                    <option value="1">1 道/行</option>
+                    <option value="2" selected>2 道/行</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>数字范围（最小值）</label>
+                <input type="number" id="minNum" value="100" min="10" max="900">
+            </div>
+            <div class="form-group">
+                <label>数字范围（最大值）</label>
+                <input type="number" id="maxNum" value="999" min="100" max="9999">
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="generateAndPreview()">🎲 生成预览</button>
+            <button class="btn btn-secondary" onclick="downloadPDF()">📥 下载 PDF</button>
+        </div>
+        <div id="status" class="status"></div>
+    </div>
+
+    <!-- 预览 -->
+    <div class="card">
+        <h2>👁️ 预览</h2>
+        <div id="preview" class="preview"></div>
+    </div>
+</div>
+
+<script>
+// ===== 工具函数 =====
+function randInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = randInt(0, i);
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+// ===== 生成算式 =====
+function genAddition(n, minN, maxN) {
+    const results = [];
+    for (let i = 0; i < n; i++) {
+        let a, b;
+        // 保证 a + b <= maxN
+        a = randInt(minN, maxN);
+        b = randInt(minN, maxN - a);
+        if (b < minN) b = minN;
+        results.push({ a, b, op: '+' });
+    }
+    return results;
+}
+
+function genSubtraction(n, minN, maxN) {
+    const results = [];
+    for (let i = 0; i < n; i++) {
+        let a, b;
+        // 保证 a - b >= minN（结果至少为最小值）
+        a = randInt(maxN, maxN);
+        // 让被减数足够大
+        a = randInt(Math.max(minN * 2, minN + 100), maxN);
+        b = randInt(minN, a - minN);
+        if (b < minN) b = minN;
+        results.push({ a, b, op: '-' });
+    }
+    return results;
+}
+
+function genMixed(n, minN, maxN) {
+    const results = [];
+    // 确保每种模式都有足够数量
+    const patterns = ['++', '--', '+-', '-+'];
+    const patternList = [];
+    while (patternList.length < n) {
+        for (const p of patterns) patternList.push(p);
+    }
+    shuffle(patternList).slice(0, n).forEach(pattern => {
+        if (pattern === '++') {
+            let a = randInt(minN, Math.floor(maxN / 3));
+            let b = randInt(minN, Math.floor((maxN - a) / 2));
+            let c = randInt(minN, maxN - a - b);
+            if (c < minN) c = minN;
+            results.push({ a, b, c, op1: '+', op2: '+' });
+        } else if (pattern === '--') {
+            let a = randInt(Math.max(minN * 3, minN + 200), maxN);
+            let b = randInt(minN, a - minN * 2);
+            let remain = a - b;
+            let c = randInt(minN, remain - minN);
+            if (c < minN) c = minN;
+            results.push({ a, b, c, op1: '-', op2: '-' });
+        } else if (pattern === '+-') {
+            let a = randInt(minN, Math.floor(maxN / 2));
+            let b = randInt(minN, maxN - a - minN);
+            let remain = a + b;
+            let c = randInt(minN, remain - minN);
+            if (c < minN) c = minN;
+            results.push({ a, b, c, op1: '-', op2: '+' });
+        } else { // -+
+            let a = randInt(Math.max(minN * 2, minN + 100), maxN);
+            let b = randInt(minN, a - minN);
+            let remain = a - b;
+            let c = randInt(minN, maxN - remain);
+            if (c < minN) c = minN;
+            results.push({ a, b, c, op1: '+', op2: '-' });
+        }
+    });
+    return results;
+}
+
+function fmtAdd(e) { return `${e.a} + ${e.b} =`; }
+function fmtSub(e) { return `${e.a} − ${e.b} =`; }
+function fmtMix(e) { return `${e.a} ${e.op1} ${e.b} ${e.op2} ${e.c} =`; }
+
+// ===== 验证 =====
+function verifyAll(adds, subs, mixes, label) {
+    for (const e of adds) {
+        if (e.a + e.b > 999) throw new Error(`${label} 加法超范围: ${e.a}+${e.b}`);
+    }
+    for (const e of subs) {
+        if (e.a - e.b < 0) throw new Error(`${label} 减法为负: ${e.a}-${e.b}`);
+    }
+    for (const e of mixes) {
+        const mid = e.op1 === '+' ? e.a + e.b : e.a - e.b;
+        if (mid < 0) throw new Error(`${label} 中间结果为负: ${mid}`);
+        const final = e.op2 === '+' ? mid + e.c : mid - e.c;
+        if (final < 0) throw new Error(`${label} 最终结果为负: ${final}`);
+    }
+    return true;
+}
+
+// ===== 全局状态 =====
+let currentProblems = null;
+
+function generateAll() {
+    const addCount = parseInt(document.getElementById('addCount').value) || 6;
+    const subCount = parseInt(document.getElementById('subCount').value) || 6;
+    const mixCount = parseInt(document.getElementById('mixCount').value) || 8;
+    const pageCount = parseInt(document.getElementById('pageCount').value) || 2;
+    const minN = parseInt(document.getElementById('minNum').value) || 100;
+    const maxN = parseInt(document.getElementById('maxNum').value) || 999;
+
+    const perPage = Math.ceil(pageCount);
+    const totalAdds = addCount * perPage;
+    const totalSubs = subCount * perPage;
+    const totalMixes = mixCount * perPage;
+
+    const adds = genAddition(totalAdds, minN, maxN);
+    const subs = genSubtraction(totalSubs, minN, maxN);
+    const mixes = genMixed(totalMixes, minN, maxN);
+
+    // 按页分配
+    const pages = [];
+    for (let p = 0; p < perPage; p++) {
+        pages.push({
+            adds: adds.slice(p * addCount, (p + 1) * addCount),
+            subs: subs.slice(p * subCount, (p + 1) * subCount),
+            mixes: mixes.slice(p * mixCount, (p + 1) * mixCount),
+        });
+    }
+
+    return pages;
+}
+
+// ===== 渲染预览 =====
+function renderPreview(pages) {
+    const container = document.getElementById('preview');
+    container.innerHTML = '';
+
+    pages.forEach((page, idx) => {
+        const div = document.createElement('div');
+        div.className = 'preview-page';
+        div.innerHTML = `
+            <div class="preview-page-header">第 ${idx + 1} 页 · 三位数计算练习</div>
+            <div class="preview-section-title">一、加法</div>
+            <div class="preview-problems cols-3">
+                ${page.adds.map(fmtAdd).map(s => `<div class="preview-problem">${s}</div>`).join('')}
+            </div>
+            <div class="preview-section-title" style="margin-top:16px;">二、减法</div>
+            <div class="preview-problems cols-3">
+                ${page.subs.map(fmtSub).map(s => `<div class="preview-problem">${s}</div>`).join('')}
+            </div>
+            <div class="preview-section-title" style="margin-top:16px;">三、混合运算</div>
+            <div class="preview-problems cols-2">
+                ${page.mixes.map(fmtMix).map(s => `<div class="preview-problem">${s}</div>`).join('')}
+            </div>
+        `;
+        container.appendChild(div);
+    });
+
+    container.classList.add('visible');
+}
+
+// ===== 生成并预览 =====
+async function generateAndPreview() {
+    const status = document.getElementById('status');
+    try {
+        const pages = generateAll();
+        verifyAll(pages[0].adds, pages[0].subs, pages[0].mixes, '第一页');
+        if (pages.length > 1) verifyAll(pages[1].adds, pages[1].subs, pages[1].mixes, '第二页');
+        currentProblems = pages;
+        renderPreview(pages);
+        showStatus(status, 'success', `✅ 已生成 ${pages.length} 页，共 ${pages.reduce((s, p) => s + p.adds.length + p.subs.length + p.mixes.length, 0)} 道题`);
+    } catch (e) {
+        showStatus(status, 'error', `❌ 生成失败: ${e.message}`);
+    }
+}
+
+// ===== 下载 PDF =====
+async function downloadPDF() {
+    const status = document.getElementById('status');
+    if (!currentProblems || currentProblems.length === 0) {
+        showStatus(status, 'error', '⚠️ 请先生成预览');
+        return;
+    }
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+        const PAGE_W = 210;
+        const PAGE_H = 297;
+        const MARGIN_L = 15;
+        const MARGIN_R = 15;
+        const MARGIN_T = 20;
+        const MARGIN_B = 15;
+        const FONT_SIZE = 14;
+        const usableW = PAGE_W - MARGIN_L - MARGIN_R;
+
+        currentProblems.forEach((page, idx) => {
+            if (idx > 0) doc.addPage();
+
+            let y = MARGIN_T;
+
+            // 标题
+            doc.setFontSize(18);
+            doc.text(`第 ${idx + 1} 页 · 三位数计算练习`, PAGE_W / 2, y, { align: 'center' });
+            y += 12;
+            // 分割线
+            doc.setLineWidth(0.5);
+            doc.line(MARGIN_L, y, PAGE_W - MARGIN_R, y);
+            y += 10;
+
+            // 加法
+            y = drawSection(doc, y, '一、加法', page.adds, 3, FONT_SIZE, usableW, MARGIN_L, fmtAdd, 3);
+            y += 6;
+
+            // 减法
+            y = drawSection(doc, y, '二、减法', page.subs, 3, FONT_SIZE, usableW, MARGIN_L, fmtSub, 3);
+            y += 6;
+
+            // 混合
+            y = drawSection(doc, y, '三、混合运算', page.mixes, 2, FONT_SIZE, usableW, MARGIN_L, fmtMix, 6);
+        });
+
+        const filename = `三位数计算练习题_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.pdf`;
+        doc.save(filename);
+        showStatus(status, 'success', `✅ PDF 已下载: ${filename}`);
+    } catch (e) {
+        showStatus(status, 'error', `❌ PDF 生成失败: ${e.message}`);
+    }
+}
+
+function drawSection(doc, y, title, problems, cols, fontSize, usableW, marginL, formatter, lineMultiplier) {
+    doc.setFontSize(fontSize + 2);
+    doc.text(title, doc.internal.pageSize.getWidth() / 2, y, { align: 'center' });
+    y += 8;
+
+    doc.setFontSize(fontSize);
+    const colWidth = usableW / cols;
+    const lineH = fontSize * 1.5;
+    const sectionLineH = lineH * lineMultiplier;
+
+    problems.forEach((expr, i) => {
+        const text = formatter(expr);
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+        const x = marginL + col * colWidth;
+        const textWidth = doc.getTextWidth(text);
+        const centerX = x + (colWidth - textWidth) / 2;
+        doc.text(text, centerX, y);
+    });
+
+    const rows = Math.ceil(problems.length / cols);
+    y += sectionLineH * rows;
+    return y;
+}
+
+function showStatus(el, type, msg) {
+    el.className = `status ${type}`;
+    el.textContent = msg;
+}
+
+// 页面加载时自动生成一次
+window.addEventListener('DOMContentLoaded', () => {
+    generateAndPreview();
+});
+</script>
+</body>
+</html>
