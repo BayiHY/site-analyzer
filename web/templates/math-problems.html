@@ -429,7 +429,7 @@ async function downloadPDF() {
         await new Promise(r => setTimeout(r, 300));
 
         for (let idx = 0; idx < pages.length; idx++) {
-            const pageDiv = printContainer.children[idx + 1];
+            const pageDiv = printContainer.children[idx];
             const canvas = await html2canvas(pageDiv, {
                 scale: 2,
                 useCORS: true,
