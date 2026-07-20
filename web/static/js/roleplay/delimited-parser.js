@@ -2,6 +2,72 @@
 // 基于 | 分隔符的 TSV/CSV 混合解析
 // 支持：回复选项（简单数组）、角色对象（TSV）
 
+
+// === 合并 LLM 错误输出的 TTS 参数列为声线字段 ===
+// LLM 可能把 +0Hz|0% 作为两个独立 | 分隔列输出，导致列数不足 19 且 anchor 检测失败。
+// 此函数在 split('\n') 之前执行，将相邻的 TTS 参数对合并到前一个字段。
+function mergeTTSParamPairs(text) {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const result = [];
+    let totalMerged = 0;
+
+    for (const line of lines) {
+        let parts = line.split('|');
+        let merged = false;
+
+        for (let i = 1; i < parts.length - 1; i++) {
+            const curr = parts[i].trim();
+            const next = parts[i + 1].trim();
+            if (/^[+-]?\d+(?:\.\d+)?Hz$/.test(curr) && /^[+-]?\d+(?:\.\d+)?%$/.test(next)) {
+                // LLM 把 TTS 参数作为独立列输出在 appearance 之后。
+                // 修复：合并 Hz + % 为一个 voice 值，删除多余的 % 列。
+                parts[i] = curr + ', rate=' + next;
+                parts.splice(i + 1, 1);
+                merged = true;
+                totalMerged++;
+                break;
+            }
+        }
+
+        if (merged) {
+            result.push(parts.join('|'));
+        } else {
+            result.push(line);
+        }
+    }
+
+    if (totalMerged > 0) {
+        rpLog('info', 'PARSE-MERGE', `合并 ${totalMerged} 组 TTS 参数到声线字段`);
+    }
+    return result.join('\n');
+}
+
+// === 修复 LLM 跳列导致的中间字段缺失 ===
+// 当 voice 在正确位置(索引4)但 imageFace 紧随其后时，说明 personality~ttsRate 等中间列被跳过
+function fixMissingMiddleColumns(vals, headers) {
+    const targetLen = headers.length; // 19
+    if (vals.length >= targetLen) return vals;
+
+    const voiceIdx = 4;
+    const imageFaceIdx = 14;
+
+    const voiceVal = (vals[voiceIdx] || '').toLowerCase();
+    const hasTTS = voiceVal.includes('hz') || voiceVal.includes('neural') || voiceVal.includes('zh-cn') || voiceVal.includes('en-us');
+
+    // Pattern: 10 cols, voice at index 4, then 5 trailing cols immediately follow
+    // Missing: personality(5)..imageFace(14) before imageFace = 9 cols
+    if (hasTTS && vals.length === 10 && voiceIdx === 4) {
+        const missingCount = imageFaceIdx - voiceIdx - 1; // 9
+        const beforeVoice = vals.slice(0, voiceIdx);
+        const voice = vals.slice(voiceIdx, voiceIdx + 1);
+        const trailing = vals.slice(voiceIdx + 1);
+        rpLog('info', 'PARSE-MISSING', `检测到 LLM 跳列: ${missingCount} 个中间字段缺失，已补齐`);
+        return [...beforeVoice, ...voice, ...Array(missingCount).fill(''), ...trailing];
+    }
+
+    return vals;
+}
+
 function parseDelimited(text) {
     if (!text || typeof text !== 'string') return null;
     text = text.trim();
@@ -9,6 +75,8 @@ function parseDelimited(text) {
     // === 清理 LLM 常见的 markdown 包裹 ===
     text = text.replace(/^```(?:tsv|csv|txt|text)?\s*\n/i, '').replace(/\n```\s*$/i, '');
     text = text.replace(/^-{3,}\s*$/gm, '').trim();
+
+    text = mergeTTSParamPairs(text);
 
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) return null;
