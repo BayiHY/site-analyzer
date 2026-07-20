@@ -1,8 +1,8 @@
 {
   "bayihy.cn": {
-    "latest": 1.81,
-    "avg": 1.85,
-    "count": 39
+    "latest": 1.34,
+    "avg": 1.88,
+    "count": 41
   },
   "baidu.com": {
     "latest": 19.81,
@@ -10,9 +10,9 @@
     "count": 15
   },
   "www.bayihy.cn": {
-    "latest": 4.18,
-    "avg": 2.14,
-    "count": 8
+    "latest": 10.62,
+    "avg": 3.08,
+    "count": 9
   },
   "zhihu.com": {
     "latest": 6.24,

@@ -185,6 +185,7 @@ let qrCodeDataUrl = null;
 
 // ===== 生成二维码图片 dataURL =====
 async function generateQRCodeAsync() {
+    if (qrCodeDataUrl) return qrCodeDataUrl;
     const tempDiv = document.createElement('div');
     new QRCode(tempDiv, {
         text: getShareUrl(),
