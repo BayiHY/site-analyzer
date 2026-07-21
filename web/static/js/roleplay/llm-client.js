@@ -42,6 +42,15 @@ App.agnesChat = async function(messages, options = {}) {
     });
 
     const startTime = Date.now();
+    
+    // 动态计算 max_tokens：输入字符估算为 token，留出足够输出空间
+    // Agnes 上下文最大是 8192，输入 + 输出不超过这个值
+    const estimatedInputTokens = Math.ceil(inputChars / 4);
+    const maxOutputTokens = Math.max(1024, 8192 - estimatedInputTokens);
+    const finalMaxTokens = Math.min(maxOutputTokens, 4096);
+    
+    rpLog('info', 'LLM', `输入估算 ${estimatedInputTokens} tokens, 输出上限 ${finalMaxTokens} tokens`);
+    
     const resp = await fetch('https://apihub.agnes-ai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -52,7 +61,7 @@ App.agnesChat = async function(messages, options = {}) {
             model: model,
             messages: messages,
             temperature: effectiveTemp,
-            max_tokens: 2048
+            max_tokens: finalMaxTokens
         }),
         signal: AbortSignal.timeout(120000)
     });
