@@ -34,6 +34,7 @@ function restoreFromUrl() {
             anyUrlParam = true;
         }
     }
+    if (anyUrlParam) mpLog('info', 'URL', '从 URL 参数恢复: ' + urlParams.toString());
     return anyUrlParam;
 }
 
@@ -46,6 +47,7 @@ function saveParams() {
     });
     localStorage.setItem('math-problems-params', JSON.stringify(params));
     updateUrlFromParams(params);
+    mpLog('info', 'SAVE', '参数已保存: ' + JSON.stringify(params));
 }
 
 // ===== 更新 URL 查询字符串（不刷新页面）=====
@@ -71,6 +73,7 @@ function restoreParams() {
                     if (el) el.value = saved[id];
                 }
             });
+            mpLog('info', 'RESTORE', '从本地缓存恢复参数');
         }
     } catch (e) {}
 }
@@ -224,6 +227,9 @@ function generateAll() {
             mixes: genMixed(mixesPerPage, minNum, maxNum),
         });
     }
+
+    const total = pages.reduce((s, p) => s + p.adds.length + p.subs.length + p.mixes.length, 0);
+    mpLog('info', 'GEN', `生成 ${pages.length} 页，共 ${total} 道题 (加${addsPerPage} 减${subsPerPage} 混${mixesPerPage})`);
     return pages;
 }
 
@@ -240,6 +246,7 @@ async function renderPreview(pages) {
 
     // 预生成二维码
     await generateQRCodeAsync();
+    mpLog('info', 'QR', '二维码生成完成');
 
     pages.forEach((page, idx) => {
         const div = document.createElement('div');
@@ -260,6 +267,7 @@ async function renderPreview(pages) {
     });
 
     container.classList.add('visible');
+    mpLog('info', 'PREVIEW', `预览渲染完成: ${pages.length} 页`);
 }
 
 // ===== 生成并预览 =====
@@ -272,6 +280,7 @@ async function generateAndPreview() {
         await renderPreview(pages);
         showStatus(status, 'success', `✅ 已生成 ${pages.length} 页，共 ${pages.reduce((s, p) => s + p.adds.length + p.subs.length + p.mixes.length, 0)} 道题`);
     } catch (e) {
+        mpLog('error', 'ERROR', '生成失败: ' + e.message);
         showStatus(status, 'error', `❌ 生成失败: ${e.message}`);
     }
 }
@@ -288,6 +297,7 @@ function resetParams() {
 async function downloadPDF() {
     if (!currentProblems || currentProblems.length === 0) {
         showStatus(document.getElementById('status'), 'error', '⚠️ 请先生成预览');
+        mpLog('warn', 'WARN', '未生成预览，无法下载 PDF');
         return;
     }
 
@@ -298,6 +308,7 @@ async function downloadPDF() {
     btn.disabled = true;
     btn.textContent = '⏳ 生成中...';
     showStatus(status, 'info', '📄 正在生成 PDF，请稍候...');
+    mpLog('info', 'PDF', '开始生成 PDF...');
 
     try {
         preview.style.display = 'block';
@@ -321,13 +332,16 @@ async function downloadPDF() {
 
             if (i > 0) pdf.addPage();
             pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+            mpLog('info', 'PDF', `第 ${i + 1}/${pages.length} 页截图完成 (${canvas.width}×${canvas.height})`);
         }
 
         const filename = `数学练习题_${new Date().toISOString().slice(0, 10)}.pdf`;
         pdf.save(filename);
+        mpLog('info', 'PDF', `PDF 已下载: ${filename}`);
 
         showStatus(status, 'success', `✅ PDF 已下载：${filename}`);
     } catch (e) {
+        mpLog('error', 'ERROR', 'PDF 生成失败: ' + e.message);
         showStatus(status, 'error', `❌ PDF 生成失败: ${e.message}`);
     } finally {
         btn.disabled = false;
@@ -353,9 +367,12 @@ function getShareUrl() {
 }
 
 // ===== 分享弹窗 =====
-async function openShareModal() {
+let isCapturing = false;
+
+function openShareModal() {
     if (!currentProblems || currentProblems.length === 0) {
         showStatus(document.getElementById('status'), 'error', '⚠️ 请先生成预览');
+        mpLog('warn', 'WARN', '未生成预览，无法分享');
         return;
     }
 
@@ -363,10 +380,27 @@ async function openShareModal() {
     const previewImg = document.getElementById('sharePreviewImg');
     const preview = document.getElementById('preview');
 
+    if (isCapturing) return;
+    isCapturing = true;
+    modal.classList.add('active');
+    mpLog('info', 'SHARE', '打开分享弹窗，开始截图...');
+
+    // 异步截图，不阻塞点击事件
+    captureShareImage(preview, previewImg).finally(() => {
+        isCapturing = false;
+        mpLog('info', 'SHARE', '截图完成，弹窗保持打开');
+    });
+}
+
+async function captureShareImage(preview, previewImg) {
     try {
-        preview.style.display = 'block';
         const firstPage = preview.querySelector('.preview-page');
         if (firstPage) {
+            preview.style.display = 'block';
+
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             const canvas = await html2canvas(firstPage, {
                 scale: 4,
                 useCORS: true,
@@ -374,21 +408,26 @@ async function openShareModal() {
                 logging: false,
             });
             previewImg.src = canvas.toDataURL('image/jpeg', 0.9);
+            mpLog('info', 'SHARE', `分享截图完成 (${canvas.width}×${canvas.height})`);
         }
     } catch (e) {
+        mpLog('error', 'ERROR', '分享截图失败: ' + e.message);
         console.error('生成预览图失败:', e);
     }
-
-    modal.classList.add('active');
 }
 
 function closeShareModal() {
-    document.getElementById('shareModal').classList.remove('active');
+    const modal = document.getElementById('shareModal');
+    if (modal) {
+        modal.classList.remove('active');
+        mpLog('info', 'SHARE', '关闭分享弹窗');
+    }
 }
 
 document.addEventListener('click', (e) => {
     const modal = document.getElementById('shareModal');
-    if (modal && e.target === modal) closeShareModal();
+    if (isCapturing || !modal || !modal.classList.contains('active')) return;
+    if (e.target === modal) closeShareModal();
 });
 
 // ===== 长按预览图：触发原生复制/保存图片菜单 =====
@@ -415,6 +454,7 @@ document.addEventListener('touchmove', () => clearTimeout(longPressTimer));
 window.addEventListener('DOMContentLoaded', () => {
     const hasUrlParams = restoreFromUrl();
     if (!hasUrlParams) restoreParams();
+    mpLog('info', 'INIT', '页面初始化，开始生成预览');
     generateAndPreview();
 
     // 根据 URL 参数控制左上角返回链接显示/隐藏，默认显示
@@ -432,6 +472,7 @@ document.querySelectorAll('#fontSize, #gapAddSub, #gapMixed, #letterSpacing, #li
     input.addEventListener('input', () => {
         if (currentProblems && currentProblems.length > 0) {
             applyStyleParams();
+            mpLog('info', 'STYLE', `样式参数变更: ${input.id}=${input.value}`);
         }
     });
 });
@@ -441,6 +482,7 @@ document.querySelectorAll('#fontSize, #gapAddSub, #gapMixed, #letterSpacing, #li
     document.getElementById(id).addEventListener('input', () => {
         if (currentProblems && currentProblems.length > 0) {
             saveParams();
+            mpLog('info', 'PARAM', `列数变更: ${id}=${document.getElementById(id).value}`);
             renderPreview(currentProblems);
         }
     });

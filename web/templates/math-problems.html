@@ -106,12 +106,17 @@
     </div>
 </div>
 
+<!-- 页内日志面板 — 内容由 logger.js renderLogPanel() 动态渲染 -->
+<div id="rp-log-panel" style="display:none;"></div>
+
 <!-- 前端 PDF 生成库 -->
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <!-- QR Code -->
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<!-- 页内日志 -->
+<script src="/static/js/math-problems-logger.js?v={{ cb }}"></script>
 <!-- 业务逻辑 -->
-<script src="/static/js/math-problems.js?v=2"></script>
+<script src="/static/js/math-problems.js?v=4"></script>
 </body>
 </html>
