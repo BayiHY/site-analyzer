@@ -278,6 +278,7 @@ async function generateAndPreview() {
         const pages = generateAll();
         currentProblems = pages;
         await renderPreview(pages);
+        logContainerLayout();
         showStatus(status, 'success', `✅ 已生成 ${pages.length} 页，共 ${pages.reduce((s, p) => s + p.adds.length + p.subs.length + p.mixes.length, 0)} 道题`);
     } catch (e) {
         mpLog('error', 'ERROR', '生成失败: ' + e.message);
@@ -449,6 +450,114 @@ document.addEventListener('touchstart', (e) => {
 
 document.addEventListener('touchend', () => clearTimeout(longPressTimer));
 document.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+
+// ===== 记录容器尺寸与自适应情况 =====
+function logContainerLayout() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const docW = document.documentElement.clientWidth;
+    const docH = document.documentElement.clientHeight;
+    const bodyRect = document.body.getBoundingClientRect();
+    const containerEl = document.querySelector('.container');
+    const containerRect = containerEl ? containerEl.getBoundingClientRect() : null;
+    const previewEl = document.getElementById('preview');
+    const previewRect = previewEl ? previewEl.getBoundingClientRect() : null;
+    const pages = previewEl ? previewEl.querySelectorAll('.preview-page') : [];
+    const firstPage = pages[0];
+    const firstPageRect = firstPage ? firstPage.getBoundingClientRect() : null;
+    const addsubGrids = previewEl ? previewEl.querySelectorAll('.addsub-grid') : [];
+    const mixGrids = previewEl ? previewEl.querySelectorAll('.mix-grid') : [];
+    const cards = document.querySelectorAll('.card');
+
+    // 获取计算后的 CSS 变量值
+    const getCSSVar = (el, prop) => {
+        const cs = getComputedStyle(el);
+        return cs.getPropertyValue('--' + prop).trim();
+    };
+
+    let lines = [];
+    lines.push(`[视口] ${vw}×${vh} | 文档 ${docW}×${docH} | body ${Math.round(bodyRect.width)}×${Math.round(bodyRect.height)}`);
+
+    if (containerRect) {
+        lines.push(`[布局] .container ${Math.round(containerRect.width)}×${Math.round(containerRect.height)} (max-w=720)`);
+    } else {
+        lines.push(`[布局] .container N/A`);
+    }
+
+    if (previewRect && previewEl.classList.contains('visible')) {
+        const previewCS = getComputedStyle(previewEl);
+        const pPadL = parseFloat(previewCS.paddingLeft) || 0;
+        const pPadT = parseFloat(previewCS.paddingTop) || 0;
+        const previewInnerW = Math.round(previewRect.width - pPadL * 2);
+        const previewInnerH = Math.round(previewRect.height - pPadT * 2);
+        lines.push(`[预览] #preview ${Math.round(previewRect.width)}×${Math.round(previewRect.height)} (内边距 ${Math.round(pPadT)}×${Math.round(pPadL)}, 内容区 ${previewInnerW}×${previewInnerH})`);
+
+        if (firstPageRect) {
+            const pageCS = getComputedStyle(firstPage);
+            const ppPadT = parseFloat(pageCS.paddingTop) || 0;
+            const ppPadL = parseFloat(pageCS.paddingLeft) || 0;
+            const pageInnerW = Math.round(firstPageRect.width - ppPadL * 2);
+            const pageInnerH = Math.round(firstPageRect.height - ppPadT * 2);
+            const aspectRatio = (firstPageRect.width / firstPageRect.height).toFixed(4);
+            lines.push(`[纸张] .preview-page ${Math.round(firstPageRect.width)}×${Math.round(firstPageRect.height)} (aspect=${aspectRatio}, 内容区 ${pageInnerW}×${pageInnerH}, padding=${Math.round(ppPadT)}×${Math.round(ppPadL)})`);
+        }
+
+        // 预览页数量
+        lines.push(`[页数] 共 ${pages.length} 页`);
+
+        // 加/减网格
+        if (addsubGrids.length > 0) {
+            const g = addsubGrids[0].getBoundingClientRect();
+            const gCS = getComputedStyle(addsubGrids[0]);
+            const gapVal = gCS.gap || gCS.columnGap || '';
+            const headerEl = addsubGrids[0].parentElement?.querySelector('.preview-page-header');
+            const headerRect = headerEl ? headerEl.getBoundingClientRect() : null;
+            const problemsInAddSub = addsubGrids[0].querySelectorAll('.preview-problem').length;
+            lines.push(`[网格] .addsub-grid ${Math.round(g.width)}×${Math.round(g.height)} | 题数:${problemsInAddSub} | gap:${gapVal} | cols:${addsubGrids[0].style.gridTemplateColumns}`);
+        }
+
+        // 混合网格
+        if (mixGrids.length > 0) {
+            const g = mixGrids[0].getBoundingClientRect();
+            const gCS = getComputedStyle(mixGrids[0]);
+            const gapVal = gCS.rowGap || gCS.gap || '';
+            const problemsInMix = mixGrids[0].querySelectorAll('.preview-problem').length;
+            lines.push(`[网格] .mix-grid ${Math.round(g.width)}×${Math.round(g.height)} | 题数:${problemsInMix} | row-gap:${gapVal} | cols:${mixGrids[0].style.gridTemplateColumns}`);
+        }
+
+        // CSS 变量（实际渲染参数）
+        const fs = getCSSVar(previewEl, 'font-size');
+        const ga = getCSSVar(previewEl, 'gap-addsub');
+        const gm = getCSSVar(previewEl, 'gap-mixed');
+        const ls = getCSSVar(previewEl, 'letter-spacing');
+        const lh = getCSSVar(previewEl, 'line-height-mixed');
+        lines.push(`[样式] --font-size:${fs} --gap-addsub:${ga} --gap-mixed:${gm} --letter-spacing:${ls} --line-height-mixed:${lh}`);
+
+        // 首行实际计算样式
+        const firstProblem = previewEl.querySelector('.preview-problem');
+        if (firstProblem) {
+            const pCS = getComputedStyle(firstProblem);
+            lines.push(`[实测] .preview-problem font-size:${pCS.fontSize} line-height:${pCS.lineHeight} padding:${Math.round(parseFloat(pCS.paddingTop))}×${Math.round(parseFloat(pCS.paddingBottom))}`);
+        }
+    } else {
+        lines.push(`[预览] #preview hidden`);
+    }
+
+    if (cards.length > 0) {
+        const cRect = cards[0].getBoundingClientRect();
+        lines.push(`[UI] .card[${cards.length}] ${Math.round(cRect.width)}×${Math.round(cRect.height)}`);
+    }
+
+    // 自适应断点判断
+    const isMobile = vw < 600;
+    const isTablet = vw >= 600 && vw < 720;
+    const isDesktop = vw >= 720;
+    if (isMobile) lines.push(`[响应] MOBILE(<600) 表单单列/按钮全宽`);
+    else if (isTablet) lines.push(`[响应] TABLET(600-720) 表单多列但容器未满`);
+    else lines.push(`[响应] DESKTOP(≥720) 容器居中最大720px`);
+
+    mpLog('info', 'PARAM', lines.join('\n'));
+}
 
 // ===== 初始化 =====
 window.addEventListener('DOMContentLoaded', () => {
