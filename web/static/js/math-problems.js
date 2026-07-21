@@ -270,6 +270,31 @@ async function renderPreview(pages) {
     mpLog('info', 'PREVIEW', `预览渲染完成: ${pages.length} 页`);
 }
 
+// ===== 预览缩放控制 =====
+const PREVIEW_BASE_WIDTH = 332; // 手机端基准宽度
+
+function updatePreviewScale() {
+    const preview = document.getElementById('preview');
+    if (!preview || !preview.classList.contains('visible')) return;
+    
+    const vw = window.innerWidth;
+    const bodyPadding = 20; // body padding
+    const availableWidth = vw - bodyPadding * 2;
+    const scale = Math.min(1, availableWidth / PREVIEW_BASE_WIDTH);
+    
+    preview.style.transform = `scale(${scale})`;
+    // 补偿缩放后的底部间距，避免多页重叠
+    const scaledBottomMargin = (1 / scale - 1) * PREVIEW_BASE_WIDTH;
+    preview.style.marginBottom = `${scaledBottomMargin}px`;
+}
+
+// 监听窗口 resize
+let resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(updatePreviewScale, 100);
+});
+
 // ===== 生成并预览 =====
 async function generateAndPreview() {
     const status = document.getElementById('status');
@@ -278,6 +303,7 @@ async function generateAndPreview() {
         const pages = generateAll();
         currentProblems = pages;
         await renderPreview(pages);
+        updatePreviewScale();
         logContainerLayout();
         showStatus(status, 'success', `✅ 已生成 ${pages.length} 页，共 ${pages.reduce((s, p) => s + p.adds.length + p.subs.length + p.mixes.length, 0)} 道题`);
     } catch (e) {
@@ -315,6 +341,12 @@ async function downloadPDF() {
         preview.style.display = 'block';
         const pages = preview.querySelectorAll('.preview-page');
 
+        // 临时取消缩放，让 html2canvas 截到真实基准尺寸
+        const originalTransform = preview.style.transform;
+        const originalMargin = preview.style.marginBottom;
+        preview.style.transform = 'none';
+        preview.style.marginBottom = '0';
+
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
 
@@ -347,6 +379,9 @@ async function downloadPDF() {
     } finally {
         btn.disabled = false;
         btn.textContent = '📥 下载 PDF';
+        // 恢复缩放状态
+        preview.style.transform = originalTransform;
+        preview.style.marginBottom = originalMargin;
     }
 }
 

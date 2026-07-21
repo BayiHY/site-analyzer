@@ -107,6 +107,9 @@ body {
     padding: 20px;
     font-family: 'Times New Roman', serif;
     display: none;
+    width: 332px;
+    margin: 0 auto;
+    transform-origin: top center;
     --font-size: 12px;
     --gap-addsub: 12px;
     --gap-mixed: 36px;
