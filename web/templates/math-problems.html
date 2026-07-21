@@ -136,19 +136,27 @@
         <a href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=65010302001591" target="_blank" style="color:#888;font-size:11px;text-decoration:none;">新公网安备65010302001591号</a>
     </div>
     <div style="font-size:11px;color:#666;">
-        <a href="/tools/about" style="color:#888;margin:0 8px;text-decoration:none;">ℹ️ 关于</a> ·
+        <span class="h-hidden"><a href="/tools/toolsbox" style="color:#888;margin:0 8px;text-decoration:none;">🧰 工具箱</a> · </span>
+        <span class="h-hidden"><a href="/tools/about" style="color:#888;margin:0 8px;text-decoration:none;">ℹ️ 关于</a> · </span>
         <a href="/tools/privacy" style="color:#888;margin:0 8px;text-decoration:none;">🔒 隐私政策</a> ·
         <a href="/tools/disclaimer" style="color:#888;margin:0 8px;text-decoration:none;">📋 免责条款</a>
     </div>
 </div>
 
+<style>
+/* h=1 时隐藏工具箱和关于 */
+.h-hidden { display: inline; }
+</style>
+
 <script>
-// h=1 时隐藏页脚（纯分享模式）
+// h=1 时隐藏页脚里的工具箱和关于链接（纯分享模式）
 (function() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('h') === '1') {
-        var footer = document.getElementById('pageFooter');
-        if (footer) footer.style.display = 'none';
+        var hiddenItems = document.querySelectorAll('.h-hidden');
+        for (var i = 0; i < hiddenItems.length; i++) {
+            hiddenItems[i].style.display = 'none';
+        }
     }
 })();
 </script>
