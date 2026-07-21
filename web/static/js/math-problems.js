@@ -409,7 +409,7 @@ async function downloadPDF() {
         const qrEls = preview.querySelectorAll('.page-qr');
         const qrOriginalDisplay = [];
         qrEls.forEach(el => {
-            qrOriginalDisplay.push(el.style.display);
+            qrOriginalDisplay.push(getComputedStyle(el).display);
             el.style.display = 'none';
         });
 
