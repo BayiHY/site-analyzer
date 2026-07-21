@@ -257,6 +257,8 @@ async function generateQRCodeAsync() {
         colorDark: '#1a1a1a',
         colorLight: '#ffffff',
     });
+    // qrcodejs 是异步渲染的，等待 DOM 更新
+    await new Promise(resolve => setTimeout(resolve, 100));
     const canvas = tempDiv.querySelector('canvas');
     if (canvas) qrCodeDataUrl = canvas.toDataURL('image/png');
     else {
@@ -401,21 +403,27 @@ async function downloadPDF() {
     showStatus(status, 'info', '📄 正在生成 PDF，请稍候...');
     mpLog('info', 'PDF', '开始生成 PDF...');
 
+    // 临时隐藏二维码，PDF 不需要
+    const qrEls = preview.querySelectorAll('.page-qr');
+    const qrOriginalDisplay = [];
+
+    // 临时取消缩放，让 html2canvas 截到真实基准尺寸
+    const originalTransform = preview.style.transform;
+    const originalMargin = preview.style.marginBottom;
+
     try {
+        const originalPreviewDisplay = preview.style.display;
         preview.style.display = 'block';
         const pages = preview.querySelectorAll('.preview-page');
 
-        // 临时隐藏二维码，PDF 不需要
-        const qrEls = preview.querySelectorAll('.page-qr');
-        const qrOriginalDisplay = [];
         qrEls.forEach(el => {
-            qrOriginalDisplay.push(getComputedStyle(el).display);
+            // 先保存当前计算样式，再隐藏
+            const currentDisplay = getComputedStyle(el).display;
             el.style.display = 'none';
+            // 如果当前是隐藏的（CSS 默认），则用空字符串表示"由 CSS 控制"
+            qrOriginalDisplay.push(currentDisplay === 'none' ? '' : currentDisplay);
         });
 
-        // 临时取消缩放，让 html2canvas 截到真实基准尺寸
-        const originalTransform = preview.style.transform;
-        const originalMargin = preview.style.marginBottom;
         preview.style.transform = 'none';
         preview.style.marginBottom = '0';
 
@@ -449,15 +457,20 @@ async function downloadPDF() {
         mpLog('error', 'ERROR', 'PDF 生成失败: ' + e.message);
         showStatus(status, 'error', `❌ PDF 生成失败：${e.message}`);
     } finally {
+        mpLog('info', 'PDF', 'finally: 恢复按钮和预览状态');
         btn.disabled = false;
         btn.textContent = '📥 下载 PDF';
         // 恢复缩放状态
         preview.style.transform = originalTransform;
         preview.style.marginBottom = originalMargin;
-        // 恢复二维码显示
-        qrEls.forEach((el, idx) => {
-            el.style.display = qrOriginalDisplay[idx] || '';
+        // 恢复预览显示状态
+        preview.classList.add('visible');
+        mpLog('info', 'PDF', '预览已恢复显示');
+        // 恢复二维码显示 — 直接清除 inline style，让 CSS 控制
+        qrEls.forEach(el => {
+            el.style.removeProperty('display');
         });
+        mpLog('info', 'PDF', '二维码已恢复显示');
     }
 }
 

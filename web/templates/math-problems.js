@@ -331,6 +331,7 @@ async function downloadPDF() {
     } catch (e) {
         showStatus(status, 'error', `❌ PDF 生成失败: ${e.message}`);
     } finally {
+        preview.classList.add('visible');
         btn.disabled = false;
         btn.textContent = '📥 下载 PDF';
     }
