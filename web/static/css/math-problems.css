@@ -24,6 +24,39 @@ body {
 .back-link { display: inline-block; margin-bottom: 16px; color: var(--primary); text-decoration: none; font-size: 0.85rem; }
 .back-link:hover { text-decoration: underline; }
 
+/* ===== 广告位 ===== */
+.ad-space {
+    background: var(--bg2);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 20px;
+    min-height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.ad-label {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    font-size: 10px;
+    color: var(--text-dim);
+    opacity: 0.5;
+    padding: 2px 6px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 4px;
+}
+.ad-content {
+    width: 100%;
+    text-align: center;
+}
+.ad-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+}
+
 .card {
     background: var(--bg2);
     border: 1px solid var(--border);
