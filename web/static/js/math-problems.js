@@ -1,7 +1,29 @@
 // ===== 工具函数 =====
+let seededRandom = null; // null = 使用 Math.random()，非 null = 使用种子 PRNG
+
 function randInt(min, max) {
     if (min >= max) return min;
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    const r = seededRandom ? seededRandom() : Math.random();
+    return Math.floor(r * (max - min + 1)) + min;
+}
+
+// Mulberry32 伪随机数生成器（确定性、跨平台一致）
+function mulberry32(a) {
+    return function() {
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+// Hash 字符串为整数种子
+function hashString(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+        h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+    }
+    return h;
 }
 
 function shuffle(arr) {
@@ -18,9 +40,38 @@ const PARAM_MAP = {
     addCount: 'a', subCount: 'b', mixCount: 'c', pageCount: 'p',
     addSubCols: 'd', mixCols: 'e', minNum: 'n', maxNum: 'm',
     fontSize: 's', gapAddSub: 'g', gapMixed: 'k', letterSpacing: 'l', lineHeightMixed: 'x',
+    seed: 'S',
 };
 const SHORT_IDS = Object.keys(PARAM_MAP);
 const DEFAULTS = {addCount:'6',subCount:'6',mixCount:'8',pageCount:'1',addSubCols:'3',mixCols:'2',minNum:'100',maxNum:'999',fontSize:'12',gapAddSub:'12',gapMixed:'48',letterSpacing:'1',lineHeightMixed:'8'};
+
+// ===== 种子管理 =====
+function generateSeed() {
+    return Math.floor(Math.random() * 2147483647);
+}
+
+function applySeedFromUrl(urlParams) {
+    const seedVal = urlParams.get('S');
+    if (seedVal !== null && seedVal !== '') {
+        const s = parseInt(seedVal, 10);
+        if (!isNaN(s)) {
+            currentSeed = s;
+            seededRandom = mulberry32(s >>> 0);
+            mpLog('info', 'SEED', `使用 URL 种子: ${s}`);
+            return true;
+        }
+    }
+    return false;
+}
+
+function ensureSeed() {
+    if (!seededRandom) {
+        currentSeed = generateSeed();
+        seededRandom = mulberry32(currentSeed >>> 0);
+        mpLog('info', 'SEED', `生成新种子: ${currentSeed}`);
+    }
+    return currentSeed;
+}
 
 // ===== 从 URL 参数恢复 =====
 function restoreFromUrl() {
@@ -36,6 +87,15 @@ function restoreFromUrl() {
     }
     if (anyUrlParam) mpLog('info', 'URL', '从 URL 参数恢复: ' + urlParams.toString());
     return anyUrlParam;
+}
+
+// ===== 初始化时处理 URL 种子 =====
+function initSeedFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (applySeedFromUrl(urlParams)) {
+        return true;
+    }
+    return false;
 }
 
 // ===== 保存参数到缓存 + URL =====
@@ -185,6 +245,7 @@ function fmtMix(e) { return `${e.a} ${e.op1} ${e.b} ${e.op2} ${e.c} =`; }
 // ===== 全局状态 =====
 let currentProblems = null;
 let qrCodeDataUrl = null;
+let currentSeed = null; // 当前使用的随机种子（用于分享/恢复一致性）
 
 // ===== 生成二维码图片 dataURL =====
 async function generateQRCodeAsync() {
@@ -214,6 +275,9 @@ function generateAll() {
     const minNum = parseInt(document.getElementById('minNum').value) || 100;
     const maxNum = parseInt(document.getElementById('maxNum').value) || 999;
 
+    // 确保有确定性随机种子
+    ensureSeed();
+
     // 表单中的题数是"每页"数量，直接复用
     const addsPerPage = addCount;
     const subsPerPage = subCount;
@@ -229,7 +293,7 @@ function generateAll() {
     }
 
     const total = pages.reduce((s, p) => s + p.adds.length + p.subs.length + p.mixes.length, 0);
-    mpLog('info', 'GEN', `生成 ${pages.length} 页，共 ${total} 道题 (加${addsPerPage} 减${subsPerPage} 混${mixesPerPage})`);
+    mpLog('info', 'GEN', `生成 ${pages.length} 页，共 ${total} 道题 (加${addsPerPage} 减${subsPerPage} 混${mixesPerPage}) | seed=${currentSeed}`);
     return pages;
 }
 
@@ -399,6 +463,8 @@ function getShareUrl() {
             url.searchParams.set(val, el.value);
         }
     }
+    // 始终包含种子，保证扫码后题目一致
+    url.searchParams.set('S', String(currentSeed));
     return url.toString();
 }
 
@@ -598,7 +664,9 @@ function logContainerLayout() {
 window.addEventListener('DOMContentLoaded', () => {
     const hasUrlParams = restoreFromUrl();
     if (!hasUrlParams) restoreParams();
-    mpLog('info', 'INIT', '页面初始化，开始生成预览');
+    // 优先处理种子（即使没有其它 URL 参数）
+    initSeedFromUrl();
+    mpLog('info', 'INIT', '页面初始化，开始生成预览' + (currentSeed ? ` | seed=${currentSeed}` : ''));
     generateAndPreview();
 
     // 根据 URL 参数控制左上角返回链接显示/隐藏，默认显示
