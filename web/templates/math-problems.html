@@ -125,7 +125,7 @@
 <!-- 页内日志 -->
 <script src="/static/js/math-problems-logger.js?v={{ cb }}"></script>
 <!-- 业务逻辑 -->
-<script src="/static/js/math-problems.js?v=6"></script>
+<script src="/static/js/math-problems.js?v=7"></script>
 
 <!-- 页脚 -->
 <div class="footer" id="pageFooter">
@@ -138,8 +138,8 @@
     <div style="font-size:11px;color:#666;">
         <span class="h-hidden"><a href="/tools/toolsbox" style="color:#888;margin:0 8px;text-decoration:none;">🧰 工具箱</a> · </span>
         <span class="h-hidden"><a href="/tools/about" style="color:#888;margin:0 8px;text-decoration:none;">ℹ️ 关于</a> · </span>
-        <a href="/tools/privacy" style="color:#888;margin:0 8px;text-decoration:none;">🔒 隐私政策</a> ·
-        <a href="/tools/disclaimer" style="color:#888;margin:0 8px;text-decoration:none;">📋 免责条款</a>
+        <a id="privacyLink" href="/tools/privacy" style="color:#888;margin:0 8px;text-decoration:none;">🔒 隐私政策</a> ·
+        <a id="disclaimerLink" href="/tools/disclaimer" style="color:#888;margin:0 8px;text-decoration:none;">📋 免责条款</a>
     </div>
 </div>
 
@@ -153,16 +153,36 @@
 (function() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('h') === '1') {
+        document.body.classList.add('h-mode');
         var hiddenItems = document.querySelectorAll('.h-hidden');
         for (var i = 0; i < hiddenItems.length; i++) {
             hiddenItems[i].style.display = 'none';
         }
-        // 隐藏日志面板
+        // 隐藏日志面板（含展开条边框）
         var logPanel = document.getElementById('rp-log-panel');
         if (logPanel) logPanel.style.display = 'none';
+        window.__hideLogPanel = true;
     }
 })();
+
+// 隐私政策/免责条款链接携带当前页面所有参数
+(function() {
+    const currentUrl = new URL(window.location.href);
+    var paramsStr = '';
+    if (currentUrl.searchParams.toString()) {
+        paramsStr = '?' + currentUrl.searchParams.toString();
+    }
+    var privacyLink = document.getElementById('privacyLink');
+    if (privacyLink) privacyLink.href = '/tools/privacy' + paramsStr;
+    var disclaimerLink = document.getElementById('disclaimerLink');
+    if (disclaimerLink) disclaimerLink.href = '/tools/disclaimer' + paramsStr;
+})();
 </script>
+
+<style>
+/* h=1 时隐藏日志面板边框 */
+.h-mode #rp-log-panel { display: none !important; }
+</style>
 
 <style>
 .footer {

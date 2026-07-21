@@ -46,6 +46,8 @@ function renderLogEntry(e) {
 function renderMpLogPanel() {
     const panel = document.getElementById('rp-log-panel');
     if (!panel) return;
+    // h=1 纯分享模式：禁止显示日志面板（包括展开条边框）
+    if (window.__hideLogPanel) return;
     panel.style.display = 'block';
 
     const visibleEntries = window._mpLogEntries;

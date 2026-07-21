@@ -35,7 +35,7 @@
 </head>
 <body>
 <div class="container">
-    <a href="/tools/math-problems" class="back-link">← 返回生成器</a>
+    <a id="backLink" href="/tools/math-problems" class="back-link">← 返回生成器</a>
 
     <h1>📋 免责条款</h1>
     <p class="update-time">最后更新：2026年7月21日</p>
@@ -90,11 +90,24 @@
             <a href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=65010302001591" target="_blank" style="color:#888;font-size:11px;text-decoration:none;">新公网安备65010302001591号</a>
         </div>
         <div style="font-size:11px;color:#666;margin-top:8px;">
-            <a href="/tools/math-problems" style="color:#888;margin:0 8px;text-decoration:none;">📐 生成器</a> ·
+            <a id="backLinkFooter" href="/tools/math-problems" style="color:#888;margin:0 8px;text-decoration:none;">📐 生成器</a> ·
             <a href="/tools/about" style="color:#888;margin:0 8px;text-decoration:none;">ℹ️ 关于</a> ·
             <a href="/tools/privacy" style="color:#888;margin:0 8px;text-decoration:none;">🔒 隐私政策</a>
         </div>
     </div>
 </div>
+<script>
+(function() {
+    const currentUrl = new URL(window.location.href);
+    var paramsStr = '';
+    if (currentUrl.searchParams.toString()) {
+        paramsStr = '?' + currentUrl.searchParams.toString();
+    }
+    var backLink = document.getElementById('backLink');
+    if (backLink) backLink.href = '/tools/math-problems' + paramsStr;
+    var backLinkFooter = document.getElementById('backLinkFooter');
+    if (backLinkFooter) backLinkFooter.href = '/tools/math-problems' + paramsStr;
+})();
+</script>
 </body>
 </html>
