@@ -405,6 +405,14 @@ async function downloadPDF() {
         preview.style.display = 'block';
         const pages = preview.querySelectorAll('.preview-page');
 
+        // 临时隐藏二维码，PDF 不需要
+        const qrEls = preview.querySelectorAll('.page-qr');
+        const qrOriginalDisplay = [];
+        qrEls.forEach(el => {
+            qrOriginalDisplay.push(el.style.display);
+            el.style.display = 'none';
+        });
+
         // 临时取消缩放，让 html2canvas 截到真实基准尺寸
         const originalTransform = preview.style.transform;
         const originalMargin = preview.style.marginBottom;
@@ -439,13 +447,17 @@ async function downloadPDF() {
         showStatus(status, 'success', `✅ PDF 已下载：${filename}`);
     } catch (e) {
         mpLog('error', 'ERROR', 'PDF 生成失败: ' + e.message);
-        showStatus(status, 'error', `❌ PDF 生成失败: ${e.message}`);
+        showStatus(status, 'error', `❌ PDF 生成失败：${e.message}`);
     } finally {
         btn.disabled = false;
         btn.textContent = '📥 下载 PDF';
         // 恢复缩放状态
         preview.style.transform = originalTransform;
         preview.style.marginBottom = originalMargin;
+        // 恢复二维码显示
+        qrEls.forEach((el, idx) => {
+            el.style.display = qrOriginalDisplay[idx] || '';
+        });
     }
 }
 
