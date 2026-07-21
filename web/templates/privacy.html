@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>隐私政策 - 站长工具</title>
-    <link rel="stylesheet" href="/static/css/common.css">
+    <title>隐私政策 - 加减法计算练习题生成器</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -13,58 +12,22 @@
             min-height: 100vh;
             padding: 20px;
         }
-        .container {
-            max-width: 720px;
-            margin: 0 auto;
-        }
-        .back-link {
-            display: inline-block;
-            margin-bottom: 24px;
-            color: #4f8a8b;
-            text-decoration: none;
-            font-size: 0.85rem;
-        }
+        .container { max-width: 720px; margin: 0 auto; }
+        .back-link { display: inline-block; margin-bottom: 24px; color: #4f8a8b; text-decoration: none; font-size: 0.85rem; }
         .back-link:hover { text-decoration: underline; }
-        h1 {
-            font-size: 1.5rem;
-            color: #4f8a8b;
-            margin-bottom: 8px;
-        }
-        .update-time {
-            color: #9aa0a6;
-            font-size: 0.85rem;
-            margin-bottom: 24px;
-        }
+        h1 { font-size: 1.5rem; color: #4f8a8b; margin-bottom: 8px; }
+        .update-time { color: #9aa0a6; font-size: 0.85rem; margin-bottom: 24px; }
         .section {
-            background: #1a2332;
-            border: 1px solid #2d3a4a;
-            border-radius: 12px;
-            padding: 20px 24px;
-            margin-bottom: 16px;
+            background: #1a2332; border: 1px solid #2d3a4a; border-radius: 12px;
+            padding: 20px 24px; margin-bottom: 16px;
         }
-        .section h2 {
-            font-size: 1.1rem;
-            color: #4f8a8b;
-            margin-bottom: 12px;
-        }
-        .section p, .section li {
-            color: #ccc;
-            font-size: 0.9rem;
-            line-height: 1.8;
-        }
-        .section ul {
-            padding-left: 20px;
-        }
-        .section li {
-            margin-bottom: 6px;
-        }
+        .section h2 { font-size: 1.1rem; color: #4f8a8b; margin-bottom: 12px; }
+        .section p, .section li { color: #ccc; font-size: 0.9rem; line-height: 1.8; }
+        .section ul { padding-left: 20px; }
+        .section li { margin-bottom: 6px; }
         .footer {
-            text-align: center;
-            padding: 24px 0 12px;
-            color: #9aa0a6;
-            font-size: 12px;
-            border-top: 1px solid #2d3a4a;
-            margin-top: 20px;
+            text-align: center; padding: 24px 0 12px; color: #9aa0a6;
+            font-size: 12px; border-top: 1px solid #2d3a4a; margin-top: 20px;
         }
         .footer a { color: #4f8a8b; text-decoration: none; }
         .footer a:hover { text-decoration: underline; }
@@ -72,23 +35,23 @@
 </head>
 <body>
 <div class="container">
-    <a href="/tools/toolsbox" class="back-link">← 返回工具箱</a>
+    <a href="/tools/math-problems" class="back-link">← 返回生成器</a>
 
     <h1>🔒 隐私政策</h1>
     <p class="update-time">最后更新：2026年7月21日</p>
 
     <div class="section">
-        <h2>一、总则</h2>
-        <p>巴依浩爷（BayiHY）运营的「站长工具」系列网站（包括 bayihy.cn、www.bayihy.cn 及其子页面）尊重并保护您的隐私。本隐私政策说明我们如何收集、使用、存储和保护您的个人信息。</p>
+        <h2>一、适用范围</h2>
+        <p>本隐私政策适用于「加减法计算练习题生成器」（bayihy.cn/tools/math-problems）。该工具用于生成 A4 纸打印的加法、减法和混合运算练习题。</p>
     </div>
 
     <div class="section">
         <h2>二、我们收集的信息</h2>
         <h3 style="color:#ccc;font-size:0.95rem;margin:12px 0 8px;">2.1 自动收集的技术数据</h3>
         <ul>
-            <li><strong>IP 地址：</strong>用于识别请求来源地区，辅助网站分析功能（如 IP 归属地查询）。</li>
+            <li><strong>IP 地址：</strong>服务器访问日志中记录请求来源 IP，用于安全防护和频率限制。</li>
             <li><strong>浏览器信息：</strong>包括 User-Agent、浏览器类型和版本、操作系统类型。</li>
-            <li><strong>设备信息：</strong>屏幕分辨率、设备像素比（DPR）、浏览器窗口大小等，用于页面适配。</li>
+            <li><strong>设备信息：</strong>屏幕分辨率、设备像素比（DPR）、浏览器窗口大小等，仅用于页面适配。</li>
             <li><strong>访问日志：</strong>访问时间、请求的 URL、响应状态码、流量大小等服务器端日志。</li>
         </ul>
         <h3 style="color:#ccc;font-size:0.95rem;margin:12px 0 8px;">2.2 广告相关数据收集</h3>
@@ -101,18 +64,17 @@
         </ul>
         <h3 style="color:#ccc;font-size:0.95rem;margin:12px 0 8px;">2.3 本地存储数据</h3>
         <ul>
-            <li><strong>localStorage：</strong>部分工具会将用户设置的参数保存在浏览器本地存储中（如数学题生成器的参数偏好），这些数据仅存储在您的设备上，不会上传至服务器。</li>
-            <li><strong>Cookies：</strong>本站不使用跟踪类 Cookies，仅可能使用必要的 Session Cookie。</li>
+            <li><strong>localStorage：</strong>本工具会将您的参数设置（如题数、数值范围、字号、间距等）保存在浏览器本地存储中，方便下次打开时自动恢复。这些数据仅存储在您的设备上，不会上传至服务器。</li>
+            <li><strong>Cookies：</strong>本站不使用跟踪类 Cookies。</li>
         </ul>
     </div>
 
     <div class="section">
         <h2>三、我们如何使用这些信息</h2>
         <ul>
-            <li><strong>提供服务：</strong>完成网站分析、IP 查询、SSL 检测等功能。</li>
+            <li><strong>生成题目：</strong>使用 localStorage 中的参数在浏览器端生成加减法练习题，无需服务器参与。</li>
             <li><strong>页面适配：</strong>根据设备尺寸和分辨率调整布局，确保移动端和 PC 端体验一致。</li>
             <li><strong>安全保护：</strong>检测异常访问、频率限制、防止滥用。</li>
-            <li><strong>统计分析：</strong>了解工具使用量，优化功能体验。</li>
             <li><strong>广告投放：</strong>第三方广告商利用收集的数据进行广告展示和效果评估。</li>
         </ul>
     </div>
@@ -120,8 +82,8 @@
     <div class="section">
         <h2>四、访客数据规则</h2>
         <ul>
-            <li><strong>不注册、不登录：</strong>所有工具无需注册账号即可使用，我们不会要求您提供姓名、邮箱、手机号等个人身份信息。</li>
-            <li><strong>不存储分析结果：</strong>网站分析结果仅在服务器端实时处理，完成后即丢弃，不会持久化存储。</li>
+            <li><strong>不注册、不登录：</strong>本工具无需注册账号即可使用，不要求提供姓名、邮箱、手机号等个人身份信息。</li>
+            <li><strong>不存储题目内容：</strong>生成的题目仅在浏览器端渲染和截图，不会上传至服务器或持久化存储。</li>
             <li><strong>不追踪用户：</strong>我们不会跨站追踪您的浏览行为，也不会将数据出售给第三方。</li>
             <li><strong>第三方限制：</strong>虽然第三方广告可能收集数据，但我们不会主动配合任何超出必要范围的数据采集。</li>
         </ul>
@@ -148,7 +110,7 @@
     <div class="section">
         <h2>七、您的权利</h2>
         <ul>
-            <li>由于我们几乎不收集可识别个人的信息，您无需行使删除权。</li>
+            <li>由于本工具几乎不收集可识别个人的信息，您无需行使删除权。</li>
             <li>您可以随时清除浏览器中的 localStorage 和本地 Cookies。</li>
             <li>如果您对我们的数据处理有任何疑问，可通过以下方式联系：</li>
             <li>📧 95440881@qq.com</li>
@@ -167,13 +129,13 @@
 
     <div class="footer">
         <div>
-            站长工具 · © <a href="https://gitcode.com/BayiHY" target="_blank">巴依浩爷(BayiHY)</a> · 免费开源 · 隐私优先<br>
+            站长工具 · © <a href="https://gitcode.com/BayiHY" target="_blank">巴依浩爷(BayiHY)</a> · 免费开源<br>
             <a href="https://beian.miit.gov.cn/" target="_blank" style="color:#888;font-size:11px;text-decoration:none;">新ICP备2026003879号-1</a>
             <span style="color:#555;"> · </span>
             <a href="https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=65010302001591" target="_blank" style="color:#888;font-size:11px;text-decoration:none;">新公网安备65010302001591号</a>
         </div>
         <div style="font-size:11px;color:#666;margin-top:8px;">
-            <a href="/tools/toolsbox" style="color:#888;margin:0 8px;text-decoration:none;">🧰 工具箱</a> ·
+            <a href="/tools/math-problems" style="color:#888;margin:0 8px;text-decoration:none;">📐 生成器</a> ·
             <a href="/tools/about" style="color:#888;margin:0 8px;text-decoration:none;">ℹ️ 关于</a> ·
             <a href="/tools/disclaimer" style="color:#888;margin:0 8px;text-decoration:none;">📋 免责条款</a>
         </div>
