@@ -416,6 +416,18 @@ def math_problems():
     return render_template('math-problems.html')
 
 
+@app.route('/privacy')
+def privacy():
+    """隐私政策"""
+    return render_template('privacy.html')
+
+
+@app.route('/disclaimer')
+def disclaimer():
+    """免责条款"""
+    return render_template('disclaimer.html')
+
+
 @app.route('/roleplay')
 def roleplay():
     """角色扮演 Web 应用（静态资源带时间戳防缓存）"""
