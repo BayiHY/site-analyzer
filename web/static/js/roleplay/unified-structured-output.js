@@ -52,7 +52,7 @@ ${rulesStr ? `【验证规则】\n${rulesStr}` : ''}
         ];
 
         rpLog('info', 'STRUCTURED', '调用 Agnes LLM 进行统一结构化输出...');
-        const rawResponse = await App.agnesChat(messages, { temperature: 0.1 });
+        const rawResponse = await App.agnesChatWithFallback(messages, { temperature: 0.1, route: 'default' });
         
         rpLog('info', 'STRUCTURED', `LLM 原始返回 (长度=${rawResponse?.length || 0}): "${rawResponse?.substring(0, 200)}..."`);
 
