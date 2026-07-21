@@ -6,6 +6,7 @@
 // 每个元素: { model, temperature, label }
 App.LLM_FALLBACK_CHAIN = [
     { model: 'agnes-2.0-flash', temperature: null, label: 'agnes-2.0-flash' },
+    { model: 'agnes-2.0-flash', temperature: null, label: 'agnes-2.0-flash (重试)' },
     { model: 'agnes-1.5-flash', temperature: null, label: 'agnes-1.5-flash' },
 ];
 
@@ -16,6 +17,11 @@ App.LLM_FALLBACK_CHAIN = [
  */
 App.shouldRetryOnError = function(err) {
     const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+    
+    // 空响应 — Agnes API 偶发，需要重试
+    if (msg.includes('empty response') || msg.includes('empty content') || msg.includes('output: 0字符')) {
+        return { shouldRetry: true, reason: 'API 返回空响应' };
+    }
     
     // 超时/中断 — 需要重试
     if (msg.includes('abort') || msg.includes('timed out') || msg.includes('network_error') || msg.includes('failed to fetch')) {
@@ -63,36 +69,30 @@ App.shouldRetryOnError = function(err) {
  */
 App.agnesChatWithFallback = async function(messages, options = {}) {
     const route = options.route || 'default';
-    const maxRetries = options.maxRetries ?? 2;
+    // maxRetries = 总尝试次数 - 1，默认允许尝试完整降级链
+    const chain = options.fallbackChain || App.LLM_FALLBACK_CHAIN;
+    const maxRetries = options.maxRetries ?? (chain.length - 1);
     const baseTemperature = options.temperature;
     
     // 构建当前 API key 对应的降级链
     const apiKey = state.apiKeys.chat;
     
-    // 从配置中取降级链，允许外部覆盖
-    let chain = options.fallbackChain || App.LLM_FALLBACK_CHAIN;
-    
     let lastError = null;
     
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    for (let attempt = 0; attempt < chain.length; attempt++) {
         // 确定当前使用的模型
         let currentModel;
         let currentTemp = baseTemperature;
         
         if (attempt === 0) {
-            // 首次尝试：用用户指定的模型或默认
-            currentModel = options.model;
+            // 首次尝试：用用户指定的模型或默认链第一个
+            currentModel = options.model || chain[0].model;
+            currentTemp = baseTemperature ?? (chain[0].temperature);
         } else {
             // 降级：取链中下一个模型
-            const fallbackIdx = attempt - 1;
-            if (fallbackIdx < chain.length) {
-                currentModel = chain[fallbackIdx].model;
-                currentTemp = baseTemperature ?? chain[fallbackIdx].temperature;
-                rpLog('warn', 'FALLBACK', `降级到模型: ${currentModel} (第 ${attempt} 次重试)`);
-            } else {
-                rpLog('error', 'FALLBACK', `所有降级模型已耗尽`);
-                break;
-            }
+            currentModel = chain[attempt].model;
+            currentTemp = baseTemperature ?? chain[attempt].temperature;
+            rpLog('warn', 'FALLBACK', `降级到模型: ${currentModel} (第 ${attempt + 1} 次尝试)`);
         }
         
         // 计算路由温度
@@ -117,6 +117,13 @@ App.agnesChatWithFallback = async function(messages, options = {}) {
                 route: route
             });
             
+            // 检查空响应 — Agnes API 有时会返回空内容，需要重试
+            if (!result || result.trim().length === 0) {
+                rpLog('warn', 'FALLBACK', `⚠️ 模型 ${currentModel} 返回空响应，触发重试...`);
+                lastError = new Error('Empty response from API');
+                continue;
+            }
+            
             if (attempt > 0) {
                 rpLog('info', 'FALLBACK', `✅ 降级重试成功 (使用 ${currentModel})`);
             }
@@ -126,13 +133,13 @@ App.agnesChatWithFallback = async function(messages, options = {}) {
             lastError = err;
             const errInfo = App.shouldRetryOnError(err);
             
-            if (!errInfo.shouldRetry || attempt >= maxRetries) {
+            if (!errInfo.shouldRetry || attempt >= chain.length - 1) {
                 // 不再重试
                 rpLog('error', 'FALLBACK', `❌ 不再重试: ${errInfo.reason} - ${err.message || String(err)}`);
                 break;
             }
             
-            rpLog('warn', 'FALLBACK', `⚠️ 第 ${attempt} 次尝试失败 (${errInfo.reason}): ${err.message || String(err)}，准备降级重试...`);
+            rpLog('warn', 'FALLBACK', `⚠️ 第 ${attempt + 1} 次尝试失败 (${errInfo.reason}): ${err.message || String(err)}，准备降级重试...`);
         }
     }
     

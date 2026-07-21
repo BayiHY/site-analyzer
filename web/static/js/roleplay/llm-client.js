@@ -76,5 +76,12 @@ App.agnesChat = async function(messages, options = {}) {
 
     rpLog('info', 'LLM', `✅ 对话请求成功, 耗时: ${(elapsedMs/1000).toFixed(1)}s, 输入: ${inputChars}字符, 输出: ${outputChars}字符`);
     rpLog('debug', 'LLM', `回复预览: ${reply.slice(0, 120)}...`);
+    
+    // 检查空响应 — Agnes API 有时会返回空内容，抛出错误让重试机制处理
+    if (outputChars === 0 || !reply.trim()) {
+        rpLog('error', 'LLM', `❌ API 返回空响应，将触发重试`);
+        throw new Error('Empty response from API');
+    }
+    
     return reply;
 }
