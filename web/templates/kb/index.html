@@ -1,0 +1,75 @@
+{% extends "kb/base.html" %}
+{% block content %}
+<!-- 面包屑 -->
+<div class="kb-breadcrumb">
+    <a href="/tools/">首页</a><span class="sep">›</span>
+    建站知识库
+</div>
+
+<!-- 页面头部 -->
+<div class="kb-index">
+    <h1>📖 建站知识库</h1>
+    <p class="kb-index-subtitle">从零开始搭建网站的每一步，新手友好，持续更新中</p>
+
+    <!-- 分类：基础概念 -->
+    <div class="kb-category">
+        <div class="kb-category-title">🏗️ 基础概念</div>
+        <div class="kb-card-grid">
+            <a href="/tools/kb/light-server/" class="kb-card">
+                <div class="kb-card-icon">☁️</div>
+                <div class="kb-card-title">轻量服务器</div>
+                <div class="kb-card-desc">什么是轻量服务器？如何选择和申请？</div>
+            </a>
+            <a href="/tools/kb/domain-dns/" class="kb-card">
+                <div class="kb-card-icon">🌐</div>
+                <div class="kb-card-title">域名与DNS</div>
+                <div class="kb-card-desc">域名注册、DNS解析配置全指南</div>
+            </a>
+            <a href="/tools/kb/ssl-certificate/" class="kb-card">
+                <div class="kb-card-icon">🔒</div>
+                <div class="kb-card-title">SSL证书</div>
+                <div class="kb-card-desc">HTTPS加密证书申请与配置</div>
+            </a>
+        </div>
+    </div>
+
+    <!-- 分类：合规备案 -->
+    <div class="kb-category">
+        <div class="kb-category-title">📋 合规备案</div>
+        <div class="kb-card-grid">
+            <a href="/tools/kb/icp-filing/" class="kb-card">
+                <div class="kb-card-icon">📝</div>
+                <div class="kb-card-title">ICP备案与许可</div>
+                <div class="kb-card-desc">ICP备案流程、ICP经营许可证申请条件</div>
+            </a>
+            <a href="/tools/kb/gongan-beian/" class="kb-card">
+                <div class="kb-card-icon">🛡️</div>
+                <div class="kb-card-title">公网安备</div>
+                <div class="kb-card-desc">互联网安全备案申请流程和注意事项</div>
+            </a>
+        </div>
+    </div>
+
+    <!-- 更多主题预告 -->
+    <div class="kb-category">
+        <div class="kb-category-title">🚧 更多内容即将上线</div>
+        <div class="kb-card-grid">
+            <div class="kb-card" style="opacity:0.5; cursor:default;">
+                <div class="kb-card-icon">⚙️</div>
+                <div class="kb-card-title">Nginx基础</div>
+                <div class="kb-card-desc">反向代理、虚拟主机、伪静态配置</div>
+            </div>
+            <div class="kb-card" style="opacity:0.5; cursor:default;">
+                <div class="kb-card-icon">🚀</div>
+                <div class="kb-card-title">CDN加速</div>
+                <div class="kb-card-desc">内容分发网络原理与配置</div>
+            </div>
+            <div class="kb-card" style="opacity:0.5; cursor:default;">
+                <div class="kb-card-icon">🐳</div>
+                <div class="kb-card-title">Docker入门</div>
+                <div class="kb-card-desc">容器化部署基础概念</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

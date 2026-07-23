@@ -13,7 +13,7 @@
 
     <div class="header" id="pageTitle">
         <h1>📐 加减法计算练习题生成器</h1>
-        <p>生成加法、减法和混合运算练习，适合 A4 纸打印</p>
+        <p>生成加法、减法和混合运算练习,适合 A4 纸打印</p>
     </div>
 
     <!-- Preview -->
@@ -43,15 +43,15 @@
         <h2>⚙️ 参数设置</h2>
         <div class="form-row">
             <div class="form-group">
-                <label>加法题数（每页）</label>
+                <label>加法题数(每页)</label>
                 <input type="number" id="addCount" value="6" min="1" max="30">
             </div>
             <div class="form-group">
-                <label>减法题数（每页）</label>
+                <label>减法题数(每页)</label>
                 <input type="number" id="subCount" value="6" min="1" max="30">
             </div>
             <div class="form-group">
-                <label>混合运算题数（每页）</label>
+                <label>混合运算题数(每页)</label>
                 <input type="number" id="mixCount" value="8" min="1" max="30">
             </div>
         </div>
@@ -81,24 +81,31 @@
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>字号（px）</label>
-                <input type="number" id="fontSize" value="12" min="6" max="30">
+                <label>字号(px)</label>
+                <input type="number" id="fontSize" value="11" min="6" max="30">
             </div>
             <div class="form-group">
-                <label>加/减网格间距（px）</label>
+                <label>加/减网格间距(px)</label>
                 <input type="number" id="gapAddSub" value="12" min="0" max="100">
             </div>
             <div class="form-group">
-                <label>混合运算网格间距（px）</label>
+                <label>混合运算网格间距(px)</label>
                 <input type="number" id="gapMixed" value="48" min="0" max="200">
             </div>
             <div class="form-group">
-                <label>字间距（px）</label>
+                <label>字间距(px)</label>
                 <input type="number" id="letterSpacing" value="0" min="-5" max="20">
             </div>
             <div class="form-group">
-                <label>混合运算行高（px）</label>
+                <label>混合运算行高(px)</label>
                 <input type="number" id="lineHeightMixed" value="8" min="0" max="50">
+            </div>
+            <div class="form-group">
+                <label>下载 PDF 附带答案页</label>
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 0;color:var(--text-dim);cursor:pointer;">
+                    <input type="checkbox" id="includeAnswers" style="width:16px;height:16px;cursor:pointer;">
+                    <span style="font-size:13px;">✓ 在题目后面附带一份答案,方便家长批改</span>
+                </label>
             </div>
         </div>
     </div>
@@ -114,7 +121,7 @@
     </div>
 </div>
 
-<!-- 页内日志面板 — 内容由 logger.js renderLogPanel() 动态渲染 -->
+<!-- 页内日志面板 - 内容由 logger.js renderLogPanel() 动态渲染 -->
 <div id="rp-log-panel" style="display:none;"></div>
 
 <!-- 前端 PDF 生成库 -->
@@ -125,7 +132,7 @@
 <!-- 页内日志 -->
 <script src="/static/js/math-problems-logger.js?v={{ cb }}"></script>
 <!-- 业务逻辑 -->
-<script src="/static/js/math-problems.js?v=7"></script>
+<script src="/static/js/math-problems.js?v=9"></script>
 
 <!-- 页脚 -->
 <div class="footer" id="pageFooter">
@@ -137,7 +144,7 @@
     </div>
     <div style="font-size:11px;color:#666;">
         <span class="h-hidden"><a href="/tools/toolsbox" style="color:#888;margin:0 8px;text-decoration:none;">🧰 工具箱</a> · </span>
-        <span class="h-hidden"><a href="/tools/about" style="color:#888;margin:0 8px;text-decoration:none;">ℹ️ 关于</a> · </span>
+        <span class="h-hidden"><a href="/tools/about" style="color:#888;margin:0 8px;text-decoration:none;">i️ 关于</a> · </span>
         <a id="privacyLink" href="/tools/privacy" style="color:#888;margin:0 8px;text-decoration:none;">🔒 隐私政策</a> ·
         <a id="disclaimerLink" href="/tools/disclaimer" style="color:#888;margin:0 8px;text-decoration:none;">📋 免责条款</a>
     </div>
@@ -149,7 +156,7 @@
 </style>
 
 <script>
-// h=1 时隐藏页脚里的工具箱和关于链接（纯分享模式）
+// h=1 时隐藏页脚里的工具箱和关于链接(纯分享模式)
 (function() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('h') === '1') {
@@ -158,7 +165,7 @@
         for (var i = 0; i < hiddenItems.length; i++) {
             hiddenItems[i].style.display = 'none';
         }
-        // 隐藏日志面板（含展开条边框）
+        // 隐藏日志面板(含展开条边框)
         var logPanel = document.getElementById('rp-log-panel');
         if (logPanel) logPanel.style.display = 'none';
         window.__hideLogPanel = true;
@@ -197,5 +204,86 @@
 .footer a:hover { text-decoration: underline; }
 </style>
 
+    <link rel="stylesheet" href="/static/css/tool-content.css">
+    <details class="tool-content" aria-label="关于本工具">
+    <summary>📖 使用说明 & 常见问题(点击展开)</summary>
+    <div class="tool-content-body">
+        <h2>📖 关于加减法练习生成器</h2>
+        <p><strong>加减法练习生成器</strong>专为小学低年级数学课设计。一键生成随机题目,直接导出 A4 PDF 打印,不用安装任何软件。家长日常给孩子制作每日习题、老师制作随堂练习、培训机构自己出卷都能用。</p>
+
+        <h3>✨ 主要功能</h3>
+        <ul>
+            <li><strong>三种题型</strong>:加法题、减法题、混合运算(两数/三数加减组合)</li>
+            <li><strong>自定义参数</strong>:可分别设置加法/减法/混合运算的题数、页数、数值范围(最小值-最大值)、字号、行列数等</li>
+            <li><strong>一键生成 A4 PDF</strong>:默认 A4 纸排版,直接下载打印,无需手动设计布局</li>
+            <li><strong>实时预览</strong>:页面实时显示生成的题目,满意后下载</li>
+            <li><strong>带答案页</strong>:勾选后可在 PDF 末尾附带答案页,方便批改</li>
+            <li><strong>完全免费</strong>:无广告、无需登录,不限量生成</li>
+            <li><strong>种子复现</strong>:分享链接自带随机种子,扫码后题目一致</li>
+        </ul>
+
+        <h3>⚡ 使用步骤</h3>
+        <ol>
+            <li>设置每页的加法/减法/混合运算题数(默认各6/6/8道)</li>
+            <li>设置数值范围(默认100-999)、字号、行列数等参数</li>
+            <li>点击 <strong>"🎲 随机生成"</strong>,页面预览当前题目</li>
+            <li>不满意?再次点击"🎲 随机生成"重新出题(无限次)</li>
+            <li>勾选"下载 PDF 附带答案页"可让 PDF 包含答案</li>
+            <li>点击 <strong>"📥 下载 PDF"</strong>,自动保存为 A4 预排版本</li>
+            <li>直接交给打印机打印或到打印店打印</li>
+        </ol>
+
+        <h3>🎯 适用场景</h3>
+        <ul>
+            <li><strong>家长日常练习</strong>:每天花 30 秒刷一张,孩子计算能力肯定提升</li>
+            <li><strong>老师制作随堂小测</strong>:充当 5 分钟开场热身</li>
+            <li><strong>假期作业补充</strong>:课本题目不够时,长假自制练习题</li>
+            <li><strong>培训机构自制卷子</strong>:不想用商业试卷,自己控制难度</li>
+            <li><strong>反复巩固练习</strong>:针对特定数值范围反复练习,对建立数感非常重要</li>
+        </ul>
+
+        <h2>❓ 常见问题</h2>
+
+        <div class="faq-item">
+            <div class="faq-q">Q：支持哪些题型？</div>
+            <div class="faq-a">A：目前支持三种：①加法题（两数相加）②减法题（两数相减）③混合运算（三数加减组合，包括++、--、+-、-+四种模式）。暂不支持乘法、除法。</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-q">Q：如何控制题目难度？</div>
+            <div class="faq-a">A：通过"最小数值"和"最大数值"两个参数控制。例如设 10-20 就是 20 以内加减法，设 100-999 就是三位数运算。所有生成的加减结果都在此范围内，不会出现负数或零。</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-q">Q：一页能排多少题？</div>
+            <div class="faq-a">A：取决于字号和行列数设置。默认字号 12px、3列排版时，每页约 18-24 道加减题 + 16 道混合题。可在参数中调整行列数来增减题量。</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-q">Q：打印出来的位置够孩子写答案吗？</div>
+            <div class="faq-a">A：题与题之间的间距可调（"加/减网格间距"和"混合运算网格间距"），默认留有充足书写空间。如果觉得不够，可以把列数调少或题量调小。</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-q">Q：为什么没有"进位/退位"开关？</div>
+            <div class="faq-a">A：当前版本通过数值范围间接控制——设小范围（如 10-20）自然会产生更多进位/退位题。精确控制进位退位需要更复杂的算法，后续考虑加入。</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-q">Q：答案页在哪里？</div>
+            <div class="faq-a">A：在参数设置区域勾选"下载 PDF 附带答案"后，下载的 PDF 末尾会多出一页答案，每道题后面标注了正确结果，方便批改。</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-q">Q：分享链接有什么用？</div>
+            <div class="faq-a">A：点击"🔗 分享"会生成一张带二维码的图片，扫码后打开的页面题目和参数与当前完全一致（包含随机种子），方便把同一套题分享给别人。</div>
+        </div>
+        </div>
+</details>
+
+    {% include '_related_tools.html' %}
+
+    <!-- 百度自动推送 -->
+    <script src="/static/js/baidu-push.js" async></script>
 </body>
 </html>

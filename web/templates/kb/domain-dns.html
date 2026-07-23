@@ -1,0 +1,198 @@
+{% extends "kb/base.html" %}
+{% block content %}
+<!-- 面包屑 -->
+<div class="kb-breadcrumb">
+    <a href="/tools/">首页</a><span class="sep">›</span>
+    <a href="/tools/kb/">知识库</a><span class="sep">›</span>
+    域名与DNS
+</div>
+
+<!-- 文章头部 -->
+<div class="kb-header">
+    <h1>什么是域名和DNS？申请途径全指南</h1>
+    <div class="kb-meta">
+        <span>📅 最后更新: 2026-07-23</span>
+        <span>⏱ 阅读时间: 6分钟</span>
+    </div>
+</div>
+
+<!-- TOC -->
+<nav class="kb-toc">
+    <div class="kb-toc-title">📑 目录</div>
+    <ul class="kb-toc-list">
+        <li><a href="#what-domain">什么是域名？</a></li>
+        <li><a href="#what-dns">什么是DNS？</a></li>
+        <li><a href="#tld">常见顶级域名一览</a></li>
+        <li><a href="#apply">如何注册域名？</a></li>
+        <li><a href="#dns-config">DNS解析配置</a></li>
+        <li><a href="#faq">常见问题</a></li>
+    </ul>
+</nav>
+
+<!-- 正文 -->
+<div class="kb-content">
+
+<h2 id="what-domain">什么是域名？</h2>
+<p>域名（Domain Name）是互联网上用于标识网站或服务的<strong>人类可读地址</strong>。它相当于网站的门牌号。</p>
+<p>每台服务器都有一个IP地址（如 <code>111.228.14.153</code>），但人很难记住一串数字。域名就是把数字IP翻译成好记的字符串，比如 <code>www.bayihy.cn</code>。</p>
+
+<div class="kb-tip">
+    <div class="kb-tip-title">💡 类比理解</div>
+    <p>IP地址就像服务器的电话号码，域名就像公司的名称。你记不住每个联系人的号码，但能记住公司名字。</p>
+</div>
+
+<h2 id="what-dns">什么是DNS？</h2>
+<p>DNS（Domain Name System，域名系统）是互联网的"电话簿"——它负责把域名翻译成IP地址。</p>
+<p>当你输入 <code>www.bayihy.cn</code> 访问网站时，发生的过程是：</p>
+<ol class="kb-steps">
+    <li>你的浏览器向DNS服务器查询 <code>www.bayihy.cn</code> 对应的IP地址</li>
+    <li>DNS服务器返回 IP（如 <code>111.228.14.153</code>）</li>
+    <li>浏览器通过IP地址连接到服务器，获取网页内容</li>
+</ol>
+
+<p>DNS记录类型中，建站最常用的有：</p>
+<ul>
+    <li><strong>A记录</strong> — 域名 → IPv4地址（最常用）</li>
+    <li><strong>AAAA记录</strong> — 域名 → IPv6地址</li>
+    <li><strong>CNAME记录</strong> — 域名别名指向另一个域名</li>
+    <li><strong>MX记录</strong> — 邮件服务器地址</li>
+    <li><strong>TXT记录</strong> — 文本验证（常用于站点验证、SPF防垃圾邮件）</li>
+</ul>
+
+<h2 id="tld">常见顶级域名一览</h2>
+<table class="kb-table">
+    <tr>
+        <th>后缀</th>
+        <th>类型</th>
+        <th>说明</th>
+        <th>参考价/年</th>
+    </tr>
+    <tr>
+        <td>.cn</td>
+        <td>国家顶级</td>
+        <td>中国，需实名+备案，国内SEO友好</td>
+        <td>¥30-50</td>
+    </tr>
+    <tr>
+        <td>.com</td>
+        <td>通用顶级</td>
+        <td>全球最流行，商业首选</td>
+        <td>¥60-80</td>
+    </tr>
+    <tr>
+        <td>.net</td>
+        <td>通用顶级</td>
+        <td>网络相关，仅次于.com</td>
+        <td>¥70-90</td>
+    </tr>
+    <tr>
+        <td>.org</td>
+        <td>通用顶级</td>
+        <td>非营利组织</td>
+        <td>¥80-100</td>
+    </tr>
+    <tr>
+        <td>.dev</td>
+        <td>通用顶级</td>
+        <td>开发者社区，强制HTTPS</td>
+        <td>¥80-120</td>
+    </tr>
+    <tr>
+        <td>.xyz</td>
+        <td>通用顶级</td>
+        <td>便宜新颖，新用户优惠多</td>
+        <td>¥5-20</td>
+    </tr>
+</table>
+
+<h2 id="apply">如何注册域名？</h2>
+
+<h3>步骤总览</h3>
+<ol class="kb-steps">
+    <li><strong>选择域名注册商</strong> — 阿里云、腾讯云、NameSilo、Cloudflare等</li>
+    <li><strong>查询域名可用性</strong> — 在注册商网站搜索想要的域名</li>
+    <li><strong>注册并实名认证</strong> — .cn等国内域名需要实名</li>
+    <li><strong>配置DNS解析</strong> — 将域名指向服务器IP</li>
+    <li><strong>完成备案（中国大陆节点必须）</strong></li>
+</ol>
+
+<h3>推荐注册商</h3>
+<table class="kb-table">
+    <tr>
+        <th>注册商</th>
+        <th>优势</th>
+        <th>适合人群</th>
+    </tr>
+    <tr>
+        <td>阿里云万网</td>
+        <td>国内最大，备案方便，与阿里云服务器无缝对接</td>
+        <td>国内用户，需要备案</td>
+    </tr>
+    <tr>
+        <td>腾讯云DNSPod</td>
+        <td>DNS解析速度快，与腾讯云生态整合好</td>
+        <td>腾讯云用户</td>
+    </tr>
+    <tr>
+        <td>NameSilo</td>
+        <td>免费WHOIS隐私保护，价格透明无套路</td>
+        <td>境外用户，注重隐私</td>
+    </tr>
+    <tr>
+        <td>Cloudflare Registrar</td>
+        <td>成本价注册，无加价，自带DNS和CDN</td>
+        <td>技术用户，追求性价比</td>
+    </tr>
+    <tr>
+        <td>Hurricane Electric</td>
+        <td>免费DNS解析，支持IPv6，老牌可靠</td>
+        <td>高级用户，需要灵活DNS</td>
+    </tr>
+</table>
+
+<h2 id="dns-config">DNS解析配置示例</h2>
+<p>假设你的服务器IP是 <code>111.228.14.153</code>，域名是 <code>bayihy.cn</code>，你需要添加以下DNS记录：</p>
+
+<pre><code>记录类型   主机记录    记录值          说明
+A         @           111.228.14.153  bayihy.cn 指向服务器
+A         www         111.228.14.153  www.bayihy.cn 指向服务器
+TXT       @           v=spf1 -all     SPF记录（防垃圾邮件）</code></pre>
+
+<div class="kb-tip">
+    <div class="kb-tip-title">💡 TTL设置建议</div>
+    <p>TTL（生存时间）控制DNS缓存时长。日常使用设为 <strong>600秒（10分钟）</strong> 即可。如果需要频繁修改DNS，可以先降到60秒，改完再调回。</p>
+</div>
+
+<h2 id="faq">常见问题</h2>
+
+<h3>Q1: 域名和服务器可以在不同厂商买吗？</h3>
+<p>可以！域名注册商和云服务器是完全独立的。你可以在阿里云买域名，在腾讯云买服务器，只要DNS解析正确就行。</p>
+
+<h3>Q2: 域名到期了怎么办？</h3>
+<p>域名到期后有<strong>续费宽限期</strong>（通常30天），在此期间续费即可恢复。超过宽限期域名会被释放，其他人可能抢注。建议开启<strong>自动续费</strong>。</p>
+
+<h3>Q3: WHOIS隐私保护是什么？</h3>
+<p>注册域名时，你的姓名、邮箱、电话等信息会公开在WHOIS数据库中。WHOIS隐私保护可以隐藏这些信息，防止被骚扰。NameSilo和Cloudflare提供免费隐私保护。</p>
+
+<h3>Q4: 一个域名可以绑定多个服务器吗？</h3>
+<p>可以。添加多条A记录指向不同IP即可。也可以用CNAME做负载均衡或CDN转发。</p>
+
+</div>
+
+<!-- 底部导航 -->
+<div class="kb-nav">
+    <div class="kb-nav-item prev"><a href="/tools/kb/light-server/" class="kb-nav-title">← 轻量服务器</a></div>
+    <div class="kb-nav-item next"><a href="/tools/kb/icp-filing/" class="kb-nav-title">ICP备案 →</a></div>
+</div>
+
+<!-- 相关主题 -->
+<div class="kb-related">
+    <div class="kb-related-title">📚 相关主题</div>
+    <ul class="kb-related-list">
+        <li><a href="/tools/kb/light-server/">轻量服务器申请</a></li>
+        <li><a href="/tools/kb/icp-filing/">ICP备案指南</a></li>
+        <li><a href="/tools/kb/gongan-beian/">公网安备办理</a></li>
+    </ul>
+</div>
+
+{% endblock %}

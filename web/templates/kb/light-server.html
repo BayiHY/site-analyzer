@@ -1,0 +1,194 @@
+{% extends "kb/base.html" %}
+{% block content %}
+<!-- 面包屑 -->
+<div class="kb-breadcrumb">
+    <a href="/tools/">首页</a><span class="sep">›</span>
+    <a href="/tools/kb/">知识库</a><span class="sep">›</span>
+    轻量服务器
+</div>
+
+<!-- 文章头部 -->
+<div class="kb-header">
+    <h1>什么是轻量服务器？申请途径全指南</h1>
+    <div class="kb-meta">
+        <span>📅 最后更新: 2026-07-23</span>
+        <span>⏱ 阅读时间: 5分钟</span>
+    </div>
+</div>
+
+<!-- TOC -->
+<nav class="kb-toc">
+    <div class="kb-toc-title">📑 目录</div>
+    <ul class="kb-toc-list">
+        <li><a href="#what">什么是轻量应用服务器？</a></li>
+        <li><a href="#vs">轻量服务器 vs 云服务器（ECS）</a></li>
+        <li><a href="#who">适合谁用？</a></li>
+        <li><a href="#apply">国内主流厂商及申请途径</a></li>
+        <li><a href="#price">价格对比</a></li>
+        <li><a href="#faq">常见问题</a></li>
+    </ul>
+</nav>
+
+<!-- 正文 -->
+<div class="kb-content">
+
+<h2 id="what">什么是轻量应用服务器？</h2>
+<p>轻量应用服务器（Lightweight Application Server，简称<strong>轻量服务器</strong>）是云服务商面向个人开发者和中小型企业推出的一种<strong>简化版云服务器</strong>。</p>
+<p>它把服务器所需的计算资源（CPU、内存）、带宽、存储打包成一个固定套餐，用户不需要像传统云服务器那样分别配置VPC、安全组、弹性公网IP等复杂参数，开箱即用。</p>
+
+<div class="kb-tip">
+    <div class="kb-tip-title">💡 一句话理解</div>
+    <p>轻量服务器就像"云服务器套餐"——不用自己搭配，直接选一个合适的套餐买就行，简单便宜。</p>
+</div>
+
+<h2 id="vs">轻量服务器 vs 云服务器（ECS）</h2>
+<table class="kb-table">
+    <tr>
+        <th>对比项</th>
+        <th>轻量服务器</th>
+        <th>云服务器 ECS/CVM</th>
+    </tr>
+    <tr>
+        <td>配置方式</td>
+        <td>固定套餐，一键选择</td>
+        <td>自由组合 CPU/内存/带宽/磁盘</td>
+    </tr>
+    <tr>
+        <td>网络模型</td>
+        <td>固定带宽（如5Mbps）</td>
+        <td>按流量计费或弹性带宽</td>
+    </tr>
+    <tr>
+        <td>适用场景</td>
+        <td>个人网站、博客、小型项目</td>
+        <td>企业级应用、高并发业务</td>
+    </tr>
+    <tr>
+        <td>价格</td>
+        <td>便宜（年付几十元起）</td>
+        <td>相对较高</td>
+    </tr>
+    <tr>
+        <td>管理复杂度</td>
+        <td>低，控制台简洁</td>
+        <td>较高，功能丰富但复杂</td>
+    </tr>
+    <tr>
+        <td>扩展性</td>
+        <td>有限（通常只能升级套餐）</td>
+        <td>强（弹性伸缩、负载均衡）</td>
+    </tr>
+</table>
+
+<h2 id="who">适合谁用？</h2>
+<ul>
+    <li><strong>个人站长</strong> — 搭建博客、作品集网站、工具站</li>
+    <li><strong>开发者</strong> — 部署个人项目、API服务、小程序后端</li>
+    <li><strong>学生</strong> — 课程作业、毕业设计、竞赛项目</li>
+    <li><strong>小微企业</strong> — 内部管理系统、官网、邮件服务器</li>
+</ul>
+
+<h2 id="apply">国内主流厂商及申请途径</h2>
+
+<h3>1. 阿里云（阿里云轻量应用服务器）</h3>
+<ol class="kb-steps">
+    <li>访问 <a href="https://www.aliyun.com/product/swas" target="_blank" rel="noopener">阿里云官网</a>，注册/登录账号</li>
+    <li>进入"轻量应用服务器"产品页</li>
+    <li>选择套餐（地域、镜像、带宽）</li>
+    <li>完成实名认证 → 支付 → 创建实例</li>
+    <li>在控制台重置root密码，通过SSH连接</li>
+</ol>
+
+<h3>2. 腾讯云（Lighthouse 轻量应用服务器）</h3>
+<ol class="kb-steps">
+    <li>访问 <a href="https://cloud.tencent.com/product/lighthouse" target="_blank" rel="noopener">腾讯云Lighthouse</a>，注册/登录账号</li>
+    <li>选择地域和套餐（推荐新加坡/香港节点，免备案即可建站）</li>
+    <li>选择预装镜像（如WordPress、宝塔面板、LNMP等）</li>
+    <li>实名认证 → 支付 → 创建实例</li>
+</ol>
+
+<h3>3. 华为云（Flexus 轻量应用服务器）</h3>
+<ol class="kb-steps">
+    <li>访问 <a href="https://www.huaweicloud.com/product/flexus.html" target="_blank" rel="noopener">华为云官网</a></li>
+    <li>进入Flexus X实例（轻量服务器产品线）</li>
+    <li>选择套餐并创建实例</li>
+</ol>
+
+<h3>4. 其他性价比厂商</h3>
+<ul>
+    <li><strong>火山引擎</strong>：<a href="https://www.volcengine.com/product/las" target="_blank" rel="noopener">轻量应用服务器</a>，新用户首年优惠力度大</li>
+    <li><strong>京东云</strong>：<a href="https://www.jdcloud.com/cn/products/light-weight-server" target="_blank" rel="noopener">轻量应用服务器</a></li>
+    <li><strong>UCloud</strong>：<a href="https://www.ucloud.cn/site/product/lws.html" target="_blank" rel="noopener">LWS轻量服务器</a></li>
+</ul>
+
+<h2 id="price">价格对比（参考）</h2>
+<table class="kb-table">
+    <tr>
+        <th>厂商</th>
+        <th>入门配置</th>
+        <th>月付</th>
+        <th>年付</th>
+    </tr>
+    <tr>
+        <td>阿里云</td>
+        <td>2核2G / 5Mbps</td>
+        <td>¥58</td>
+        <td>¥348</td>
+    </tr>
+    <tr>
+        <td>腾讯云</td>
+        <td>2核2G / 6Mbps</td>
+        <td>¥50</td>
+        <td>¥300</td>
+    </tr>
+    <tr>
+        <td>华为云</td>
+        <td>2核2G / 5Mbps</td>
+        <td>¥55</td>
+        <td>¥330</td>
+    </tr>
+    <tr>
+        <td>火山引擎</td>
+        <td>2核2G / 5Mbps</td>
+        <td>¥45</td>
+        <td>¥270</td>
+    </tr>
+</table>
+<div class="kb-tip">
+    <div class="kb-tip-title">💡 省钱建议</div>
+    <p>新用户首年通常有<strong>3-5折</strong>优惠，建议趁活动入手。年付比月付便宜很多，如果确定长期使用选年付。</p>
+</div>
+
+<h2 id="faq">常见问题</h2>
+
+<h3>Q1: 轻量服务器需要备案吗？</h3>
+<p>如果选择<strong>中国大陆节点</strong>（如北京、上海、深圳），域名必须完成ICP备案才能解析。如果选择<strong>境外节点</strong>（如香港、新加坡、美国），则不需要备案。</p>
+
+<h3>Q2: 轻量服务器能用自己的域名吗？</h3>
+<p>可以。在服务器控制台绑定域名，然后在DNS服务商处将域名A记录指向服务器公网IP即可。</p>
+
+<h3>Q3: 轻量服务器能跑什么？</h3>
+<p>适合跑：WordPress博客、静态网站、Node.js/Python/Go项目、Docker容器、Redis、MySQL（小流量）、邮件服务器等。不适合高并发Web应用或大数据处理。</p>
+
+<h3>Q4: 从轻量服务器迁移到ECS容易吗？</h3>
+<p>大部分情况下可以。数据都在服务器上，迁移主要是重新配置环境。建议先用快照备份，再逐步迁移。</p>
+
+</div>
+
+<!-- 底部导航 -->
+<div class="kb-nav">
+    <div class="kb-nav-item prev">← 上一篇</div>
+    <div class="kb-nav-item next"><a href="/tools/kb/domain-dns/" class="kb-nav-title">域名与DNS →</a></div>
+</div>
+
+<!-- 相关主题 -->
+<div class="kb-related">
+    <div class="kb-related-title">📚 相关主题</div>
+    <ul class="kb-related-list">
+        <li><a href="/tools/kb/domain-dns/">域名与DNS概念</a></li>
+        <li><a href="/tools/kb/icp-filing/">ICP备案指南</a></li>
+        <li><a href="/tools/kb/ssl-certificate/">SSL证书申请</a></li>
+    </ul>
+</div>
+
+{% endblock %}

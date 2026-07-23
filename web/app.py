@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from flask import Flask, render_template, request, jsonify, send_from_directory, make_response
 from analyzer import SiteAnalyzer
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from report_store import save_report, get_report, list_recent_reports, count_reports, SITE_BASE, REPORT_PREFIX
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.config['JSON_AS_ASCII'] = False
@@ -426,6 +427,110 @@ def privacy():
 def disclaimer():
     """免责条款"""
     return render_template('disclaimer.html')
+
+
+# ==================== 分析报告分享页 ====================
+
+@app.route('/report/<rid>')
+def report_view(rid):
+    """服务端渲染的分析报告页（SEO 友好，可分享）"""
+    rid = (rid or '').strip().lower()
+    if not re.match(r'^[0-9a-f]{6,32}$', rid):
+        return f"<h1>报告 ID 无效</h1><p><a href='/tools/'>返回首页</a></p>", 404
+    report = get_report(rid)
+    if not report:
+        return f"<h1>报告不存在</h1><p>报告 ID: {rid}</p><p><a href='/tools/'>返回首页</a></p>", 404
+
+    score = report['score'] or 0
+    if score >= 80:
+        score_color, score_text = '#2ed573', '优秀'
+    elif score >= 60:
+        score_color, score_text = '#ffa502', '良好'
+    else:
+        score_color, score_text = '#ff4757', '需优化'
+
+    display_title = report['title'] or report['domain'] or report['url']
+    share_url = f"{SITE_BASE}{REPORT_PREFIX}/{report['id']}"
+    meta_desc = f"{report['domain'] or report['url']} 的网站SEO分析报告，综合评分 {score}/100，包含SSL、性能、SEO、AI可信度等多维度检测。"
+
+    return render_template(
+        'report.html',
+        report=report,
+        data=report['data'],
+        display_title=display_title,
+        share_url=share_url,
+        meta_desc=meta_desc,
+        score_color=score_color,
+        score_text=score_text,
+    )
+
+
+@app.route('/reports')
+def reports_index():
+    """最近报告列表页（也有 SEO 价值）"""
+    reports = list_recent_reports(50)
+    total = count_reports()
+    items = ''.join(
+        f'<li><a href="/tools/report/{r["id"]}">{(r["title"] or r["domain"] or r["url"])[:60]}</a> '
+        f'<span style="color:#8b95a3;font-size:12px">— 评分 {r["score"]} · {r["created_at"]}</span></li>'
+        for r in reports
+    )
+    html = f'''<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>最近分析报告 - 站长工具 bayihy.cn</title>
+<meta name="description" content="bayihy.cn 站长工具最近生成的 {total} 份网站分析报告，可公开查看。">
+<link rel="canonical" href="{SITE_BASE}/tools/reports">
+<style>body{{background:#0e1a2b;color:#e4e6eb;font-family:sans-serif;padding:20px;max-width:900px;margin:0 auto;line-height:1.8}}
+a{{color:#00d2ff;text-decoration:none}}ul{{padding-left:20px}}h1{{font-size:22px}}</style></head>
+<body><p><a href="/tools/">← 返回站长工具</a></p>
+<h1>📊 最近分析报告</h1>
+<p style="color:#8b95a3">共 {total} 份报告，显示最新 {len(reports)} 份</p>
+<ul>{items}</ul>
+<p style="margin-top:40px"><a href="/tools/">创建新分析 →</a></p>
+<script src="/static/js/baidu-push.js" async></script></body></html>'''
+    return html
+
+
+# ==================== 建站知识库 ====================
+
+KB_ARTICLES = {
+    'kb/': {'title': '建站知识库 - 巴依浩爷', 'description': '从零开始搭建网站的每一步：轻量服务器、域名DNS、ICP备案、公网安备、SSL证书等入门指南。'},
+    'kb/light-server/': {'title': '什么是轻量服务器？申请途径全指南 - 建站知识库', 'description': '轻量应用服务器概念详解，与ECS对比，国内主流厂商申请途径和价格对比。'},
+    'kb/domain-dns/': {'title': '什么是域名和DNS？申请途径全指南 - 建站知识库', 'description': '域名注册、DNS解析配置、顶级域名选择、推荐注册商一览。'},
+    'kb/icp-filing/': {'title': '什么是ICP备案和ICP许可？申请方式全解析 - 建站知识库', 'description': 'ICP备案流程、ICP经营许可证申请条件、个人与企业区别。'},
+    'kb/gongan-beian/': {'title': '什么是公网安备？申请方式全指南 - 建站知识库', 'description': '互联网安全保护技术措施备案（公安备案）申请流程和注意事项。'},
+    'kb/ssl-certificate/': {'title': '什么是SSL证书？申请途径全指南 - 建站知识库', 'description': 'HTTPS加密证书申请，Let\'s Encrypt免费证书、云厂商免费证书、付费证书对比。'},
+}
+
+
+@app.route('/kb/')
+def kb_index():
+    """知识库首页"""
+    return render_template('kb/index.html', **KB_ARTICLES['kb/'])
+
+
+@app.route('/kb/<slug>/')
+def kb_article(slug):
+    """知识库文章页"""
+    key = f'kb/{slug}/'
+    if key not in KB_ARTICLES:
+        return '文章不存在', 404
+    template_map = {
+        'kb/': 'kb/index.html',
+        'kb/light-server/': 'kb/light-server.html',
+        'kb/domain-dns/': 'kb/domain-dns.html',
+        'kb/icp-filing/': 'kb/icp-filing.html',
+        'kb/gongan-beian/': 'kb/gongan-beian.html',
+        'kb/ssl-certificate/': 'kb/ssl-certificate.html',
+    }
+    canonical = f"https://www.bayihy.cn/tools/{slug}"
+    return render_template(template_map[key], canonical=canonical, **KB_ARTICLES[key])
+
+
+@app.route('/kb/<slug>')
+def kb_article_redirect(slug):
+    """不带尾部斜杠的重定向"""
+    return f'<html><head><meta http-equiv="refresh" content="0;url=/tools/kb/{slug}/"></head></html>', 200, {'Content-Type': 'text/html'}
 
 
 @app.route('/roleplay')
@@ -931,6 +1036,13 @@ def analyze():
         # 将 seo.ai_trust 提升到顶级 ai_trust 字段
         if 'seo' in results and 'ai_trust' in results['seo']:
             results['ai_trust'] = results['seo']['ai_trust']
+        # 保存报告 + 自动追加 sitemap(异步、不阻塞响应)
+        try:
+            report_id = save_report(url, results)
+            results['report_id'] = report_id
+            results['share_url'] = f"{SITE_BASE}{REPORT_PREFIX}/{report_id}"
+        except Exception as _e:
+            app.logger.warning(f'保存报告失败: {_e}')
         resp = jsonify(results)
         return resp
     except Exception as e:

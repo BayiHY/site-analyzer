@@ -1,0 +1,184 @@
+/**
+ * 工具页 - SEO 内容区块统一样式
+ * 用于 audio-cutter / hum-to-midi / json-visualizer / math-problems / (index)
+ *
+ * v2 (2026-07-23): 换为 <details> 折叠式
+ *   - 默认折叠，不干扰工具使用
+ *   - HTML 内容仍存在，百度/谷歌蜘蛛仍可抓取 SEO 长尾词
+ *   - 用户主动点开才看内容
+ */
+
+.tool-content {
+    max-width: 900px;
+    margin: 40px auto 20px;
+    padding: 0 20px;
+    color: #b4bcc8;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.75;
+    font-size: 14px;
+}
+
+/* details/summary 折叠头 */
+.tool-content > summary,
+.tool-content-summary {
+    cursor: pointer;
+    padding: 12px 18px;
+    background: rgba(0, 210, 255, 0.06);
+    border: 1px solid rgba(0, 210, 255, 0.15);
+    border-radius: 8px;
+    color: #00d2ff;
+    font-size: 14px;
+    font-weight: 500;
+    list-style: none;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.tool-content > summary::-webkit-details-marker,
+.tool-content-summary::-webkit-details-marker { display: none; }
+
+.tool-content > summary::before,
+.tool-content-summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 10px;
+    transition: transform 0.2s;
+    color: #00d2ff;
+}
+
+details.tool-content[open] > summary::before,
+details[open] > .tool-content-summary::before {
+    transform: rotate(90deg);
+}
+
+.tool-content > summary:hover,
+.tool-content-summary:hover {
+    background: rgba(0, 210, 255, 0.10);
+}
+
+/* 折叠内容区 */
+.tool-content-body {
+    padding: 16px 4px;
+    animation: toolContentFadeIn 0.25s ease;
+}
+
+@keyframes toolContentFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.tool-content h2 {
+    color: #00d2ff;
+    font-size: 18px;
+    margin: 28px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 210, 255, 0.15);
+}
+
+.tool-content h3 {
+    color: #e4e6eb;
+    font-size: 15px;
+    margin: 18px 0 8px;
+}
+
+.tool-content p {
+    margin: 8px 0;
+}
+
+.tool-content ul, .tool-content ol {
+    padding-left: 24px;
+    margin: 8px 0;
+}
+
+.tool-content ul li,
+.tool-content ol li {
+    margin: 6px 0;
+}
+
+.tool-content .faq-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 10px 0;
+}
+
+.tool-content .faq-q {
+    color: #00d2ff;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+.tool-content .faq-a {
+    color: #b4bcc8;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.tool-content .highlight {
+    color: #00d2ff;
+}
+
+.tool-content code {
+    background: rgba(0, 210, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #00d2ff;
+}
+
+.related-tools {
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.related-tools h2 {
+    color: #00d2ff;
+    font-size: 16px;
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.related-tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.related-tools-grid a {
+    display: block;
+    padding: 12px 14px;
+    background: rgba(0, 210, 255, 0.05);
+    border: 1px solid rgba(0, 210, 255, 0.12);
+    border-radius: 8px;
+    text-decoration: none;
+    color: #e4e6eb;
+    transition: all 0.2s;
+}
+
+.related-tools-grid a:hover {
+    background: rgba(0, 210, 255, 0.12);
+    border-color: rgba(0, 210, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.related-tools-grid .emoji {
+    font-size: 20px;
+    margin-bottom: 6px;
+}
+
+.related-tools-grid .name {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.related-tools-grid .desc {
+    font-size: 11px;
+    color: #888;
+    line-height: 1.5;
+}

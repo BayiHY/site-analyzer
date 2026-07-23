@@ -40,10 +40,11 @@ const PARAM_MAP = {
     addCount: 'a', subCount: 'b', mixCount: 'c', pageCount: 'p',
     addSubCols: 'd', mixCols: 'e', minNum: 'n', maxNum: 'm',
     fontSize: 's', gapAddSub: 'g', gapMixed: 'k', letterSpacing: 'l', lineHeightMixed: 'x',
+    includeAnswers: 'A',
     seed: 'S',
 };
 const SHORT_IDS = Object.keys(PARAM_MAP);
-const DEFAULTS = {addCount:'6',subCount:'6',mixCount:'8',pageCount:'1',addSubCols:'3',mixCols:'2',minNum:'100',maxNum:'999',fontSize:'12',gapAddSub:'12',gapMixed:'48',letterSpacing:'1',lineHeightMixed:'8'};
+const DEFAULTS = {addCount:'6',subCount:'6',mixCount:'8',pageCount:'1',addSubCols:'3',mixCols:'2',minNum:'100',maxNum:'999',fontSize:'11',gapAddSub:'12',gapMixed:'48',letterSpacing:'0',lineHeightMixed:'8',includeAnswers:'0'};
 
 // ===== 种子管理 =====
 function generateSeed() {
@@ -81,7 +82,10 @@ function restoreFromUrl() {
         const val = urlParams.get(short);
         if (val !== null && val !== '') {
             const el = document.getElementById(id);
-            if (el) el.value = val;
+            if (el) {
+                if (el.type === 'checkbox') el.checked = (val === '1' || val === 'true');
+                else el.value = val;
+            }
             anyUrlParam = true;
         }
     }
@@ -103,7 +107,9 @@ function saveParams() {
     const params = {};
     SHORT_IDS.forEach(id => {
         const el = document.getElementById(id);
-        if (el) params[id] = el.value;
+        if (el) {
+            params[id] = (el.type === 'checkbox') ? (el.checked ? '1' : '0') : el.value;
+        }
     });
     localStorage.setItem('math-problems-params', JSON.stringify(params));
     updateUrlFromParams(params);
@@ -128,9 +134,12 @@ function restoreParams() {
         const saved = JSON.parse(localStorage.getItem('math-problems-params'));
         if (saved) {
             SHORT_IDS.forEach(id => {
-                if (saved[id]) {
+                if (saved[id] !== undefined) {
                     const el = document.getElementById(id);
-                    if (el) el.value = saved[id];
+                    if (el) {
+                        if (el.type === 'checkbox') el.checked = (saved[id] === '1' || saved[id] === true);
+                        else el.value = saved[id];
+                    }
                 }
             });
             mpLog('info', 'RESTORE', '从本地缓存恢复参数');
@@ -159,7 +168,7 @@ function genAddition(n, minN, maxN) {
             if (b >= minN && a + b <= maxN) break;
         }
         if (b < minN || a + b > maxN) { a = minN; b = minN; }
-        results.push({ a, b, op: '+' });
+        results.push({ a, b, op: '+', ans: a + b });
     }
     return results;
 }
@@ -178,7 +187,7 @@ function genSubtraction(n, minN, maxN) {
             if (a > maxN) a = maxN;
             if (a - b < minN) b = a - minN;
         }
-        results.push({ a, b, op: '-' });
+        results.push({ a, b, op: '-', ans: a - b });
     }
     return results;
 }
@@ -200,7 +209,7 @@ function genMixed(n, minN, maxN) {
                 if (c >= minN && a + b + c <= maxN) break;
             }
             if (c < minN || a + b + c > maxN) { a = minN; b = minN; c = minN; }
-            results.push({ a, b, c, op1: '+', op2: '+' });
+            results.push({ a, b, c, op1: '+', op2: '+', ans: a + b + c });
         } else if (pattern === '--') {
             let a, b, c;
             for (let t = 0; t < 1000; t++) {
@@ -210,7 +219,7 @@ function genMixed(n, minN, maxN) {
                 if (c >= minN && a - b - c >= minN) break;
             }
             if (c < minN || a - b - c < minN) { a = minN*2; b = minN; c = minN; }
-            results.push({ a, b, c, op1: '-', op2: '-' });
+            results.push({ a, b, c, op1: '-', op2: '-', ans: a - b - c });
         } else if (pattern === '+-') {
             let a, b, c, diff;
             for (let t = 0; t < 1000; t++) {
@@ -221,7 +230,7 @@ function genMixed(n, minN, maxN) {
                 if (c >= minN && diff + c <= maxN) break;
             }
             if (c < minN || diff + c > maxN) { a = minN*2; b = minN; c = minN; }
-            results.push({ a, b, c, op1: '-', op2: '+' });
+            results.push({ a, b, c, op1: '-', op2: '+', ans: (a - b) + c });
         } else {
             let a, b, c, sum;
             for (let t = 0; t < 1000; t++) {
@@ -232,7 +241,7 @@ function genMixed(n, minN, maxN) {
                 if (c >= minN && sum - c >= minN) break;
             }
             if (c < minN || sum - c < minN) { a = minN; b = minN; c = minN; }
-            results.push({ a, b, c, op1: '+', op2: '-' });
+            results.push({ a, b, c, op1: '+', op2: '-', ans: (a + b) - c });
         }
     });
     return results;
@@ -241,6 +250,10 @@ function genMixed(n, minN, maxN) {
 function fmtAdd(e) { return `${e.a} + ${e.b} =`; }
 function fmtSub(e) { return `${e.a} − ${e.b} =`; }
 function fmtMix(e) { return `${e.a} ${e.op1} ${e.b} ${e.op2} ${e.c} =`; }
+// 答案页专用: 算式 + 结果
+function fmtAddAns(e) { return `${e.a} + ${e.b} = ${e.ans}`; }
+function fmtSubAns(e) { return `${e.a} − ${e.b} = ${e.ans}`; }
+function fmtMixAns(e) { return `${e.a} ${e.op1} ${e.b} ${e.op2} ${e.c} = ${e.ans}`; }
 
 // ===== 全局状态 =====
 let currentProblems = null;
@@ -331,6 +344,29 @@ async function renderPreview(pages) {
         `;
         container.appendChild(div);
     });
+
+    // 附带答案页（预览中默认隐藏，仅在 PDF 中显现）
+    const includeAns = document.getElementById('includeAnswers')?.checked;
+    if (includeAns) {
+        pages.forEach((page, idx) => {
+            const div = document.createElement('div');
+            div.className = 'preview-page answer-page';
+            div.innerHTML = `
+                <div class="preview-page-header">✓ 第 ${idx + 1} 页 答案</div>
+                <div class="addsub-grid" style="grid-template-columns: repeat(${addSubCols}, 1fr);">
+                    ${page.adds.map(fmtAddAns).map(s => `<div class="preview-problem">${s}</div>`).join('')}
+                    ${page.subs.map(fmtSubAns).map(s => `<div class="preview-problem">${s}</div>`).join('')}
+                </div>
+                <div style="height:16px;"></div>
+                <div class="mix-grid" style="grid-template-columns: repeat(${mixCols}, 1fr);">
+                    ${page.mixes.map(fmtMixAns).map(s => `<div class="preview-problem">${s}</div>`).join('')}
+                </div>
+                <div class="page-qr"><img src="${qrCodeDataUrl}" alt="二维码"></div>
+            `;
+            container.appendChild(div);
+        });
+        mpLog('info', 'ANSWER', `已附带 ${pages.length} 页答案`);
+    }
 
     container.classList.add('visible');
     mpLog('info', 'PREVIEW', `预览渲染完成: ${pages.length} 页`);
@@ -448,7 +484,9 @@ async function downloadPDF() {
             mpLog('info', 'PDF', `第 ${i + 1}/${pages.length} 页截图完成 (${canvas.width}×${canvas.height})`);
         }
 
-        const filename = `数学练习题_${new Date().toISOString().slice(0, 10)}.pdf`;
+        const includeAns = document.getElementById('includeAnswers')?.checked;
+        const suffix = includeAns ? '_含答案' : '';
+        const filename = `数学练习题${suffix}_${new Date().toISOString().slice(0, 10)}.pdf`;
         pdf.save(filename);
         mpLog('info', 'PDF', `PDF 已下载: ${filename}`);
 
@@ -724,3 +762,15 @@ document.querySelectorAll('#fontSize, #gapAddSub, #gapMixed, #letterSpacing, #li
         }
     });
 });
+
+// 监听“附带答案页”开关，重新渲染预览
+const includeAnswersEl = document.getElementById('includeAnswers');
+if (includeAnswersEl) {
+    includeAnswersEl.addEventListener('change', () => {
+        saveParams();
+        mpLog('info', 'ANSWER', `附带答案开关: ${includeAnswersEl.checked}`);
+        if (currentProblems && currentProblems.length > 0) {
+            renderPreview(currentProblems);
+        }
+    });
+}

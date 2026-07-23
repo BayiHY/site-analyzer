@@ -1,8 +1,8 @@
 {
   "bayihy.cn": {
-    "latest": 1.34,
-    "avg": 1.88,
-    "count": 41
+    "latest": 10.82,
+    "avg": 2.25,
+    "count": 52
   },
   "baidu.com": {
     "latest": 19.81,
@@ -33,5 +33,10 @@
     "latest": 0.29,
     "avg": 0.29,
     "count": 1
+  },
+  "github.com": {
+    "latest": 36.19,
+    "avg": 28.61,
+    "count": 3
   }
 }

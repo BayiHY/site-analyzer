@@ -535,6 +535,48 @@
                     <button onclick="quickAnalyze('alicdn.com')" style="padding:8px 20px;background:rgba(0,210,255,0.1);border:1px solid rgba(0,210,255,0.3);color:#00d2ff;border-radius:20px;cursor:pointer;font-size:13px;">示例：阿里CDN</button>
                     <button onclick="quickAnalyze('weixin.qq.com')" style="padding:8px 20px;background:rgba(0,210,255,0.1);border:1px solid rgba(0,210,255,0.3);color:#00d2ff;border-radius:20px;cursor:pointer;font-size:13px;">示例：微信</button>
                 </div>
+
+                <!-- 其他工具推荐 (不含角色扮演) -->
+                <div style="margin-top:40px;padding-top:24px;border-top:1px solid rgba(255,255,255,0.06);">
+                    <div style="font-size:14px;color:#00d2ff;margin-bottom:16px;">✨ 还有这些实用小工具</div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;text-align:left;">
+                        <a href="/tools/reports" style="display:block;padding:14px;background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.15);border-radius:10px;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,210,255,0.12)'" onmouseout="this.style.background='rgba(0,210,255,0.06)'">
+                            <div style="font-size:22px;margin-bottom:6px;">📊</div>
+                            <div style="color:#e4e6eb;font-size:14px;font-weight:600;margin-bottom:4px;">报告库</div>
+                            <div style="color:#888;font-size:11px;line-height:1.5;">浏览最近生成的网站分析报告</div>
+                        </a>
+                        <a href="/tools/audio-cutter" style="display:block;padding:14px;background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.15);border-radius:10px;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,210,255,0.12)'" onmouseout="this.style.background='rgba(0,210,255,0.06)'">
+                            <div style="font-size:22px;margin-bottom:6px;">🎵</div>
+                            <div style="color:#e4e6eb;font-size:14px;font-weight:600;margin-bottom:4px;">音频裁剪</div>
+                            <div style="color:#888;font-size:11px;line-height:1.5;">纯浏览器端处理，波形可视化剪接</div>
+                        </a>
+                        <a href="/tools/hum-to-midi" style="display:block;padding:14px;background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.15);border-radius:10px;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,210,255,0.12)'" onmouseout="this.style.background='rgba(0,210,255,0.06)'">
+                            <div style="font-size:22px;margin-bottom:6px;">🎶</div>
+                            <div style="color:#e4e6eb;font-size:14px;font-weight:600;margin-bottom:4px;">哼唱转 MIDI</div>
+                            <div style="color:#888;font-size:11px;line-height:1.5;">对麦克风哼旋律，自动生成 MIDI</div>
+                        </a>
+                        <a href="/tools/json-visualizer" style="display:block;padding:14px;background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.15);border-radius:10px;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,210,255,0.12)'" onmouseout="this.style.background='rgba(0,210,255,0.06)'">
+                            <div style="font-size:22px;margin-bottom:6px;">🌳</div>
+                            <div style="color:#e4e6eb;font-size:14px;font-weight:600;margin-bottom:4px;">JSON 可视化</div>
+                            <div style="color:#888;font-size:11px;line-height:1.5;">交互式树形图谱，支持编辑导入导出</div>
+                        </a>
+                        <a href="/tools/math-problems" style="display:block;padding:14px;background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.15);border-radius:10px;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,210,255,0.12)'" onmouseout="this.style.background='rgba(0,210,255,0.06)'">
+                            <div style="font-size:22px;margin-bottom:6px;">➕</div>
+                            <div style="color:#e4e6eb;font-size:14px;font-weight:600;margin-bottom:4px;">加减法练习</div>
+                            <div style="color:#888;font-size:11px;line-height:1.5;">随机生成题目，直接导出 A4 PDF</div>
+                        </a>
+                        <a href="/tools/kb/" style="display:block;padding:14px;background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.15);border-radius:10px;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,210,255,0.12)'" onmouseout="this.style.background='rgba(0,210,255,0.06)'">
+                            <div style="font-size:22px;margin-bottom:6px;">📖</div>
+                            <div style="color:#e4e6eb;font-size:14px;font-weight:600;margin-bottom:4px;">建站知识库</div>
+                            <div style="color:#888;font-size:11px;line-height:1.5;">服务器、域名、备案、证书入门指南</div>
+                        </a>
+                        <a href="/tools/toolsbox" style="display:block;padding:14px;background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.15);border-radius:10px;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,210,255,0.12)'" onmouseout="this.style.background='rgba(0,210,255,0.06)'">
+                            <div style="font-size:22px;margin-bottom:6px;">🧰</div>
+                            <div style="color:#e4e6eb;font-size:14px;font-weight:600;margin-bottom:4px;">全部工具</div>
+                            <div style="color:#888;font-size:11px;line-height:1.5;">查看完整工具箱</div>
+                        </a>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
@@ -553,6 +595,8 @@
             <a href="https://gitcode.com/BayiHY/site-analyzer" target="_blank" style="color:#888;margin:0 8px;">⭐ 给个Star</a> · 
             <a href="/tools/api/docs.html" style="color:#888;margin:0 8px;">🤖 AI接口</a> ·
             <a href="/tools/toolsbox" style="color:#888;margin:0 8px;">🧰 工具箱</a> ·
+            <a href="/tools/reports" style="color:#888;margin:0 8px;">📊 报告库</a> ·
+            <a href="/tools/kb/" style="color:#888;margin:0 8px;">📖 知识库</a> ·
             <a href="#privacy" onclick="showPrivacy();return false;" style="color:#888;margin:0 8px;">🔒 隐私政策</a> ·
             <a href="#disclaimer" onclick="showDisclaimer();return false;" style="color:#888;margin:0 8px;">📋 免责条款</a> · 
             <a href="https://gitcode.com/BayiHY/site-analyzer" target="_blank" style="color:#888;margin:0 8px;">📖 使用文档</a>
@@ -919,6 +963,13 @@
                         <div class="score-bar">
                             <div class="score-bar-fill" style="width: ${score}%; background: ${scoreColor};"></div>
                         </div>
+                        ${data.share_url ? `
+                        <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;font-size:12px">
+                            <span style="color:#8b95a3">🔗 分享报告:</span>
+                            <input type="text" value="${data.share_url}" readonly onclick="this.select()" style="flex:1;min-width:200px;max-width:400px;padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);color:#e4e6eb;border-radius:4px;font-size:12px">
+                            <button onclick="navigator.clipboard.writeText('${data.share_url}').then(()=>{this.textContent='✓ 已复制';setTimeout(()=>this.textContent='复制',2000)})" style="padding:6px 14px;background:#00d2ff;border:none;border-radius:4px;color:#0e1a2b;font-weight:600;cursor:pointer;font-size:12px">复制</button>
+                            <a href="${data.share_url}" target="_blank" rel="noopener" style="padding:6px 14px;background:rgba(0,210,255,0.15);border-radius:4px;color:#00d2ff;text-decoration:none;font-size:12px">打开 ↗</a>
+                        </div>` : ''}
                     </div>
 
                     
@@ -1396,5 +1447,7 @@
         })();
     </script>
     <div id="copyToast" style="display:none;position:fixed;background:rgba(0,0,0,0.85);color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;z-index:99999;transition:opacity 0.3s;pointer-events:none;white-space:nowrap;backdrop-filter:blur(4px);box-shadow:0 4px 12px rgba(0,0,0,0.3);"></div>
+    <!-- 百度自动推送 -->
+    <script src="/static/js/baidu-push.js" async></script>
 </body>
 </html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{{ title }}</title>
+    <meta name="description" content="{{ description }}">
+    <meta name="keywords" content="{{ keywords|default('建站知识,服务器,域名,ICP备案,公网安备,站长工具') }}">
+    <meta name="author" content="巴依浩爷(BayiHY)">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{{ canonical }}">
+    <!-- 百度自动推送 -->
+    <script src="/static/js/baidu-push.js" async></script>
+    <link rel="stylesheet" href="/static/css/kb.css">
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <nav class="kb-topnav">
+        <a href="/tools/" class="kb-logo">🛠 站长工具</a>
+        <div class="kb-nav-links">
+            <a href="/tools/">首页</a>
+            <a href="/tools/toolsbox">工具箱</a>
+            <a href="/tools/kb/" style="color:#00d2ff;">知识库</a>
+            <a href="/tools/about">关于</a>
+        </div>
+    </nav>
+
+    <div class="kb-article">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- 页脚 -->
+    <footer class="kb-footer">
+        <div class="kb-footer-inner">
+            <div class="kb-footer-links">
+                <a href="/tools/">首页</a> ·
+                <a href="/tools/toolsbox">工具箱</a> ·
+                <a href="/tools/kb/">知识库</a> ·
+                <a href="/tools/privacy">隐私政策</a> ·
+                <a href="/tools/disclaimer">免责条款</a>
+            </div>
+            <p class="kb-footer-copy">© 2026 巴依浩爷(BayiHY). All rights reserved.</p>
+        </div>
+    </footer>
+
+    <style>
+    /* 顶部导航 */
+    .kb-topnav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        background: rgba(0,0,0,0.3);
+        border-bottom: 1px solid rgba(0,210,255,0.08);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+    }
+    .kb-logo {
+        font-size: 16px;
+        color: #e4e6eb;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .kb-nav-links a {
+        color: #888;
+        text-decoration: none;
+        font-size: 14px;
+        margin-left: 16px;
+        transition: color 0.2s;
+    }
+    .kb-nav-links a:hover { color: #e4e6eb; }
+
+    /* 页脚 */
+    .kb-footer {
+        text-align: center;
+        padding: 30px 20px;
+        border-top: 1px solid rgba(255,255,255,0.06);
+        margin-top: 40px;
+    }
+    .kb-footer-links a {
+        color: #888;
+        text-decoration: none;
+        font-size: 13px;
+    }
+    .kb-footer-links a:hover { color: #00d2ff; }
+    .kb-footer-copy {
+        font-size: 12px;
+        color: #555;
+        margin: 10px 0 0;
+    }
+    </style>
+</body>
+</html>

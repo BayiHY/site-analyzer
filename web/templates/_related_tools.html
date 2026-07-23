@@ -1,0 +1,65 @@
+<!--
+  工具页公共"相关工具"区块
+  用法: 每个工具页嵌入此内容,并把当前工具的卡片删掉(避免自己推自己)
+  角色扮演不在推荐列表(SEO 内容策略)
+-->
+<section class="related-tools" aria-label="其他工具推荐">
+    <h2>🧰 其他实用小工具</h2>
+    <div class="related-tools-grid">
+        <a href="/tools/" data-tool="site-analyzer">
+            <div class="emoji">🔍</div>
+            <div class="name">网站 SEO 分析</div>
+            <div class="desc">SEO 评分、ICP 备案、SSL、AI 信任度全维度检测</div>
+        </a>
+        <a href="/tools/reports" data-tool="reports">
+            <div class="emoji">📊</div>
+            <div class="name">报告库</div>
+            <div class="desc">浏览最近生成的网站分析报告</div>
+        </a>
+        <a href="/tools/audio-cutter" data-tool="audio-cutter">
+            <div class="emoji">🎵</div>
+            <div class="name">音频裁剪</div>
+            <div class="desc">纯浏览器端处理,波形可视化,不上传服务器</div>
+        </a>
+        <a href="/tools/hum-to-midi" data-tool="hum-to-midi">
+            <div class="emoji">🎶</div>
+            <div class="name">哼唱转 MIDI</div>
+            <div class="desc">对麦克风哼旋律,实时检测音高生成 MIDI</div>
+        </a>
+        <a href="/tools/json-visualizer" data-tool="json-visualizer">
+            <div class="emoji">🌳</div>
+            <div class="name">JSON 可视化</div>
+            <div class="desc">交互式树形图谱,支持编辑、导入导出</div>
+        </a>
+        <a href="/tools/math-problems" data-tool="math-problems">
+            <div class="emoji">➕</div>
+            <div class="name">加减法练习</div>
+            <div class="desc">随机生成题目,直接导出 A4 PDF 打印</div>
+        </a>
+        <a href="/tools/toolsbox" data-tool="toolsbox">
+            <div class="emoji">🧰</div>
+            <div class="name">全部工具</div>
+            <div class="desc">查看完整工具箱</div>
+        </a>
+    </div>
+</section>
+<script>
+// 页面加载时自动隐藏"自己推荐自己"的卡片
+(function() {
+    var currentPath = window.location.pathname.replace(/\/$/, '');
+    var pathMap = {
+        '/tools': 'site-analyzer', '/tools/': 'site-analyzer',
+        '/tools/reports': 'reports',
+        '/tools/audio-cutter': 'audio-cutter',
+        '/tools/hum-to-midi': 'hum-to-midi',
+        '/tools/json-visualizer': 'json-visualizer',
+        '/tools/math-problems': 'math-problems',
+        '/tools/toolsbox': 'toolsbox'
+    };
+    var self = pathMap[currentPath];
+    if (self) {
+        var el = document.querySelector('[data-tool="' + self + '"]');
+        if (el) el.style.display = 'none';
+    }
+})();
+</script>

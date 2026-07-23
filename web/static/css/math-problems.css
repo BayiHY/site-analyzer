@@ -173,6 +173,15 @@ body {
     color: #666;
 }
 
+/* 答案页区分 header 颜色，答案数字用深蓝突出 */
+.preview-page.answer-page .preview-page-header {
+    color: #2563eb;
+    border-bottom-color: #93c5fd;
+}
+.preview-page.answer-page .preview-problem {
+    color: #1e40af;
+}
+
 /* ===== 加法和减法 ===== */
 .addsub-grid {
     display: grid;

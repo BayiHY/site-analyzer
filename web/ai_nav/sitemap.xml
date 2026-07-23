@@ -1,15 +1,123 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.bayihy.cn/tools/</loc>
-    <lastmod>2026-05-21</lastmod>
+    <lastmod>2026-07-23</lastmod>
     <priority>1.0</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://www.bayihy.cn/api/docs.html</loc>
-    <lastmod>2026-05-21</lastmod>
+    <loc>https://www.bayihy.cn/tools/toolsbox</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.9</priority>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/about</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/audio-cutter</loc>
+    <lastmod>2026-07-23</lastmod>
     <priority>0.8</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/hum-to-midi</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.8</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/json-visualizer</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.8</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/math-problems</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.8</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/roleplay</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.8</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/privacy</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/disclaimer</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/reports</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+    <changefreq>daily</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/api/docs.html</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.6</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/report/627ea47bb1</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/report/31e9e75845</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/kb/</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/kb/light-server/</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/kb/domain-dns/</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/kb/icp-filing/</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/kb/gongan-beian/</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.bayihy.cn/tools/kb/ssl-certificate/</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
 </urlset>

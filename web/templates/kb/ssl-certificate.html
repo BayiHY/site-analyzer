@@ -1,0 +1,144 @@
+{% extends "kb/base.html" %}
+{% block content %}
+<!-- 面包屑 -->
+<div class="kb-breadcrumb">
+    <a href="/tools/">首页</a><span class="sep">›</span>
+    <a href="/tools/kb/">知识库</a><span class="sep">›</span>
+    SSL证书
+</div>
+
+<!-- 文章头部 -->
+<div class="kb-header">
+    <h1>什么是SSL证书？申请途径全指南</h1>
+    <div class="kb-meta">
+        <span>📅 最后更新: 2026-07-23</span>
+        <span>⏱ 阅读时间: 5分钟</span>
+    </div>
+</div>
+
+<!-- TOC -->
+<nav class="kb-toc">
+    <div class="kb-toc-title">📑 目录</div>
+    <ul class="kb-toc-list">
+        <li><a href="#what">什么是SSL证书？</a></li>
+        <li><a href="#why">为什么需要SSL证书？</a></li>
+        <li><a href="#types">SSL证书类型</a></li>
+        <li><a href="#apply">免费SSL证书申请途径</a></li>
+        <li><a href="#paid">付费SSL证书</a></li>
+        <li><a href="#faq">常见问题</a></li>
+    </ul>
+</nav>
+
+<!-- 正文 -->
+<div class="kb-content">
+
+<h2 id="what">什么是SSL证书？</h2>
+<p>SSL（Secure Sockets Layer）证书是一种<strong>数字证书</strong>，用于在网站和浏览器之间建立加密连接。安装SSL证书后，网站协议从 <code>http://</code> 变为 <code>https://</code>，数据传输会被加密。</p>
+
+<div class="kb-tip">
+    <div class="kb-tip-title">💡 类比理解</div>
+    <p>HTTP就像寄明信片——谁都能看到内容；HTTPS就像寄加密信件——只有收信人能打开。</p>
+</div>
+
+<h2 id="why">为什么需要SSL证书？</h2>
+<ul>
+    <li><strong>数据安全</strong> — 加密传输，防止中间人窃听和篡改</li>
+    <li><strong>SEO排名</strong> — 百度、Google都优先收录HTTPS站点</li>
+    <li><strong>用户信任</strong> — 浏览器显示"安全"锁标，提升转化率</li>
+    <li><strong>合规要求</strong> — 涉及用户登录、支付等场景必须HTTPS</li>
+    <li><strong>现代Web功能</strong> — HTTP/2、Service Worker等功能需要HTTPS</li>
+</ul>
+
+<h2 id="types">SSL证书类型</h2>
+<table class="kb-table">
+    <tr>
+        <th>类型</th>
+        <th>验证方式</th>
+        <th>适用场景</th>
+        <th>价格</th>
+    </tr>
+    <tr>
+        <td>DV（域名验证）</td>
+        <td>验证域名所有权</td>
+        <td>个人网站、博客、工具站</td>
+        <td>免费/¥50-200</td>
+    </tr>
+    <tr>
+        <td>OV（企业验证）</td>
+        <td>验证企业身份</td>
+        <td>企业官网、电商平台</td>
+        <td>¥1000-3000</td>
+    </tr>
+    <tr>
+        <td>EV（扩展验证）</td>
+        <td>严格的企业身份审核</td>
+        <td>银行、金融、支付平台</td>
+        <td>¥2000-5000</td>
+    </tr>
+</table>
+<p>对个人站长而言，<strong>DV证书完全够用</strong>。</p>
+
+<h2 id="apply">免费SSL证书申请途径</h2>
+
+<h3>1. Let's Encrypt（推荐 ⭐）</h3>
+<p>全球最流行的免费SSL证书颁发机构，被所有主流浏览器信任。</p>
+<ol class="kb-steps">
+    <li>安装 Certbot：<code>sudo apt install certbot python3-certbot-nginx</code></li>
+    <li>运行自动配置：<code>sudo certbot --nginx -d www.bayihy.cn -d bayihy.cn</code></li>
+    <li>Certbot 自动完成域名验证 + 证书部署 + nginx 配置</li>
+    <li>设置自动续期：Certbot 默认注册 systemd timer，每12小时检查</li>
+</ol>
+
+<h3>2. 云厂商免费SSL证书</h3>
+<ul>
+    <li><strong>阿里云</strong> — 控制台 →  SSL证书 → 免费DV证书，每年可申请20张</li>
+    <li><strong>腾讯云</strong> — 控制台 → SSL证书管理 → 免费证书，每年可申请20张</li>
+    <li><strong>华为云</strong> — 免费DV证书，有效期1年</li>
+</ul>
+
+<h3>3. Cloudflare CDN</h3>
+<p>使用Cloudflare作为CDN时，会自动提供免费的Universal SSL证书，无需手动配置。</p>
+
+<h2 id="paid">付费SSL证书</h2>
+<p>如果网站是企业级应用或有特殊需求，可以考虑付费证书：</p>
+<ul>
+    <li><strong>DigiCert</strong> — 行业标杆，兼容性最好</li>
+    <li><strong>Sectigo（原Comodo）</strong> — 性价比高，支持多域名/Wildcard</li>
+    <li><strong>GlobalSign</strong> — 国际知名CA，支持OV/EV证书</li>
+</ul>
+
+<div class="kb-tip">
+    <div class="kb-tip-title">💡 续费提醒</div>
+    <p>免费SSL证书有效期通常为90天（Let's Encrypt）或1年（云厂商）。建议设置续费提醒或使用Certbot自动续期。</p>
+</div>
+
+<h2 id="faq">常见问题</h2>
+
+<h3>Q1: SSL证书会影响网站速度吗？</h3>
+<p>首次HTTPS握手会有轻微延迟，但现代TLS 1.3协议已将影响降到极低。配合HTTP/2使用，HTTPS反而比HTTP更快。</p>
+
+<h3>Q2: 一个证书可以保护多个域名吗？</h3>
+<p>可以申请<strong>多域名证书（SAN）</strong>或<strong>通配符证书（*.example.com）</strong>，覆盖多个子域名。</p>
+
+<h3>Q3: 证书过期了会怎样？</h3>
+<p>浏览器会显示"不安全"警告页面，用户可能不敢访问你的网站。务必设置自动续期！</p>
+
+</div>
+
+<!-- 底部导航 -->
+<div class="kb-nav">
+    <div class="kb-nav-item prev"><a href="/tools/kb/gongan-beian/" class="kb-nav-title">← 公网安备</a></div>
+    <div class="kb-nav-item next">下一篇 →</div>
+</div>
+
+<!-- 相关主题 -->
+<div class="kb-related">
+    <div class="kb-related-title">📚 相关主题</div>
+    <ul class="kb-related-list">
+        <li><a href="/tools/kb/light-server/">轻量服务器申请</a></li>
+        <li><a href="/tools/kb/domain-dns/">域名与DNS</a></li>
+        <li><a href="/tools/kb/icp-filing/">ICP备案指南</a></li>
+    </ul>
+</div>
+
+{% endblock %}

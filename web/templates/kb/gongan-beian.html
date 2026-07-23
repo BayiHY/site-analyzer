@@ -1,0 +1,111 @@
+{% extends "kb/base.html" %}
+{% block content %}
+<!-- 面包屑 -->
+<div class="kb-breadcrumb">
+    <a href="/tools/">首页</a><span class="sep">›</span>
+    <a href="/tools/kb/">知识库</a><span class="sep">›</span>
+    公网安备
+</div>
+
+<!-- 文章头部 -->
+<div class="kb-header">
+    <h1>什么是公网安备？申请方式全指南</h1>
+    <div class="kb-meta">
+        <span>📅 最后更新: 2026-07-23</span>
+        <span>⏱ 阅读时间: 4分钟</span>
+    </div>
+</div>
+
+<!-- TOC -->
+<nav class="kb-toc">
+    <div class="kb-toc-title">📑 目录</div>
+    <ul class="kb-toc-list">
+        <li><a href="#what">什么是公网安备？</a></li>
+        <li><a href="#why">为什么要办？</a></li>
+        <li><a href="#apply">申请流程</a></li>
+        <li><a href="#where">在哪里办理？</a></li>
+        <li><a href="#faq">常见问题</a></li>
+    </ul>
+</nav>
+
+<!-- 正文 -->
+<div class="kb-content">
+
+<h2 id="what">什么是公网安备？</h2>
+<p>全称<strong>「互联网安全保护技术措施备案」</strong>，俗称"公网安备"或"公安备案"。是指网站在完成ICP备案后，向所在地公安机关网络安全部门进行的<strong>安全备案</strong>。</p>
+<p>依据《计算机信息网络国际联网安全保护管理办法》（公安部令第30号），在中国境内运行的网站都需要进行公安备案。</p>
+
+<div class="kb-tip">
+    <div class="kb-tip-title">💡 备案关系</div>
+    <p>建站合规流程：<br>
+    域名注册 → ICP备案（工信部/通管局）→ 公安备案（公安局网安支队）<br>
+    两者都要做，缺一不可。</p>
+</div>
+
+<h2 id="why">为什么要办公安备案？</h2>
+<ul>
+    <li><strong>法律要求</strong> — 《网络安全法》规定网络运营者必须履行安全保护义务</li>
+    <li><strong>网站合规</strong> — 未备案的网站可能被责令整改、罚款甚至关闭</li>
+    <li><strong>信任标识</strong> — 网站底部展示公安备案编号，提升用户信任度</li>
+    <li><strong>配合监管</strong> — 便于公安机关在发生网络安全事件时追溯</li>
+</ul>
+
+<h2 id="apply">公安备案申请流程</h2>
+<ol class="kb-steps">
+    <li><strong>登录全国互联网安全管理服务平台</strong> — <a href="https://www.beian.gov.cn/" target="_blank" rel="noopener">www.beian.gov.cn</a></li>
+    <li><strong>注册账号</strong> — 使用邮箱或个人信息注册</li>
+    <li><strong>填写备案信息</strong> — 网站名称、域名、IP地址、主办单位、负责人信息等</li>
+    <li><strong>上传材料</strong> — 个人：身份证照片；企业：营业执照+法人身份证</li>
+    <li><strong>提交审核</strong> — 当地公安机关网安部门审核（通常7-15个工作日）</li>
+    <li><strong>审核通过</strong> — 获得备案号，在网站底部悬挂</li>
+</ol>
+
+<h2 id="where">在哪里办理？</h2>
+<p>公安备案通过<strong>全国统一的在线平台</strong>办理，无需到线下窗口：</p>
+<ul>
+    <li>官网：<a href="https://www.beian.gov.cn/" target="_blank" rel="noopener">https://www.beian.gov.cn/</a></li>
+    <li>选择你所在的省份/城市</li>
+    <li>按提示填写信息并提交</li>
+</ul>
+
+<div class="kb-tip">
+    <div class="kb-tip-title">💡 悬挂格式</div>
+    <p>公安备案号悬挂格式示例：<br>
+    <code>京公网安备 110108020XXXXX号</code><br>
+    链接指向：<a href="https://www.beian.gov.cn/" target="_blank" rel="noopener">全国互联网安全管理服务平台</a></p>
+</div>
+
+<h2 id="faq">常见问题</h2>
+
+<h3>Q1: 公安备案和ICP备案是一回事吗？</h3>
+<p>不是一回事。ICP备案是向工信部申请，公安备案是向公安局申请。两者都需要做，且公安备案通常在ICP备案完成后进行。</p>
+
+<h3>Q2: 个人博客需要公安备案吗？</h3>
+<p>需要。无论经营性还是非经营性网站，只要服务器在中国大陆，都应当进行公安备案。</p>
+
+<h3>Q3: 境外服务器需要公安备案吗？</h3>
+<p>不需要。公安备案针对的是在中国大陆境内运行的网站。如果你的服务器在境外（如香港、新加坡），则无需公安备案。</p>
+
+<h3>Q4: 备案多久能下来？</h3>
+<p>一般7-15个工作日。各地公安机关处理速度不同，部分地区可能更快。</p>
+
+</div>
+
+<!-- 底部导航 -->
+<div class="kb-nav">
+    <div class="kb-nav-item prev"><a href="/tools/kb/icp-filing/" class="kb-nav-title">← ICP备案</a></div>
+    <div class="kb-nav-item next"><a href="/tools/kb/ssl-certificate/" class="kb-nav-title">SSL证书 →</a></div>
+</div>
+
+<!-- 相关主题 -->
+<div class="kb-related">
+    <div class="kb-related-title">📚 相关主题</div>
+    <ul class="kb-related-list">
+        <li><a href="/tools/kb/light-server/">轻量服务器申请</a></li>
+        <li><a href="/tools/kb/domain-dns/">域名与DNS</a></li>
+        <li><a href="/tools/kb/icp-filing/">ICP备案指南</a></li>
+        <li><a href="/tools/kb/ssl-certificate/">SSL证书申请</a></li>
+    </ul>
+</div>
+
+{% endblock %}
