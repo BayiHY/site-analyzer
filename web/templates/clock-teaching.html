@@ -101,31 +101,34 @@
         .hour-hand, .minute-hand, .second-hand {
             position: absolute;
             background: #333;
-            transform-origin: bottom center;
+            transform-origin: 50% 50%;
             border-radius: 2px;
         }
         
         .hour-hand {
             width: 4px;
             height: 80px;
-            top: 70px;
-            left: 148px;
+            bottom: 50%;
+            left: calc(50% - 2px);
+            transform-origin: center bottom;
             background: #2c3e50;
         }
         
         .minute-hand {
             width: 3px;
             height: 110px;
-            top: 40px;
-            left: 148.5px;
+            bottom: 50%;
+            left: calc(50% - 1.5px);
+            transform-origin: center bottom;
             background: #34495e;
         }
         
         .second-hand {
-            width: 1px;
+            width: 2px;
             height: 120px;
-            top: 30px;
-            left: 149.5px;
+            bottom: 50%;
+            left: calc(50% - 1px);
+            transform-origin: center bottom;
             background: #e74c3c;
         }
         
@@ -152,21 +155,7 @@
         .clock-mark {
             position: absolute;
             background: #666;
-            transform-origin: center;
-        }
-        
-        .hour-mark {
-            width: 3px;
-            height: 15px;
-            top: 5px;
-            left: 148.5px;
-        }
-        
-        .minute-mark {
-            width: 1px;
-            height: 8px;
-            top: 5px;
-            left: 149.5px;
+            border-radius: 1px;
         }
         
         .digital-time {
@@ -281,6 +270,33 @@
             color: white;
         }
         
+        /* Pointer selector buttons */
+        .pointer-selector {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .pointer-btn {
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+            background: var(--bg3);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .pointer-btn:hover {
+            background: var(--card-hover);
+            border-color: var(--primary);
+        }
+        .pointer-btn.active-pointer {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
         @media (max-width: 768px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -294,20 +310,14 @@
             
             .hour-hand {
                 height: 60px;
-                top: 65px;
-                left: 123px;
             }
             
             .minute-hand {
                 height: 85px;
-                top: 40px;
-                left: 123.5px;
             }
             
             .second-hand {
                 height: 95px;
-                top: 30px;
-                left: 124.5px;
             }
         }
     </style>
@@ -325,15 +335,22 @@
     <div class="main-content">
         <div class="clock-section">
             <div class="digital-time" id="digitalTime">00:00:00</div>
-            <div class="clock-container">
+            <div class="clock-container" id="clockContainer">
                 <div class="clock-face">
                     <div class="clock-marks" id="clockMarks"></div>
                     <div class="clock-numbers" id="clockNumbers"></div>
                     <div class="hour-hand" id="hourHand"></div>
                     <div class="minute-hand" id="minuteHand"></div>
                     <div class="second-hand" id="secondHand"></div>
-                    <div class="clock-center"></div>
+                    <div class="clock-center" id="clockCenter"></div>
                 </div>
+            </div>
+            <!-- Pointer selector buttons (visible in manual mode) -->
+            <div id="pointerSelector" style="display:none; margin-top:15px;" class="pointer-selector">
+                <span style="color:var(--text-dim); font-size:0.85rem; margin-right:8px;">选择指针：</span>
+                <button class="pointer-btn active-pointer" data-pointer="hour" onclick="selectPointer('hour')">🕐 时针</button>
+                <button class="pointer-btn" data-pointer="minute" onclick="selectPointer('minute')">🕑 分针</button>
+                <button class="pointer-btn" data-pointer="second" onclick="selectPointer('second')">🕒 秒针</button>
             </div>
         </div>
 
@@ -351,7 +368,7 @@
             <div id="manualControls" class="time-display" style="display: none;">
                 <h3>手动设置时间</h3>
                 <div class="control-group">
-                    <label for="timeInput">设置时间 (HH:MM:SS):</label>
+                    <label for="timeInput">设置时间 (HH:MM, 12小时制):</label>
                     <input type="time" id="timeInput" class="time-input" step="1">
                 </div>
                 <button class="btn" onclick="setManualTime()">设置时间</button>
@@ -399,6 +416,28 @@
     </footer>
 </div>
 
+<!-- 页内日志面板 — 内容由 clock-teaching-logger.js 动态渲染 -->
+<div id="rp-log-panel" style="display:none;"></div>
+
+<script src="/static/js/clock-teaching-logger.js"></script>
 <script src="/static/js/clock-teaching.js"></script>
+
+<!-- h=1 纯分享模式：隐藏日志面板 -->
+<script>
+(function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('h') === '1') {
+        document.body.classList.add('h-mode');
+        var logPanel = document.getElementById('rp-log-panel');
+        if (logPanel) logPanel.style.display = 'none';
+        window.__hideLogPanel = true;
+    }
+})();
+</script>
+
+<style>
+/* h=1 时隐藏日志面板边框 */
+.h-mode #rp-log-panel { display: none !important; }
+</style>
 </body>
 </html>
