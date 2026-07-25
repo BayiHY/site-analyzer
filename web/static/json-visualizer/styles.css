@@ -219,6 +219,66 @@ textarea::placeholder {
     opacity: 0.6;
 }
 
+.zoom-control {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px 12px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    user-select: none;
+}
+
+.zoom-label {
+    font-size: 14px;
+}
+
+.zoom-value {
+    min-width: 40px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+#zoomSlider {
+    width: 120px;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+#zoomSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #00d4ff;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#zoomSlider::-webkit-slider-thumb:hover {
+    background: #00b8e6;
+}
+
+#zoomSlider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #00d4ff;
+    cursor: pointer;
+    border: none;
+}
+
 .legend {
     position: absolute;
     bottom: 10px;

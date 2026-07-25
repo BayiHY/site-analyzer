@@ -37,13 +37,18 @@
                 <div class="error-message" id="errorMsg"></div>
             </div>
         </div>
-        <button class="panel-toggle" id="panelToggle" onclick="toggleLeftPanel()" title="收起/展开编辑区">◂</button>
+        <button class="panel-toggle" id="panelToggle" onclick="toggleLeftPanel()" title="显示图谱/编辑代码">◀ 显示图谱</button>
         <div class="right-panel">
             <svg id="canvas"></svg>
             <div class="tooltip" id="tooltip"></div>
             <div class="info-panel" id="infoPanel">
                 <div>节点数: <span id="nodeCount">0</span></div>
                 <div>连接数: <span id="edgeCount">0</span></div>
+            </div>
+            <div class="zoom-control" id="zoomControl">
+                <span class="zoom-label">🔍</span>
+                <input type="range" id="zoomSlider" min="10" max="300" value="100" step="5">
+                <span class="zoom-value" id="zoomValue">100%</span>
             </div>
             <div class="legend">
                 <div class="legend-item">

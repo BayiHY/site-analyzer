@@ -71,6 +71,7 @@ function initCanvasInteraction() {
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
         scale = Math.min(Math.max(scale * delta, CONFIG.minScale), CONFIG.maxScale);
         svg.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+        syncZoomSlider();
     });
 
     // ===== 触摸事件（移动端支持）=====
@@ -121,6 +122,7 @@ function initCanvasInteraction() {
             lastTouchCenterY = center.y;
             
             svg.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+            syncZoomSlider();
         }
     }, { passive: false });
 
@@ -141,6 +143,26 @@ function initCanvasInteraction() {
     svg.addEventListener('touchcancel', () => {
         isTouching = false;
         isDragging = false;
+    });
+}
+
+// 同步滑块到当前缩放值
+function syncZoomSlider() {
+    const slider = document.getElementById('zoomSlider');
+    const zoomValue = document.getElementById('zoomValue');
+    if (slider) slider.value = Math.round(scale * 100);
+    if (zoomValue) zoomValue.textContent = Math.round(scale * 100) + '%';
+}
+
+// 初始化缩放滑块
+function initZoomSlider() {
+    const slider = document.getElementById('zoomSlider');
+    if (!slider) return;
+    slider.addEventListener('input', () => {
+        const newScale = parseInt(slider.value) / 100;
+        scale = Math.min(Math.max(newScale, CONFIG.minScale), CONFIG.maxScale);
+        ELEMENTS.svg.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+        syncZoomSlider();
     });
 }
 

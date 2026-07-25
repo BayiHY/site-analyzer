@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>钟表教具 - 小学数学工具</title>
+    <meta name="description" content="小学钟表教具 - 帮助学生学习认识时间，掌握时针、分针、秒针的读法">
+    <link rel="canonical" href="https://www.bayihy.cn/tools/clock-teaching">
+    <style>
+        :root {
+            --primary: #4f8a8b;
+            --primary-dark: #3a6b6c;
+            --accent: #ffd700;
+            --bg: #0f1419;
+            --bg2: #1a2332;
+            --bg3: #243044;
+            --text: #e8eaed;
+            --text-dim: #9aa0a6;
+            --border: #2d3a4a;
+            --card-hover: rgba(79,138,139,0.12);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px 0;
+        }
+        .header h1 {
+            font-size: 2.2rem;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+        .header p {
+            color: var(--text-dim);
+            font-size: 1rem;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .back-link:hover { text-decoration: underline; }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+        
+        .clock-section {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .clock-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto 30px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        .clock-face {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+        }
+        
+        .clock-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 12px;
+            height: 12px;
+            background: #333;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        
+        .hour-hand, .minute-hand, .second-hand {
+            position: absolute;
+            background: #333;
+            transform-origin: bottom center;
+            border-radius: 2px;
+        }
+        
+        .hour-hand {
+            width: 4px;
+            height: 80px;
+            top: 70px;
+            left: 148px;
+            background: #2c3e50;
+        }
+        
+        .minute-hand {
+            width: 3px;
+            height: 110px;
+            top: 40px;
+            left: 148.5px;
+            background: #34495e;
+        }
+        
+        .second-hand {
+            width: 1px;
+            height: 120px;
+            top: 30px;
+            left: 149.5px;
+            background: #e74c3c;
+        }
+        
+        .clock-numbers {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .clock-number {
+            position: absolute;
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            transform: translate(-50%, -50%);
+        }
+        
+        .clock-marks {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .clock-mark {
+            position: absolute;
+            background: #666;
+            transform-origin: center;
+        }
+        
+        .hour-mark {
+            width: 3px;
+            height: 15px;
+            top: 5px;
+            left: 148.5px;
+        }
+        
+        .minute-mark {
+            width: 1px;
+            height: 8px;
+            top: 5px;
+            left: 149.5px;
+        }
+        
+        .digital-time {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .controls-section {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+        }
+        
+        .control-group {
+            margin-bottom: 25px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text);
+            font-weight: 500;
+        }
+        
+        .time-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg3);
+            color: var(--text);
+            font-size: 1rem;
+        }
+        
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-secondary {
+            background: var(--bg3);
+            color: var(--text);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+        
+        .info-section {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            margin-top: 40px;
+        }
+        
+        .info-title {
+            font-size: 1.3rem;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+        
+        .info-content {
+            line-height: 1.6;
+            color: var(--text);
+        }
+        
+        .time-display {
+            background: var(--bg3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg3);
+            color: var(--text);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .mode-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .clock-container {
+                width: 250px;
+                height: 250px;
+            }
+            
+            .hour-hand {
+                height: 60px;
+                top: 65px;
+                left: 123px;
+            }
+            
+            .minute-hand {
+                height: 85px;
+                top: 40px;
+                left: 123.5px;
+            }
+            
+            .second-hand {
+                height: 95px;
+                top: 30px;
+                left: 124.5px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <a href="/tools/toolsbox" class="back-link">← 返回工具箱</a>
+
+    <div class="header">
+        <h1>🕐 钟表教具</h1>
+        <p>帮助小学生认识时间，掌握时针、分针、秒针的读法</p>
+    </div>
+
+    <div class="main-content">
+        <div class="clock-section">
+            <div class="digital-time" id="digitalTime">00:00:00</div>
+            <div class="clock-container">
+                <div class="clock-face">
+                    <div class="clock-marks" id="clockMarks"></div>
+                    <div class="clock-numbers" id="clockNumbers"></div>
+                    <div class="hour-hand" id="hourHand"></div>
+                    <div class="minute-hand" id="minuteHand"></div>
+                    <div class="second-hand" id="secondHand"></div>
+                    <div class="clock-center"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <div class="mode-toggle">
+                <div class="mode-btn active" data-mode="realtime">实时模式</div>
+                <div class="mode-btn" data-mode="manual">手动模式</div>
+            </div>
+            
+            <div id="realtimeControls" class="time-display">
+                <h3>实时时钟</h3>
+                <p>显示当前真实时间，帮助学生学习认识时钟</p>
+            </div>
+            
+            <div id="manualControls" class="time-display" style="display: none;">
+                <h3>手动设置时间</h3>
+                <div class="control-group">
+                    <label for="timeInput">设置时间 (HH:MM:SS):</label>
+                    <input type="time" id="timeInput" class="time-input" step="1">
+                </div>
+                <button class="btn" onclick="setManualTime()">设置时间</button>
+                <button class="btn btn-secondary" onclick="resetToCurrent()">重置为当前时间</button>
+            </div>
+            
+            <div class="control-group">
+                <button class="btn" onclick="toggleAnimation()">暂停/继续</button>
+                <button class="btn btn-secondary" onclick="resetClock()">重置</button>
+            </div>
+            
+            <div class="time-display">
+                <h3>当前时间信息</h3>
+                <p id="timeInfo">正在加载...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="info-section">
+        <h2 class="info-title">📚 学习指导</h2>
+        <div class="info-content">
+            <h3>认识钟表</h3>
+            <p>钟表有三个重要的指针：</p>
+            <ul style="margin: 10px 0 10px 20px;">
+                <li><strong>时针（短而粗）</strong>：指向小时，走得最慢</li>
+                <li><strong>分针（中等长度）</strong>：指向分钟，走得中等速度</li>
+                <li><strong>秒针（最长最细）</strong>：指向秒，走得最快</li>
+            </ul>
+            
+            <h3>读时间的方法</h3>
+            <p>1. 先看时针指向几或几过几</p>
+            <p>2. 再看分针指向几（每个数字代表5分钟）</p>
+            <p>3. 最后看秒针指向几</p>
+            
+            <h3>练习建议</h3>
+            <p>• 在实时模式下观察钟表指针的运动规律</p>
+            <p>• 在手动模式下设置不同的时间来练习读数</p>
+            <p>• 注意时针和分针的位置关系</p>
+        </div>
+    </div>
+
+    <footer style="text-align: center; margin-top: 60px; padding: 16px; color: var(--text-dim); font-size: 0.75px; border-top: 1px solid var(--border);">
+        <a href="/tools/toolsbox" style="color: var(--primary); text-decoration: none;">← 返回工具箱</a> · 
+        新ICP备2026003879号-1
+    </footer>
+</div>
+
+<script src="/static/js/clock-teaching.js"></script>
+</body>
+</html>

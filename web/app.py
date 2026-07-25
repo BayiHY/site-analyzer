@@ -417,6 +417,12 @@ def math_problems():
     return render_template('math-problems.html')
 
 
+@app.route('/clock-teaching')
+def clock_teaching():
+    """小学钟表教具"""
+    return render_template('clock-teaching.html')
+
+
 @app.route('/privacy')
 def privacy():
     """隐私政策"""
