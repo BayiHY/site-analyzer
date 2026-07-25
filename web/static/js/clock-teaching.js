@@ -341,7 +341,7 @@ function getClockCenter() {
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度
-let lastLowAngle = -1; // 记录最近一次离开0-5区间时的角度（供逆时针检测用）
+let lastMinuteValue = -1; // 记录上一帧的分钟数（0~59）
 let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
 let lastProcessTime = 0; // 上次处理的时间戳
 const DEBOUNCE_MS = 30; // 去抖间隔，30ms过滤微抖但不丢正常拖动帧
@@ -372,31 +372,21 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         
         let newHours = hours;
         
-        // 分针过12点时，根据方向判断小时加减，每圈只触发一次
-        // 顺时针（55→59→0→5）：在 m<=5 区间，prev≈354°, new≈0°, diff≈6° (<180) → +1
-        // 逆时针（0→5→...→55→59）：在 m>=55 区间，prev≈6°, new≈354°, diff≈348° (>180) → -1
-        if (!minuteCrossedZero && m <= 5) {
-            let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
-            let diff = (newAngleDeg - prevNorm + 360) % 360;
-            
-            // 顺时针过12点（59→0）：prev≈354°, diff≈6° (<180) → +1
-            if (diff < 180) {
+        // 分针过12点时，根据分钟数变化判断小时加减
+        // 59→0（顺时针）：+1小时
+        // 0→59（逆时针）：-1小时
+        if (!minuteCrossedZero && lastMinuteValue >= 0) {
+            if (lastMinuteValue === 59 && m === 0) {
+                // 顺时针过12点
                 newHours = hours + 1;
                 clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
                 minuteCrossedZero = true;
-            } else {
-                // 逆时针过12点（0→59）：记录角度供m>=55时减1用
-                lastLowAngle = prevNorm;
-            }
-        } else if (!minuteCrossedZero && m >= 55) {
-            // 逆时针过12点：检查 lastLowAngle（m<=5时diff>180记录的）
-            if (lastLowAngle >= 0 && lastLowAngle < 30) {
+            } else if (lastMinuteValue === 0 && m === 59) {
+                // 逆时针过12点
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
                 minuteCrossedZero = true;
             }
-            lastLowAngle = -1; // 消费掉
-            // 其他情况到55-59不处理
         }
         
         time.setHours(newHours, m, 0);
@@ -409,10 +399,8 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         // 每帧更新 prevFrameAngle
         prevFrameAngle = newAngleDeg;
         
-        // 离开0-5区间范围后清除lastLowAngle
-        if (m > 10) {
-            lastLowAngle = -1;
-        }
+        // 记录上一帧的分钟数
+        lastMinuteValue = m;
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
         const h = (totalHours % 12 + 12) % 12;
