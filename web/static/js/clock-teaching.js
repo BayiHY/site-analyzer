@@ -341,7 +341,7 @@ function getClockCenter() {
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度
-let lastMinuteAngleForCross = -1; // 记录上一帧角度（用于判断过12点方向）
+let lastMinuteValue = -1; // 记录上一帧的分钟数（0~59）
 let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
 let lastProcessTime = 0; // 上次处理的时间戳
 const DEBOUNCE_MS = 30; // 去抖间隔，30ms过滤微抖但不丢正常拖动帧
@@ -372,32 +372,19 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         
         let newHours = hours;
         
-        // 分针过12点时，根据角度变化趋势判断小时加减
-        let prevNorm = ((lastMinuteAngleForCross % 360) + 360) % 360;
-        let rawDiff = newAngleDeg - prevNorm;
-        
-        // 顺时针：角度从 ~354° 变到 ~0°，rawDiff ≈ -6（角度减小跨过0）
-        // 逆时针：角度从 ~6° 变到 ~354°，rawDiff ≈ +348（角度增大跨过360）
-        if (lastMinuteAngleForCross >= 0 && prevFrameAngle >= 0) {
-            // 顺时针过12点（角度减小跨过0°）
-            if (rawDiff < -300) {
-                newHours = hours + 1;
-                clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-            }
-            // 逆时针过12点（角度增大跨过360°）
-            else if (rawDiff > 300) {
-                newHours = hours - 1;
-                clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
-            }
+        // 只看分钟数变化：59→0加1，0→59减1
+        if (lastMinuteValue === 59 && m === 0) {
+            newHours = hours + 1;
+            clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
+        } else if (lastMinuteValue === 0 && m === 59) {
+            newHours = hours - 1;
+            clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
         }
         
         time.setHours(newHours, m, 0);
         
-        // 每帧更新 prevFrameAngle
-        prevFrameAngle = newAngleDeg;
-        
-        // 记录上一帧的角度（用于判断过12点方向）
-        lastMinuteAngleForCross = newAngleDeg;
+        // 记录上一帧的分钟数
+        lastMinuteValue = m;
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
         const h = (totalHours % 12 + 12) % 12;
