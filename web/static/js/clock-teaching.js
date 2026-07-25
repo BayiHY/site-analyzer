@@ -410,11 +410,20 @@ function setTimeByPointer(pointerType, newAngleDeg) {
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
         const h = (totalHours % 12 + 12) % 12;
-        const newH = h === 0 ? 12 : h;
-        if (newH !== hours && newH !== (hours % 12 === 0 ? 12 : hours % 12)) {
-            clockLog('info', 'TIME', `⏰ 小时变化: ${hours}→${newH} (时针拖动)`);
+        const newH12 = h === 0 ? 12 : h;
+        
+        // 时针拖动：根据当前上下午决定24小时制值
+        let newH24;
+        if (hours >= 12) {
+            // 当前是下午/晚上(>=12)，拖动到1-11加12，拖动到12设为0（午夜）
+            newH24 = (newH12 === 12) ? 0 : (newH12 % 12) + 12;
+        } else {
+            // 当前是上午(<12)，拖动到12设为12（中午），拖动到1-11直接设
+            newH24 = newH12 === 12 ? 12 : newH12;
         }
-        time.setHours(newH, minutes, seconds);
+        
+        clockLog('info', 'TIME', `⏰ 时针拖动: ${hours}→${newH24} (${newH12}点)`);
+        time.setHours(newH24, minutes, seconds);
     }
     
     clock.manualTime = time;
