@@ -341,6 +341,7 @@ function getClockCenter() {
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度
+let lastMinuteInLowRange = -1; // 记录最近一次在0-5分区间时的角度（逆时针用）
 let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
 let lastProcessTime = 0; // 上次处理的时间戳
 const DEBOUNCE_MS = 30; // 去抖间隔，30ms过滤微抖但不丢正常拖动帧
@@ -387,8 +388,8 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         } else if (!minuteCrossedZero && m >= 55) {
             let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
             
-            // 逆时针过12点：只有从前一帧在0~5分（角度<30°）过来才减1
-            if (prevNorm < 30) {
+            // 逆时针过12点：用 lastMinuteInLowRange 记录离开0-5区间时的角度
+            if (lastMinuteInLowRange >= 0 && lastMinuteInLowRange < 30) {
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
                 minuteCrossedZero = true;
@@ -397,6 +398,13 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         }
         
         time.setHours(newHours, m, 0);
+        
+        // 记录最近一次在0-5分区间时的角度（供逆时针检测用）
+        if (m <= 5) {
+            lastMinuteInLowRange = newAngleDeg;
+        } else if (m > 10) {
+            lastMinuteInLowRange = -1; // 离开0-5区间后清除
+        }
         
         // 离开边界区域后重置标记
         if (minuteCrossedZero && m > 10 && m < 55) {
