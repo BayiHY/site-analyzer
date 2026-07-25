@@ -379,14 +379,13 @@ function setTimeByPointer(pointerType, newAngleDeg) {
             let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
             let diff = (newAngleDeg - prevNorm + 360) % 360;
             
+            // 顺时针过12点（59→0）：prev≈354°, diff≈6° (<180) → +1
             if (diff < 180) {
                 newHours = hours + 1;
                 clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-            } else {
-                newHours = hours - 1;
-                clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
+                minuteCrossedZero = true;
             }
-            minuteCrossedZero = true;
+            // 其他情况到0-5不处理（逆时针减1在m>=55处理）
         } else if (!minuteCrossedZero && m >= 55) {
             // 逆时针过12点：检查 lastLowAngle（离开0-5区间时记录的角度）
             if (lastLowAngle >= 0 && lastLowAngle < 30) {
