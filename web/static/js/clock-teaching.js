@@ -341,7 +341,7 @@ function getClockCenter() {
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度
-let lastMinuteValue = -1; // 记录上一帧的分钟数（0~59）
+let lastMinuteAngleForCross = -1; // 记录上一帧角度（用于判断过12点方向）
 let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
 let lastProcessTime = 0; // 上次处理的时间戳
 const DEBOUNCE_MS = 30; // 去抖间隔，30ms过滤微抖但不丢正常拖动帧
@@ -372,15 +372,26 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         
         let newHours = hours;
         
-        // 分针过12点时，根据分钟数变化判断小时加减
-        // 59→0（顺时针）：+1小时
-        // 0→59（逆时针）：-1小时
-        if (lastMinuteValue === 59 && m === 0) {
-            newHours = hours + 1;
-            clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-        } else if (lastMinuteValue === 0 && m === 59) {
-            newHours = hours - 1;
-            clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
+        // 分针过12点时，根据角度变化趋势判断小时加减
+        // 顺时针（59→0）：角度从 ~354° 变到 ~0°（减小）→ +1
+        // 逆时针（0→59）：角度从 ~0° 变到 ~354°（实际是角度增大越过360）→ -1
+        if (lastMinuteAngleForCross >= 0 && prevFrameAngle >= 0) {
+            let prevNorm = ((lastMinuteAngleForCross % 360) + 360) % 360;
+            let angleDiff = newAngleDeg - prevNorm;
+            // 处理360°跳变
+            if (angleDiff > 180) angleDiff -= 360;
+            if (angleDiff < -180) angleDiff += 360;
+            
+            // 角度减小（顺时针过12点）→ +1
+            if (angleDiff < -30) {
+                newHours = hours + 1;
+                clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
+            }
+            // 角度增大跨过360（逆时针过12点）→ -1
+            else if (angleDiff > 30) {
+                newHours = hours - 1;
+                clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
+            }
         }
         
         time.setHours(newHours, m, 0);
@@ -388,8 +399,8 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         // 每帧更新 prevFrameAngle
         prevFrameAngle = newAngleDeg;
         
-        // 记录上一帧的分钟数
-        lastMinuteValue = m;
+        // 记录上一帧的角度（用于判断过12点方向）
+        lastMinuteAngleForCross = newAngleDeg;
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
         const h = (totalHours % 12 + 12) % 12;
