@@ -340,7 +340,7 @@ function getClockCenter() {
 
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
-let lastMinuteAngleAtZero = -1; // 记录上一次 m=0 时的角度（用于判断过12点的方向）
+let prevFrameAngle = -1; // 记录上一帧分针的实际角度（不管m是多少）
 
 function setTimeByPointer(pointerType, newAngleDeg) {
     // 角度没变就跳过，不做任何计算和DOM操作
@@ -371,9 +371,9 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         let newHours = hours;
         
         // 分针过12点时，根据方向判断小时加减
-        // lastMinuteAngleAtZero 只在上一次 m=0 时记录，拖动过程中不更新
-        if (m === 0 && lastMinuteAngleAtZero >= 0) {
-            let prevNorm = ((lastMinuteAngleAtZero % 360) + 360) % 360;
+        // prevFrameAngle 记录上一帧的实际角度（m=59时≈354°或m=1时≈6°）
+        if (m === 0 && prevFrameAngle >= 0) {
+            let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
             let diff = (newAngleDeg - prevNorm + 360) % 360;
             
             // 顺时针过12点（59→0）：prevNorm ≈ 354°, new=0°, diff ≈ 6° (<180) → 小时+1
@@ -385,15 +385,16 @@ function setTimeByPointer(pointerType, newAngleDeg) {
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
             }
-            // 处理完一次后锁定，直到分针离开0分再解锁
-            lastMinuteAngleAtZero = -1;
+            // 处理完一次后锁定，防止重复触发
+            prevFrameAngle = -2; // 特殊值表示"已处理过本次过12点"
         }
         
         time.setHours(newHours, m, 0);
         
-        // 只有 m===0 时才更新 lastMinuteAngleAtZero，其他时候不动它
-        if (m === 0) {
-            lastMinuteAngleAtZero = newAngleDeg;
+        // 每帧都更新 prevFrameAngle（用于下一次判断过12点）
+        // 但如果刚处理过跨12点事件（prevFrameAngle == -2），不要重置
+        if (prevFrameAngle !== -2) {
+            prevFrameAngle = newAngleDeg;
         }
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
