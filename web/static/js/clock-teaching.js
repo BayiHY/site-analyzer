@@ -397,7 +397,7 @@ function setTimeByPointer(pointerType, newAngleDeg) {
             clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
         }
         
-        time.setHours(newHours, m, 0);
+        time.setHours(newHours, m, seconds);
         
         // 只有11→12和12→11需要切换上下午（12→1不切换）
         const newH12 = newHours % 12 === 0 ? 12 : newHours % 12;
