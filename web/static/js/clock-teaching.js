@@ -375,26 +375,15 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         // 分针过12点时，根据分钟数变化判断小时加减
         // 59→0（顺时针）：+1小时
         // 0→59（逆时针）：-1小时
-        if (!minuteCrossedZero && lastMinuteValue >= 0) {
-            if (lastMinuteValue === 59 && m === 0) {
-                // 顺时针过12点
-                newHours = hours + 1;
-                clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-                minuteCrossedZero = true;
-            } else if (lastMinuteValue === 0 && m === 59) {
-                // 逆时针过12点
-                newHours = hours - 1;
-                clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
-                minuteCrossedZero = true;
-            }
+        if (lastMinuteValue === 59 && m === 0) {
+            newHours = hours + 1;
+            clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
+        } else if (lastMinuteValue === 0 && m === 59) {
+            newHours = hours - 1;
+            clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
         }
         
         time.setHours(newHours, m, 0);
-        
-        // 离开边界区域后重置标记
-        if (minuteCrossedZero && m > 10 && m < 55) {
-            minuteCrossedZero = false;
-        }
         
         // 每帧更新 prevFrameAngle
         prevFrameAngle = newAngleDeg;
