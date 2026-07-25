@@ -342,6 +342,7 @@ function getClockCenter() {
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度
 let lastMinuteValue = -1; // 记录上一帧的分钟数（0~59）
+let lastSecondValue = -1; // 记录上一帧的秒数（0~59）
 let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
 let lastProcessTime = 0; // 上次处理的时间戳
 const DEBOUNCE_MS = 30; // 去抖间隔，30ms过滤微抖但不丢正常拖动帧
@@ -365,7 +366,19 @@ function setTimeByPointer(pointerType, newAngleDeg) {
     
     if (pointerType === 'second') {
         const newSeconds = Math.round(newAngleDeg / 6);
-        time.setSeconds(((newSeconds % 60) + 60) % 60);
+        let s = newSeconds % 60;
+        
+        // 秒针过12点：55-59→0-4加1分钟，0-4→55-59减1分钟
+        if ((lastSecondValue >= 55 && lastSecondValue <= 59) && (s >= 0 && s <= 4)) {
+            time.setMinutes(minutes + 1, 0);
+            clockLog('info', 'TIME', `⏰ 分钟+1: ${minutes}→${minutes + 1}`);
+        } else if ((lastSecondValue >= 0 && lastSecondValue <= 4) && (s >= 55 && s <= 59)) {
+            time.setMinutes(minutes - 1, 0);
+            clockLog('info', 'TIME', `⏰ 分钟-1: ${minutes}→${minutes - 1}`);
+        }
+        lastSecondValue = s;
+        
+        time.setSeconds(s);
     } else if (pointerType === 'minute') {
         const totalMinutes = Math.round(newAngleDeg / 6);
         const m = totalMinutes % 60;
