@@ -388,16 +388,14 @@ function setTimeByPointer(pointerType, newAngleDeg) {
             minuteCrossedZero = true;
         } else if (!minuteCrossedZero && m >= 55) {
             let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
-            let diff = (newAngleDeg - prevNorm + 360) % 360;
             
-            if (diff < 180) {
-                newHours = hours + 1;
-                clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-            } else {
+            // 逆时针过12点：只有从前一帧在0~5分（角度<30°）过来才减1
+            if (prevNorm < 30) {
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
+                minuteCrossedZero = true;
             }
-            minuteCrossedZero = true;
+            // 其他情况到55-59不处理
         }
         
         time.setHours(newHours, m, 0);
