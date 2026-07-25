@@ -229,7 +229,7 @@ class ClockTeaching {
         const seconds = time.getSeconds();
         const milliseconds = time.getMilliseconds();
         
-        const secondAngle = (seconds + milliseconds / 1000) * 6;
+        const secondAngle = seconds * 6;
         const minuteAngle = (minutes + seconds / 60) * 6;
         const hourAngle = (hours % 12 + minutes / 60) * 30;
         
