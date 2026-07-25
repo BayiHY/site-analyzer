@@ -384,11 +384,12 @@ function setTimeByPointer(pointerType, newAngleDeg) {
                 newHours = hours + 1;
                 clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
                 minuteCrossedZero = true;
+            } else {
+                // 逆时针过12点（0→59）：记录角度供m>=55时减1用
+                lastLowAngle = prevNorm;
             }
-            // 其他情况到0-5不处理（逆时针减1在m>=55处理）
         } else if (!minuteCrossedZero && m >= 55) {
-            // 逆时针过12点：检查 lastLowAngle（离开0-5区间时记录的角度）
-            clockLog('info', 'TIME', `DEBUG m>=55: lastLowAngle=${lastLowAngle.toFixed(1)}° minuteCrossedZero=${minuteCrossedZero}`);
+            // 逆时针过12点：检查 lastLowAngle（m<=5时diff>180记录的）
             if (lastLowAngle >= 0 && lastLowAngle < 30) {
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
@@ -408,14 +409,9 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         // 每帧更新 prevFrameAngle
         prevFrameAngle = newAngleDeg;
         
-        // 记录离开0-5区间时的角度（供逆时针检测用）
-        // 当从 m<=5 进入 m>5 时，记录当时的角度
-        if (m <= 5 && prevFrameAngle >= 0) {
-            let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
-            lastLowAngle = prevNorm;
-            clockLog('info', 'TIME', `DEBUG lastLowAngle=${prevNorm.toFixed(1)}° m=${m}`);
-        } else if (m > 10) {
-            lastLowAngle = -1; // 离开0-5区间范围后清除
+        // 离开0-5区间范围后清除lastLowAngle
+        if (m > 10) {
+            lastLowAngle = -1;
         }
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
