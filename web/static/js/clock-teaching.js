@@ -340,9 +340,9 @@ function getClockCenter() {
 
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
-let prevFrameAngle = -1; // 记录上一帧分针的实际角度（不管m是多少）
-let lastProcessTime = 0; // 上次处理的时间戳（用于时间戳去抖）
-const DEBOUNCE_MS = 80; // 去抖间隔，80ms足够过滤微抖又不会丢正常拖动帧
+let prevFrameAngle = -1; // 记录上一帧分针的实际角度
+let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
+const DEBOUNCE_MS = 80; // 去抖间隔
 
 function setTimeByPointer(pointerType, newAngleDeg) {
     const now = Date.now();
@@ -370,39 +370,32 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         
         let newHours = hours;
         
-        // 分针过12点时，根据方向判断小时加减
-        // 顺时针：59→0（m=0），前一帧角度≈354° → +1
-        // 逆时针：0→59（m=59），前一帧角度≈6° → -1
-        if (m === 0 && prevFrameAngle >= 0) {
+        // 分针过12点时，根据方向判断小时加减，每圈只触发一次
+        // 顺时针（55→59→0→5）：prev≈354°, new≈0°, diff≈6° (<180) → +1
+        // 逆时针（0→5→55→59）：prev≈6°, new≈354°, diff≈348° (>180) → -1
+        if (!minuteCrossedZero && m <= 5) {
             let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
             let diff = (newAngleDeg - prevNorm + 360) % 360;
             
-            // 顺时针过12点（59→0）：prevNorm ≈ 354°, new=0°, diff ≈ 6° (<180) → +1
             if (diff < 180) {
                 newHours = hours + 1;
                 clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-            }
-            prevFrameAngle = -2; // 锁定，防止重复触发
-        } else if (m === 59 && prevFrameAngle >= 0) {
-            let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
-            
-            // 逆时针过12点（0→59）：prevNorm ≈ 0~6°, 当前≈354° → -1
-            if (prevNorm < 30) {
+            } else {
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
             }
-            prevFrameAngle = -2; // 锁定，防止重复触发
+            minuteCrossedZero = true;
         }
         
         time.setHours(newHours, m, 0);
         
-        // 每帧都更新 prevFrameAngle
-        // 如果刚处理过跨12点事件（prevFrameAngle == -2），只有当 m 离开边界时才恢复
-        if (prevFrameAngle === -2 && m !== 0 && m !== 59) {
-            prevFrameAngle = newAngleDeg;
-        } else if (prevFrameAngle !== -2) {
-            prevFrameAngle = newAngleDeg;
+        // 离开0°附近区域后重置标记，允许下一圈再次触发
+        if (m > 10) {
+            minuteCrossedZero = false;
         }
+        
+        // 每帧更新 prevFrameAngle
+        prevFrameAngle = newAngleDeg;
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
         const h = (totalHours % 12 + 12) % 12;
