@@ -373,22 +373,19 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         let newHours = hours;
         
         // 分针过12点时，根据角度变化趋势判断小时加减
-        // 顺时针（59→0）：角度从 ~354° 变到 ~0°（减小）→ +1
-        // 逆时针（0→59）：角度从 ~0° 变到 ~354°（实际是角度增大越过360）→ -1
+        let prevNorm = ((lastMinuteAngleForCross % 360) + 360) % 360;
+        let rawDiff = newAngleDeg - prevNorm;
+        
+        // 顺时针：角度从 ~354° 变到 ~0°，rawDiff ≈ -6（角度减小跨过0）
+        // 逆时针：角度从 ~6° 变到 ~354°，rawDiff ≈ +348（角度增大跨过360）
         if (lastMinuteAngleForCross >= 0 && prevFrameAngle >= 0) {
-            let prevNorm = ((lastMinuteAngleForCross % 360) + 360) % 360;
-            let angleDiff = newAngleDeg - prevNorm;
-            // 处理360°跳变
-            if (angleDiff > 180) angleDiff -= 360;
-            if (angleDiff < -180) angleDiff += 360;
-            
-            // 角度减小（顺时针过12点）→ +1
-            if (angleDiff < -30) {
+            // 顺时针过12点（角度减小跨过0°）
+            if (rawDiff < -300) {
                 newHours = hours + 1;
                 clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
             }
-            // 角度增大跨过360（逆时针过12点）→ -1
-            else if (angleDiff > 30) {
+            // 逆时针过12点（角度增大跨过360°）
+            else if (rawDiff > 300) {
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
             }
