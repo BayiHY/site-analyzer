@@ -343,6 +343,7 @@ let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度
 let lastMinuteValue = -1; // 记录上一帧的分钟数（0~59）
 let lastSecondValue = -1; // 记录上一帧的秒数（0~59）
+let lastHourSet = -1; // 记录上次时针设置的小时（防止重复设置）
 let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
 let lastProcessTime = 0; // 上次处理的时间戳
 const DEBOUNCE_MS = 30; // 去抖间隔，30ms过滤微抖但不丢正常拖动帧
@@ -412,18 +413,22 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         const h = (totalHours % 12 + 12) % 12;
         const newH12 = h === 0 ? 12 : h;
         
-        // 时针拖动：根据当前上下午决定24小时制值
-        let newH24;
-        if (hours >= 12) {
-            // 当前是下午/晚上(>=12)，拖动到1-11加12，拖动到12设为0（午夜）
-            newH24 = (newH12 === 12) ? 0 : (newH12 % 12) + 12;
-        } else {
-            // 当前是上午(<12)，拖动到12设为12（中午），拖动到1-11直接设
-            newH24 = newH12 === 12 ? 12 : newH12;
+        // 只在小时数真正变化时更新一次
+        if (newH12 !== lastHourSet) {
+            lastHourSet = newH12;
+            
+            let newH24;
+            if (hours >= 12) {
+                // 当前是下午/晚上(>=12)，拖动到1-11加12，拖动到12设为0（午夜）
+                newH24 = (newH12 === 12) ? 0 : (newH12 % 12) + 12;
+            } else {
+                // 当前是上午(<12)，拖动到12设为12（中午），拖动到1-11直接设
+                newH24 = newH12 === 12 ? 12 : newH12;
+            }
+            
+            clockLog('info', 'TIME', `⏰ 时针拖动: ${hours}→${newH24} (${newH12}点)`);
+            time.setHours(newH24, minutes, seconds);
         }
-        
-        clockLog('info', 'TIME', `⏰ 时针拖动: ${hours}→${newH24} (${newH12}点)`);
-        time.setHours(newH24, minutes, seconds);
     }
     
     clock.manualTime = time;
@@ -568,6 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         isDragging = false;
         dragTarget = null;
+        lastHourSet = -1; // 松手重置时针锁定，下次拖动重新计算
     });
     
     // 触摸事件（防止浏览器手势滚动）
