@@ -400,7 +400,8 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         time.setHours(newHours, m, 0);
         
         // 记录最近一次在0-5分区间时的角度（供逆时针检测用）
-        if (m <= 5) {
+        // 只在进入0-5区间的第一帧记录，之后不再更新，直到离开
+        if (m <= 5 && lastMinuteInLowRange === -1) {
             lastMinuteInLowRange = newAngleDeg;
         } else if (m > 10) {
             lastMinuteInLowRange = -1; // 离开0-5区间后清除
