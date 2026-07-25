@@ -50,52 +50,168 @@ function clearCanvas() {
     resetCanvasState();
 }
 
+// 模板数据
+const TEMPLATES = {
+    default: {
+        name: "默认模板",
+        data: {
+            项目名称: "JSON 可视化工具",
+            版本: "4.0.0",
+            描述: "支持树视图和图谱可视化的 JSON 编辑器",
+            功能列表: ["图谱视图", "树视图", "代码编辑", "导入导出"],
+            作者: {
+                姓名: "开发者",
+                邮箱: "dev@example.com"
+            },
+            设置: {
+                主题: "深色",
+                自动布局: true,
+                动画效果: true
+            }
+        }
+    },
+    "math-knowledge": {
+        name: "数学知识点",
+        data: {
+            "领域": "数与代数",
+            "年级范围": "1-9年级",
+            "核心模块": [
+                "数的认识",
+                "数的运算", 
+                "常见的量",
+                "数量关系",
+                "方程",
+                "函数"
+            ],
+            "知识点分布": {
+                "小学阶段": {
+                    "一年级": ["数数", "10以内加减法"],
+                    "二年级": ["100以内加减法", "乘法口诀"],
+                    "三年级": ["万以内加减法", "两位数乘除法"],
+                    "四年级": ["大数认识", "三位数乘除法"],
+                    "五年级": ["分数", "小数"],
+                    "六年级": ["百分数", "比例"]
+                },
+                "初中阶段": {
+                    "七年级": ["有理数", "整式"],
+                    "八年级": ["分式", "方程组"],
+                    "九年级": ["函数", "不等式"]
+                }
+            },
+            "核心素养": {
+                "数学抽象": "从具体到抽象的思维过程",
+                "逻辑推理": "严谨的推理和证明能力",
+                "数学建模": "用数学方法解决实际问题"
+            }
+        }
+    },
+    "api-response": {
+        name: "API响应",
+        data: {
+            "status": "success",
+            "code": 200,
+            "message": "请求成功",
+            "data": {
+                "users": [
+                    {
+                        "id": 1,
+                        "name": "张三",
+                        "email": "zhangsan@example.com",
+                        "age": 25,
+                        "roles": ["user", "editor"],
+                        "profile": {
+                            "avatar": "https://example.com/avatar1.jpg",
+                            "bio": "前端开发工程师"
+                        }
+                    },
+                    {
+                        "id": 2,
+                        "name": "李四",
+                        "email": "lisi@example.com",
+                        "age": 30,
+                        "roles": ["admin"],
+                        "profile": {
+                            "avatar": "https://example.com/avatar2.jpg",
+                            "bio": "产品经理"
+                        }
+                    }
+                ],
+                "pagination": {
+                    "page": 1,
+                    "pageSize": 10,
+                    "total": 2,
+                    "hasNext": false
+                }
+            },
+            "timestamp": "2026-07-25T13:43:00Z"
+        }
+    },
+    "config": {
+        name: "配置文件",
+        data: {
+            "app": {
+                "name": "JSON可视化工具",
+                "version": "4.0.0",
+                "debug": false,
+                "port": 3000,
+                "host": "localhost"
+            },
+            "database": {
+                "type": "postgresql",
+                "host": "localhost",
+                "port": 5432,
+                "name": "json_visualizer",
+                "user": "postgres",
+                "password": "password",
+                "pool": {
+                    "min": 2,
+                    "max": 10,
+                    "idle": 30000
+                }
+            },
+            "features": {
+                "visualization": true,
+                "export": true,
+                "import": true,
+                "share": false,
+                "auth": {
+                    "enabled": false,
+                    "provider": "jwt"
+                }
+            },
+            "logging": {
+                "level": "info",
+                "file": "logs/app.log",
+                "maxSize": "10MB",
+                "maxFiles": 5
+            }
+        }
+    },
+    "empty": {
+        name: "空白模板",
+        data: {}
+    }
+};
+
+// 加载模板
+function loadTemplate() {
+    const templateSelect = document.getElementById('templateSelect');
+    const selectedTemplate = templateSelect.value;
+    
+    if (TEMPLATES[selectedTemplate]) {
+        const templateData = TEMPLATES[selectedTemplate].data;
+        ELEMENTS.jsonInput.value = JSON.stringify(templateData, null, 2);
+        if (jsonEditor) {
+            jsonEditor.setData(templateData);
+        }
+        visualizeJson();
+    }
+}
+
 // 设置示例 JSON
 function setExampleJson() {
-    const exampleData = {
-        项目名称: "JSON 可视化工具",
-        版本: "4.0.0",
-        描述: "支持树视图和图谱可视化的 JSON 编辑器",
-        功能列表: ["图谱视图", "树视图", "代码编辑", "导入导出"],
-        作者: {
-            姓名: "开发者",
-            邮箱: "dev@example.com",
-            技能: ["JavaScript", "Python", "Vue"],
-            社交: {
-                博客: "https://example.com",
-                GitHub: "https://github.com"
-            }
-        },
-        混合数组示例: [
-            "这是一个字符串",
-            12345,
-            true,
-            {
-                名称: "数组中的对象",
-                嵌套数组: ["嵌套数组项1", "嵌套数组项2"]
-            },
-            ["数组中的数组", "第二项"]
-        ],
-        设置: {
-            主题: "深色",
-            自动布局: true,
-            动画效果: true,
-            插件列表: [
-                {
-                    名称: "主题插件",
-                    启用: true
-                },
-                {
-                    名称: "导出插件",
-                    启用: false
-                }
-            ]
-        }
-    };
-    ELEMENTS.jsonInput.value = JSON.stringify(exampleData, null, 2);
-    if (jsonEditor) {
-        jsonEditor.setData(exampleData);
-    }
+    // 默认加载默认模板
+    loadTemplate();
 }
 
 // 将树节点转换为JSON对象
@@ -277,6 +393,6 @@ function toggleLeftPanel() {
     const left = document.querySelector('.left-panel');
     const btn = document.getElementById('panelToggle');
     const collapsed = left.classList.toggle('collapsed');
-    btn.textContent = collapsed ? '展开编辑区 ▸' : '收起编辑区 ◂';
+    btn.textContent = collapsed ? '▸' : '◂';
     btn.title = collapsed ? '展开编辑区' : '收起编辑区';
 }
