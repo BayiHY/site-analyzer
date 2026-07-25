@@ -398,6 +398,13 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         
         time.setHours(newHours, m, 0);
         
+        // 只有11→12和12→11需要切换上下午（12→1不切换）
+        const newH12 = newHours % 12 === 0 ? 12 : newHours % 12;
+        if (hours % 12 !== newH12) {
+            const oldH12 = hours % 12 === 0 ? 12 : hours % 12;
+            clockLog('info', 'TIME', `⏰ AM/PM切换: ${oldH12}→${newH12}`);
+        }
+        
         // 记录上一帧的分钟数
         lastMinuteValue = m;
     } else if (pointerType === 'hour') {
