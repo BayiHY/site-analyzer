@@ -392,8 +392,10 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         time.setHours(newHours, m, 0);
         
         // 每帧都更新 prevFrameAngle（用于下一次判断过12点）
-        // 但如果刚处理过跨12点事件（prevFrameAngle == -2），不要重置
-        if (prevFrameAngle !== -2) {
+        // 如果刚处理过跨12点事件（prevFrameAngle == -2），只有当 m ≠ 0 时才恢复
+        if (prevFrameAngle === -2 && m !== 0) {
+            prevFrameAngle = newAngleDeg;
+        } else if (prevFrameAngle !== -2) {
             prevFrameAngle = newAngleDeg;
         }
     } else if (pointerType === 'hour') {
