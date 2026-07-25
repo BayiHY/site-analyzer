@@ -341,9 +341,9 @@ function getClockCenter() {
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度
-let lastMinuteInLowRange = -1; // 记录最近一次在0-5分区间时的角度（逆时针用）
 let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
 let lastProcessTime = 0; // 上次处理的时间戳
+let crossingDirection = 0; // 0=未知, 1=顺时针, -1=逆时针
 const DEBOUNCE_MS = 30; // 去抖间隔，30ms过滤微抖但不丢正常拖动帧
 
 function setTimeByPointer(pointerType, newAngleDeg) {
@@ -373,39 +373,40 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         let newHours = hours;
         
         // 分针过12点时，根据方向判断小时加减，每圈只触发一次
-        // 顺时针（55→59→0→5）：在 m<=5 区间，prev≈354°, new≈0°, diff≈6° (<180) → +1
-        // 逆时针（0→5→...→55→59）：在 m>=55 区间，prev≈6°, new≈354°, diff≈348° (>180) → -1
-        if (!minuteCrossedZero && m <= 5) {
+        // 通过角度变化趋势判断方向：角度增加=顺时针，角度减少=逆时针
+        
+        // 检测角度变化方向（只在0-5和55-59边界区域外有效）
+        if (m > 10 && m < 50 && prevFrameAngle >= 0) {
             let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
+            let angleDiff = newAngleDeg - prevNorm;
+            // 处理360°跳变
+            if (angleDiff > 180) angleDiff -= 360;
+            if (angleDiff < -180) angleDiff += 360;
             
-            // 顺时针过12点：只有从前一帧在55~59分（角度>=330°）过来才加1
-            if (prevNorm >= 330) {
+            if (Math.abs(angleDiff) > 2) {
+                crossingDirection = angleDiff > 0 ? 1 : -1;
+            }
+        }
+        
+        if (!minuteCrossedZero && m <= 5) {
+            // 顺时针过12点：+1
+            if (crossingDirection === 1) {
                 newHours = hours + 1;
                 clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
                 minuteCrossedZero = true;
             }
-            // 其他情况到0-5不处理
+            crossingDirection = 0; // 重置方向
         } else if (!minuteCrossedZero && m >= 55) {
-            let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
-            
-            // 逆时针过12点：用 lastMinuteInLowRange 记录离开0-5区间时的角度
-            if (lastMinuteInLowRange >= 0 && lastMinuteInLowRange < 30) {
+            // 逆时针过12点：-1
+            if (crossingDirection === -1) {
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
                 minuteCrossedZero = true;
             }
-            // 其他情况到55-59不处理
+            crossingDirection = 0; // 重置方向
         }
         
         time.setHours(newHours, m, 0);
-        
-        // 记录最近一次在0-5分区间时的角度（供逆时针检测用）
-        // 只在进入0-5区间的第一帧记录，之后不再更新，直到离开
-        if (m <= 5 && lastMinuteInLowRange === -1) {
-            lastMinuteInLowRange = newAngleDeg;
-        } else if (m > 10) {
-            lastMinuteInLowRange = -1; // 离开0-5区间后清除
-        }
         
         // 离开边界区域后重置标记
         if (minuteCrossedZero && m > 10 && m < 55) {
