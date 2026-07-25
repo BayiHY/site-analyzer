@@ -371,29 +371,34 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         let newHours = hours;
         
         // 分针过12点时，根据方向判断小时加减
-        // prevFrameAngle 记录上一帧的实际角度（m=59时≈354°或m=1时≈6°）
+        // 顺时针：59→0（m=0），前一帧角度≈354° → +1
+        // 逆时针：0→59（m=59），前一帧角度≈6° → -1
         if (m === 0 && prevFrameAngle >= 0) {
             let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
             let diff = (newAngleDeg - prevNorm + 360) % 360;
             
-            // 顺时针过12点（59→0）：prevNorm ≈ 354°, new=0°, diff ≈ 6° (<180) → 小时+1
-            // 逆时针过12点（1→0）：prevNorm ≈ 6°, new=0°, diff ≈ 354° (>180) → 小时-1
+            // 顺时针过12点（59→0）：prevNorm ≈ 354°, new=0°, diff ≈ 6° (<180) → +1
             if (diff < 180) {
                 newHours = hours + 1;
                 clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-            } else {
+            }
+            prevFrameAngle = -2; // 锁定，防止重复触发
+        } else if (m === 59 && prevFrameAngle >= 0) {
+            let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
+            
+            // 逆时针过12点（0→59）：prevNorm ≈ 0~6°, 当前≈354° → -1
+            if (prevNorm < 30) {
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
             }
-            // 处理完一次后锁定，防止重复触发
-            prevFrameAngle = -2; // 特殊值表示"已处理过本次过12点"
+            prevFrameAngle = -2; // 锁定，防止重复触发
         }
         
         time.setHours(newHours, m, 0);
         
-        // 每帧都更新 prevFrameAngle（用于下一次判断过12点）
-        // 如果刚处理过跨12点事件（prevFrameAngle == -2），只有当 m ≠ 0 时才恢复
-        if (prevFrameAngle === -2 && m !== 0) {
+        // 每帧都更新 prevFrameAngle
+        // 如果刚处理过跨12点事件（prevFrameAngle == -2），只有当 m 离开边界时才恢复
+        if (prevFrameAngle === -2 && m !== 0 && m !== 59) {
             prevFrameAngle = newAngleDeg;
         } else if (prevFrameAngle !== -2) {
             prevFrameAngle = newAngleDeg;
