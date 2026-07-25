@@ -339,7 +339,22 @@ function getClockCenter() {
 }
 
 // 根据拖动的指针计算新时间
+let _prevAngle = null; // 用于去抖：上次处理的指针角度
+
 function setTimeByPointer(pointerType, newAngleDeg) {
+    // 角度没变就跳过，不做任何计算和DOM操作
+    if (pointerType === 'minute') {
+        if (_prevAngle === 'minute' && Math.abs(newAngleDeg - _getPrevAngle()) <= 0.5) {
+            return;
+        }
+        _setPrevAngle('minute', newAngleDeg);
+    } else if (pointerType === 'hour') {
+        if (_prevAngle === 'hour' && Math.abs(newAngleDeg - _getPrevAngle()) <= 1) {
+            return;
+        }
+        _setPrevAngle('hour', newAngleDeg);
+    }
+    
     let time = new Date(clock.manualTime);
     const hours = time.getHours();
     const minutes = time.getMinutes();
@@ -350,24 +365,49 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         time.setSeconds(((newSeconds % 60) + 60) % 60);
     } else if (pointerType === 'minute') {
         const totalMinutes = Math.round(newAngleDeg / 6);
-        const h = Math.floor(totalMinutes / 60) % 24;
         const m = totalMinutes % 60;
-        time.setHours(hours + h, m, 0);
         
-        // 分针指到12点（0分）时，时针跳到最近整点
-        if (m === 0) {
-            time.setMinutes(0);
+        let newHours = hours;
+        
+        // 分针过12点时，根据方向判断小时加减
+        if (m === 0 && lastMinuteAngle >= 0) {
+            let prevNorm = ((lastMinuteAngle % 360) + 360) % 360;
+            let diff = newAngleDeg - prevNorm;
+            if (diff < 0) diff += 360;
+            
+            if (diff > 180) {
+                newHours = hours + 1;
+                clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
+            } else if (diff < 180 && prevNorm > 180) {
+                newHours = hours - 1;
+                clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
+            }
+        }
+        
+        time.setHours(newHours, m, 0);
+        
+        // 只在角度有实际变化或离开0分时才更新 lastMinuteAngle
+        if (Math.abs(newAngleDeg - lastMinuteAngle) > 5 || m !== 0) {
+            lastMinuteAngle = newAngleDeg;
         }
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
         const h = (totalHours % 12 + 12) % 12;
-        time.setHours(h === 0 ? 12 : h, minutes, seconds);
+        const newH = h === 0 ? 12 : h;
+        if (newH !== hours && newH !== (hours % 12 === 0 ? 12 : hours % 12)) {
+            clockLog('info', 'TIME', `⏰ 小时变化: ${hours}→${newH} (时针拖动)`);
+        }
+        time.setHours(newH, minutes, seconds);
     }
     
     clock.manualTime = time;
     clock.updateClock();
     clock.updateTimeInfo();
 }
+
+// 去抖辅助函数
+function _getPrevAngle() { return window._prevAngleVal || 0; }
+function _setPrevAngle(type, angle) { window._prevAngleVal = angle; _prevAngle = type; }
 
 // 获取指针在某个时间的初始角度
 function getPointerStartAngle(pointerType, time) {
@@ -387,6 +427,7 @@ function getPointerStartAngle(pointerType, time) {
 // 全局函数
 let clock;
 let selectedPointer = 'hour'; // 当前选中的指针（默认时针）
+let lastMinuteAngle = -1; // 记录上一帧分针角度（用于判断过12点的方向）
 
 // 选择要拖动的指针
 function selectPointer(type) {
