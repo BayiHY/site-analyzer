@@ -372,9 +372,21 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         let newHours = hours;
         
         // 分针过12点时，根据方向判断小时加减，每圈只触发一次
-        // 顺时针（55→59→0→5）：prev≈354°, new≈0°, diff≈6° (<180) → +1
-        // 逆时针（0→5→55→59）：prev≈6°, new≈354°, diff≈348° (>180) → -1
+        // 顺时针（55→59→0→5）：在 m<=5 区间，prev≈354°, new≈0°, diff≈6° (<180) → +1
+        // 逆时针（0→5→...→55→59）：在 m>=55 区间，prev≈6°, new≈354°, diff≈348° (>180) → -1
         if (!minuteCrossedZero && m <= 5) {
+            let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
+            let diff = (newAngleDeg - prevNorm + 360) % 360;
+            
+            if (diff < 180) {
+                newHours = hours + 1;
+                clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
+            } else {
+                newHours = hours - 1;
+                clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
+            }
+            minuteCrossedZero = true;
+        } else if (!minuteCrossedZero && m >= 55) {
             let prevNorm = ((prevFrameAngle % 360) + 360) % 360;
             let diff = (newAngleDeg - prevNorm + 360) % 360;
             
