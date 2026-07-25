@@ -373,12 +373,12 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         let newHours = hours;
         
         // 只看分钟数变化，不依赖角度
-        if ((lastMinuteValue >= 57 && lastMinuteValue <= 59) && (m >= 0 && m <= 2)) {
-            // 顺时针：57,58,59 → 0,1,2 → +1
+        if ((lastMinuteValue >= 55 && lastMinuteValue <= 59) && (m >= 0 && m <= 4)) {
+            // 顺时针：55-59 → 0-4 → +1
             newHours = hours + 1;
             clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-        } else if ((lastMinuteValue >= 0 && lastMinuteValue <= 2) && (m >= 57 && m <= 59)) {
-            // 逆时针：0,1,2 → 57,58,59 → -1
+        } else if ((lastMinuteValue >= 0 && lastMinuteValue <= 4) && (m >= 55 && m <= 59)) {
+            // 逆时针：0-4 → 55-59 → -1
             newHours = hours - 1;
             clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
         }
