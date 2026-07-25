@@ -344,7 +344,7 @@ let _prevAngle = null; // 用于去抖：上次处理的指针角度
 function setTimeByPointer(pointerType, newAngleDeg) {
     // 角度没变就跳过，不做任何计算和DOM操作
     if (pointerType === 'minute') {
-        if (_prevAngle === 'minute' && Math.abs(newAngleDeg - _getPrevAngle()) <= 0.5) {
+        if (_prevAngle === 'minute' && Math.abs(newAngleDeg - _getPrevAngle()) <= 1) {
             return;
         }
         _setPrevAngle('minute', newAngleDeg);
