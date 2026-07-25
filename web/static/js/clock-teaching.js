@@ -341,7 +341,7 @@ function getClockCenter() {
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度
-let lastMinuteValue = -1; // 记录上一帧的分钟数（0~59）
+let lastMinuteAngleForCross = -1; // 记录上一帧的角度（用于判断过12点）
 let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
 let lastProcessTime = 0; // 上次处理的时间戳
 const DEBOUNCE_MS = 30; // 去抖间隔，30ms过滤微抖但不丢正常拖动帧
@@ -372,19 +372,30 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         
         let newHours = hours;
         
-        // 只看分钟数变化：59→0加1，0→59减1
-        if (lastMinuteValue === 59 && m === 0) {
-            newHours = hours + 1;
-            clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-        } else if (lastMinuteValue === 0 && m === 59) {
-            newHours = hours - 1;
-            clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
+        // 只看角度是否跨越12点（0°）：顺时针+1，逆时针-1
+        if (lastMinuteAngleForCross >= 0) {
+            let prevNorm = ((lastMinuteAngleForCross % 360) + 360) % 360;
+            let rawDiff = newAngleDeg - prevNorm;
+            
+            // 顺时针过12点：角度从 ~354° 变到 ~0°，rawDiff ≈ -6
+            // 逆时针过12点：角度从 ~6° 变到 ~354°，rawDiff ≈ +348
+            if (Math.abs(rawDiff) > 300) {
+                if (rawDiff < 0) {
+                    // 顺时针
+                    newHours = hours + 1;
+                    clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
+                } else {
+                    // 逆时针
+                    newHours = hours - 1;
+                    clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
+                }
+            }
         }
         
         time.setHours(newHours, m, 0);
         
-        // 记录上一帧的分钟数
-        lastMinuteValue = m;
+        // 记录上一帧的角度
+        lastMinuteAngleForCross = newAngleDeg;
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
         const h = (totalHours % 12 + 12) % 12;
