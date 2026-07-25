@@ -341,20 +341,20 @@ function getClockCenter() {
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度（不管m是多少）
+let lastProcessTime = 0; // 上次处理的时间戳（用于时间戳去抖）
+const DEBOUNCE_MS = 80; // 去抖间隔，80ms足够过滤微抖又不会丢正常拖动帧
 
 function setTimeByPointer(pointerType, newAngleDeg) {
-    // 角度没变就跳过，不做任何计算和DOM操作
-    if (pointerType === 'minute') {
-        if (_prevAngle === 'minute' && Math.abs(newAngleDeg - _getPrevAngle()) <= 1) {
-            return;
-        }
-        _setPrevAngle('minute', newAngleDeg);
-    } else if (pointerType === 'hour') {
-        if (_prevAngle === 'hour' && Math.abs(newAngleDeg - _getPrevAngle()) <= 1) {
-            return;
-        }
-        _setPrevAngle('hour', newAngleDeg);
+    const now = Date.now();
+    
+    // 时间戳去抖：同指针80ms内不重复处理
+    if (pointerType === 'minute' && lastProcessTime > 0 && now - lastProcessTime < DEBOUNCE_MS) {
+        return;
     }
+    if (pointerType === 'hour' && lastProcessTime > 0 && now - lastProcessTime < DEBOUNCE_MS) {
+        return;
+    }
+    lastProcessTime = now;
     
     let time = new Date(clock.manualTime);
     const hours = time.getHours();
