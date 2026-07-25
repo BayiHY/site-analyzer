@@ -342,7 +342,8 @@ function getClockCenter() {
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
 let prevFrameAngle = -1; // 记录上一帧分针的实际角度
 let minuteCrossedZero = false; // 标记本圈是否已处理过跨12点事件
-const DEBOUNCE_MS = 80; // 去抖间隔
+let lastProcessTime = 0; // 上次处理的时间戳
+const DEBOUNCE_MS = 30; // 去抖间隔，30ms过滤微抖但不丢正常拖动帧
 
 function setTimeByPointer(pointerType, newAngleDeg) {
     const now = Date.now();
