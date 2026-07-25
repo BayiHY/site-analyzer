@@ -340,6 +340,7 @@ function getClockCenter() {
 
 // 根据拖动的指针计算新时间
 let _prevAngle = null; // 用于去抖：上次处理的指针角度
+let lastMinuteAngleAtZero = -1; // 记录上一次 m=0 时的角度（用于判断过12点的方向）
 
 function setTimeByPointer(pointerType, newAngleDeg) {
     // 角度没变就跳过，不做任何计算和DOM操作
@@ -370,25 +371,29 @@ function setTimeByPointer(pointerType, newAngleDeg) {
         let newHours = hours;
         
         // 分针过12点时，根据方向判断小时加减
-        if (m === 0 && lastMinuteAngle >= 0) {
-            let prevNorm = ((lastMinuteAngle % 360) + 360) % 360;
-            let diff = newAngleDeg - prevNorm;
-            if (diff < 0) diff += 360;
+        // lastMinuteAngleAtZero 只在上一次 m=0 时记录，拖动过程中不更新
+        if (m === 0 && lastMinuteAngleAtZero >= 0) {
+            let prevNorm = ((lastMinuteAngleAtZero % 360) + 360) % 360;
+            let diff = (newAngleDeg - prevNorm + 360) % 360;
             
-            if (diff > 180) {
+            // 顺时针过12点（59→0）：prevNorm ≈ 354°, new=0°, diff ≈ 6° (<180) → 小时+1
+            // 逆时针过12点（1→0）：prevNorm ≈ 6°, new=0°, diff ≈ 354° (>180) → 小时-1
+            if (diff < 180) {
                 newHours = hours + 1;
                 clockLog('info', 'TIME', `⏰ 小时+1: ${hours}→${newHours}`);
-            } else if (diff < 180 && prevNorm > 180) {
+            } else {
                 newHours = hours - 1;
                 clockLog('info', 'TIME', `⏰ 小时-1: ${hours}→${newHours}`);
             }
+            // 处理完一次后锁定，直到分针离开0分再解锁
+            lastMinuteAngleAtZero = -1;
         }
         
         time.setHours(newHours, m, 0);
         
-        // 只在角度有实际变化或离开0分时才更新 lastMinuteAngle
-        if (Math.abs(newAngleDeg - lastMinuteAngle) > 5 || m !== 0) {
-            lastMinuteAngle = newAngleDeg;
+        // 只有 m===0 时才更新 lastMinuteAngleAtZero，其他时候不动它
+        if (m === 0) {
+            lastMinuteAngleAtZero = newAngleDeg;
         }
     } else if (pointerType === 'hour') {
         const totalHours = Math.round(newAngleDeg / 30);
