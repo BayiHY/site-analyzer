@@ -303,7 +303,8 @@ class ClockTeaching {
         // 验证 HH:MM:SS 格式
         const match = timeValue.match(/^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})$/);
         if (!match) {
-            alert('请输入正确的 HH:MM:SS 格式时间，例如 14:30:00');
+            timeInput.setCustomValidity('请输入正确的 HH:MM:SS 格式时间，例如 14:30:00');
+            timeInput.reportValidity();
             return;
         }
         
@@ -311,10 +312,13 @@ class ClockTeaching {
         const minutes = parseInt(match[2], 10);
         const seconds = parseInt(match[3], 10);
         
-        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
-            alert('小时范围 0-23，分钟和秒范围 0-59');
+        if (hours > 23 || minutes > 59 || seconds > 59) {
+            timeInput.setCustomValidity('小时范围 0-23，分钟和秒范围 0-59');
+            timeInput.reportValidity();
             return;
         }
+        
+        timeInput.setCustomValidity('');
         
         this.manualTime = new Date();
         this.manualTime.setHours(hours, minutes, seconds);
