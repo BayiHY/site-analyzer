@@ -95,6 +95,8 @@ class ClockTeaching {
     createClockMarks() {
         const clockMarks = document.getElementById('clockMarks');
         if (!clockMarks) return;
+        clockMarks.innerHTML = ''; // 清除旧刻度，适配响应式
+        
         const faceSize = this.getFaceSize();
         const centerX = faceSize / 2;
         const radius = faceSize * 0.467; // ~140 for 300
@@ -137,6 +139,8 @@ class ClockTeaching {
     createClockNumbers() {
         const clockNumbers = document.getElementById('clockNumbers');
         if (!clockNumbers) return;
+        clockNumbers.innerHTML = ''; // 清除旧数字，适配响应式
+        
         const faceSize = this.getFaceSize();
         const centerX = faceSize / 2;
         const radius = faceSize * 0.35; // ~105 for 300
@@ -261,6 +265,12 @@ class ClockTeaching {
         const ampm = hours < 12 ? '上午' : '下午';
         const timeString = `${ampm} ${this.padZero(h)}:${this.padZero(minutes)}:${this.padZero(seconds)}`;
         document.getElementById('digitalTime').textContent = timeString;
+        
+        // 隐藏时同步隐藏当前时间信息
+        if (!digitalVisible) {
+            const info = document.getElementById('timeInfoSection');
+            if (info) info.style.display = 'none';
+        }
     }
     
     padZero(num) {
@@ -636,5 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('resize', () => {
     if (clock) {
         clock.updateClock();
+        clock.createClockMarks();
+        clock.createClockNumbers();
     }
 });
