@@ -271,17 +271,18 @@ class ClockTeaching {
         const time = this.isRealTime ? this.currentTime : this.manualTime;
         const hours = time.getHours();
         const minutes = time.getMinutes();
+        const seconds = time.getSeconds();
         
-        let timeInfo = '';
-        let h = hours % 12;
-        if (h === 0) h = 12;
+        // 12小时制
+        let h12 = hours % 12;
+        if (h12 === 0) h12 = 12;
         const ampm = hours < 12 ? '上午' : '下午';
+        const time12 = `${ampm} ${this.padZero(h12)}:${this.padZero(minutes)}:${this.padZero(seconds)}`;
         
-        if (this.isRealTime) {
-            timeInfo = `当前时间：${ampm} ${this.padZero(h)}:${this.padZero(minutes)}<br>`;
-        } else {
-            timeInfo = `设置时间：${ampm} ${this.padZero(h)}:${this.padZero(minutes)}<br>`;
-        }
+        // 24小时制
+        const time24 = `${this.padZero(hours)}:${this.padZero(minutes)}:${this.padZero(seconds)}`;
+        
+        let timeInfo = `12小时制：${time12}<br>24小时制：${time24}`;
         
         document.getElementById('timeInfo').innerHTML = timeInfo;
     }
@@ -494,6 +495,23 @@ function toggleAnimation() {
 
 function resetClock() {
     clock.resetClock();
+}
+
+let digitalVisible = true;
+function toggleDigitalVisibility() {
+    const digitalTime = document.getElementById('digitalTime');
+    const timeInfoSection = document.getElementById('timeInfoSection');
+    const btn = document.getElementById('toggleDigitalBtn');
+    digitalVisible = !digitalVisible;
+    if (digitalVisible) {
+        digitalTime.style.display = 'block';
+        timeInfoSection.style.display = 'block';
+        btn.textContent = '👁 隐藏';
+    } else {
+        digitalTime.style.display = 'none';
+        timeInfoSection.style.display = 'none';
+        btn.textContent = '👁‍🗨 显示';
+    }
 }
 
 // 初始化钟表

@@ -166,6 +166,24 @@
             font-family: 'Courier New', monospace;
         }
         
+        .btn-toggle-digital {
+            display: block;
+            margin: 0 auto 15px;
+            padding: 6px 16px;
+            font-size: 0.85rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg2);
+            color: var(--text);
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        
+        .btn-toggle-digital:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
         .controls-section {
             background: var(--bg2);
             border: 1px solid var(--border);
@@ -175,6 +193,7 @@
         
         .control-group {
             margin-bottom: 25px;
+            text-align: center;
         }
         
         .control-group label {
@@ -335,6 +354,7 @@
     <div class="main-content">
         <div class="clock-section">
             <div class="digital-time" id="digitalTime">00:00:00</div>
+            <button class="btn-toggle-digital" id="toggleDigitalBtn" onclick="toggleDigitalVisibility()" title="切换显示/隐藏">👁 隐藏</button>
             <div class="clock-container" id="clockContainer">
                 <div class="clock-face">
                     <div class="clock-marks" id="clockMarks"></div>
@@ -377,10 +397,9 @@
             
             <div class="control-group">
                 <button class="btn" onclick="toggleAnimation()">暂停/继续</button>
-                <button class="btn btn-secondary" onclick="resetClock()">重置</button>
             </div>
             
-            <div class="time-display">
+            <div class="time-display" id="timeInfoSection">
                 <h3>当前时间信息</h3>
                 <p id="timeInfo">正在加载...</p>
             </div>
