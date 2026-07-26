@@ -368,8 +368,8 @@
             <!-- Pointer selector buttons (visible in manual mode) -->
             <div id="pointerSelector" style="display:none; margin-top:15px;" class="pointer-selector">
                 <span style="color:var(--text-dim); font-size:0.85rem; margin-right:8px;">选择指针：</span>
-                <button class="pointer-btn active-pointer" data-pointer="hour" onclick="selectPointer('hour')">🕐 时针</button>
-                <button class="pointer-btn" data-pointer="minute" onclick="selectPointer('minute')">🕑 分针</button>
+                <button class="pointer-btn" data-pointer="hour" onclick="selectPointer('hour')">🕐 时针</button>
+                <button class="pointer-btn active-pointer" data-pointer="minute" onclick="selectPointer('minute')">🕑 分针</button>
                 <button class="pointer-btn" data-pointer="second" onclick="selectPointer('second')">🕒 秒针</button>
             </div>
         </div>
@@ -388,8 +388,8 @@
             <div id="manualControls" class="time-display" style="display: none;">
                 <h3>手动设置时间</h3>
                 <div class="control-group">
-                    <label for="timeInput">设置时间 (HH:MM, 12小时制):</label>
-                    <input type="time" id="timeInput" class="time-input" step="1">
+                    <label for="timeInput">设置时间 (HH:MM:SS, 24小时制):</label>
+                    <input type="text" id="timeInput" class="time-input" placeholder="例: 14:30:00" pattern="[0-9]{2}:[0-9]{2}:[0-9]{2}" title="请输入 HH:MM:SS 格式时间">
                 </div>
                 <button class="btn" onclick="setManualTime()">设置时间</button>
                 <button class="btn btn-secondary" onclick="resetToCurrent()">重置为当前时间</button>
@@ -429,7 +429,7 @@
         </div>
     </div>
 
-    <footer style="text-align: center; margin-top: 60px; padding: 16px; color: var(--text-dim); font-size: 0.75px; border-top: 1px solid var(--border);">
+    <footer id="siteFooter" style="text-align: center; margin-top: 60px; padding: 16px; color: var(--text-dim); font-size: 0.75px; border-top: 1px solid var(--border);">
         <a href="/tools/toolsbox" style="color: var(--primary); text-decoration: none;">← 返回工具箱</a> · 
         新ICP备2026003879号-1
     </footer>
@@ -449,6 +449,10 @@
         document.body.classList.add('h-mode');
         var logPanel = document.getElementById('rp-log-panel');
         if (logPanel) logPanel.style.display = 'none';
+        var backLink = document.querySelector('.back-link');
+        if (backLink) backLink.style.display = 'none';
+        var footer = document.getElementById('siteFooter');
+        if (footer) footer.style.display = 'none';
         window.__hideLogPanel = true;
     }
 })();

@@ -210,15 +210,14 @@ class ClockTeaching {
     }
     
     startManualMode() {
-        // 首次切换到手动模式时，默认填充当前时间
+        // 首次切换到手动模式时，默认填充当前时间（24小时制）
         const timeInput = document.getElementById('timeInput');
         if (timeInput && !timeInput.value) {
             const now = new Date();
-            let h = now.getHours() % 12;
-            if (h === 0) h = 12;
+            const hours = this.padZero(now.getHours());
             const minutes = this.padZero(now.getMinutes());
             const seconds = this.padZero(now.getSeconds());
-            timeInput.value = `${this.padZero(h)}:${minutes}:${seconds}`;
+            timeInput.value = `${hours}:${minutes}:${seconds}`;
         }
         this.updateClock();
         this.updateTimeInfo();
@@ -299,16 +298,29 @@ class ClockTeaching {
     
     setManualTime() {
         const timeInput = document.getElementById('timeInput');
-        const timeValue = timeInput.value;
+        const timeValue = timeInput.value.trim();
         
-        if (timeValue) {
-            const [hours, minutes, seconds] = timeValue.split(':').map(Number);
-            this.manualTime = new Date();
-            this.manualTime.setHours(hours, minutes, seconds || 0);
-            this.updateClock();
-            this.updateTimeInfo();
-            clockLog('info', 'TIME', '手动设置时间: ' + timeValue);
+        // 验证 HH:MM:SS 格式
+        const match = timeValue.match(/^([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})$/);
+        if (!match) {
+            alert('请输入正确的 HH:MM:SS 格式时间，例如 14:30:00');
+            return;
         }
+        
+        const hours = parseInt(match[1], 10);
+        const minutes = parseInt(match[2], 10);
+        const seconds = parseInt(match[3], 10);
+        
+        if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
+            alert('小时范围 0-23，分钟和秒范围 0-59');
+            return;
+        }
+        
+        this.manualTime = new Date();
+        this.manualTime.setHours(hours, minutes, seconds);
+        this.updateClock();
+        this.updateTimeInfo();
+        clockLog('info', 'TIME', '手动设置时间: ' + timeValue);
     }
     
     resetToCurrent() {
@@ -316,13 +328,11 @@ class ClockTeaching {
         this.updateClock();
         this.updateTimeInfo();
         
-        let h = this.manualTime.getHours() % 12;
-        if (h === 0) h = 12;
-        const ampm = this.manualTime.getHours() < 12 ? '上午' : '下午';
+        const hours = this.padZero(this.manualTime.getHours());
         const minutes = this.padZero(this.manualTime.getMinutes());
         const seconds = this.padZero(this.manualTime.getSeconds());
-        document.getElementById('timeInput').placeholder = `例：${this.padZero(h)}:${minutes} (${ampm})`;
-        document.getElementById('timeInput').value = `${this.padZero(h)}:${minutes}`;
+        document.getElementById('timeInput').placeholder = `例：${hours}:${minutes}`;
+        document.getElementById('timeInput').value = `${hours}:${minutes}:${seconds}`;
         clockLog('info', 'TIME', '重置为当前时间');
     }
     
@@ -478,7 +488,7 @@ function getPointerStartAngle(pointerType, time) {
 
 // 全局函数
 let clock;
-let selectedPointer = 'hour'; // 当前选中的指针（默认时针）
+let selectedPointer = 'minute'; // 当前选中的指针（默认分针）
 let lastMinuteAngle = -1; // 记录上一帧分针角度（用于判断过12点的方向）
 
 // 选择要拖动的指针
