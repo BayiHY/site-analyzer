@@ -206,6 +206,16 @@ class ClockTeaching {
     }
     
     startManualMode() {
+        // 首次切换到手动模式时，默认填充当前时间
+        const timeInput = document.getElementById('timeInput');
+        if (timeInput && !timeInput.value) {
+            const now = new Date();
+            let h = now.getHours() % 12;
+            if (h === 0) h = 12;
+            const minutes = this.padZero(now.getMinutes());
+            const seconds = this.padZero(now.getSeconds());
+            timeInput.value = `${this.padZero(h)}:${minutes}:${seconds}`;
+        }
         this.updateClock();
         this.updateTimeInfo();
         
