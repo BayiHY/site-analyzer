@@ -9,7 +9,7 @@
             throw new Error('未配置生图 API Key');
         }
 
-        const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
+        const resp = await fetch('https://api.agnes-ai.cn/v1/images/generations', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -214,7 +214,7 @@
                 console.log('角色头像未就绪，使用文生图模式');
             }
 
-            const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
+            const resp = await fetch('https://api.agnes-ai.cn/v1/images/generations', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -18,12 +18,13 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
     } catch (err) {
         const errMsg = (err.message || String(err));
         rpLog('error', 'INIT', '世界观生成失败: ' + errMsg);
-        // 如果是因为超时（abort），降级到 agnes-2.0-flash + 温度 0.6 重试
+        // 如果是因为超时（abort），降级到 agnes-2.5-flash + 温度 0.6 重试
         if (errMsg.includes('abort') || errMsg.includes('Abort') || errMsg.includes('Failed to fetch')) {
-            rpLog('warn', 'INIT', '检测到超时/中断，降级到 agnes-2.0-flash + 温度 0.6 重试...');
+            rpLog('warn', 'INIT', '检测到超时/中断，降级到 agnes-2.5-flash + 温度 0.6 重试...');
             addSystemMessage('⏱️ 生成超时，正在使用备用模型重试...');
+            // 使用 agnes-2.5-flash 进行重试
             try {
-                await App.generateWorldview(userInspiration, { model: 'agnes-2.0-flash', temperature: 0.6 });
+                await App.generateWorldview(userInspiration, { model: 'agnes-2.5-flash', temperature: 0.6 });
                 addSystemMessage('✅ 世界观已通过备用模型生成！');
                 rpLog('info', 'INIT', '第一阶段降级重试成功');
             } catch (err2) {

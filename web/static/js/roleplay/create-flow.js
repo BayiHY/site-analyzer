@@ -28,15 +28,17 @@ App.createCharacter = async function() {
     // 校验 API Key 有效性（复用 validateApiKey）
     App.showKeyCheckOverlay();
     try {
-        const valid = await App.validateApiKey(chatKey);
-        if (!valid) {
+        const result = await App.validateApiKey(chatKey);
+        if (!result.valid) {
             App.hideKeyCheckOverlay();
-            App.showErrorModal('API Key 无效，请检查后重试', '❌ 校验失败');
+            const errorMsg = result.error || 'API Key 无效';
+            const detailMsg = result.detail ? `<br><br><strong style="color:var(--warning);">详情:</strong> ${result.detail}` : '';
+            App.showErrorModal(`API Key 验证失败：${errorMsg}${detailMsg}`, '❌ 校验失败');
             return;
         }
     } catch (e) {
         App.hideKeyCheckOverlay();
-        App.showErrorModal('API Key 校验失败，请检查网络连接或 Key 是否正确', '❌ 网络错误');
+        App.showErrorModal(`API Key 校验失败: ${e.message || '未知错误'}，请检查网络连接或 Key 是否正确`, '❌ 网络错误');
         return;
     } finally {
         App.hideKeyCheckOverlay();

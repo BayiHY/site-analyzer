@@ -51,28 +51,68 @@ App.hideKeyCheckOverlay = function() {
  * 校验 API Key 是否有效（发送一个最小请求测试）
  * 实测最快方案：无 system prompt，仅 user + temp:0 + max_tokens:1，耗时 ~7s
  * @param {string} apiKey - API Key
- * @returns {Promise<boolean>} 是否有效
+ * @returns {Promise<{valid: boolean, error?: string, status?: number}>} 包含验证结果和详细信息的对象
  */
 App.validateApiKey = async function(apiKey) {
-    if (!apiKey) return false;
+    if (!apiKey) {
+        rpLog('warn', 'KEY-CHK', 'API Key 为空');
+        return { valid: false, error: 'API Key 为空' };
+    }
+    // 脱敏显示 Key（只显示前6位和后4位）
+    const maskedKey = apiKey.length > 10 ? apiKey.substring(0, 6) + '****' + apiKey.slice(-4) : '****';
+    rpLog('info', 'KEY-CHK', `正在校验 API Key: ${maskedKey}...`);
+    
     try {
-        const resp = await fetch('https://apihub.agnes-ai.com/v1/chat/completions', {
+        rpLog('debug', 'KEY-CHK', `请求目标: https://api.agnes-ai.cn/v1/chat/completions`);
+        const startTime = Date.now();
+        const resp = await fetch('https://api.agnes-ai.cn/v1/chat/completions', {
             method: 'POST',
-            headers: {
+            headers: Object.assign({
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
+                'Authorization': 'Bearer ' + apiKey
+            }),
             body: JSON.stringify({
-                model: 'agnes-2.0-flash',
+                model: 'agnes-2.5-flash',
                 messages: [{ role: 'user', content: 'ok' }],
                 temperature: 0,
                 max_tokens: 1
             }),
             signal: AbortSignal.timeout(12000)
         });
-        return resp.ok;
+        const elapsed = Date.now() - startTime;
+        rpLog('info', 'KEY-CHK', `请求完成，状态码: ${resp.status}, 耗时: ${elapsed}ms`);
+        
+        if (resp.ok) {
+            rpLog('success', 'KEY-CHK', '✅ API Key 验证通过！');
+            return { valid: true };
+        } else {
+            // 尝试获取详细错误信息
+            let errDetail = '';
+            try {
+                const errData = await resp.json();
+                errDetail = errData.error?.message || errData.message || '';
+            } catch (e) {
+                errDetail = await resp.text().catch(e => '无法获取详情');
+            }
+            rpLog('warn', 'KEY-CHK', `❌ API Key 验证失败，状态码: ${resp.status}, 详情: ${errDetail.substring(0, 200)}`);
+            return { 
+                valid: false, 
+                error: `API 验证失败 (状态码: ${resp.status})`, 
+                detail: errDetail.substring(0, 200),
+                status: resp.status
+            };
+        }
     } catch (e) {
-        return false;
+        const errMsg = e.message || '';
+        rpLog('error', 'KEY-CHK', `❌ API Key 校验异常: ${errMsg}`);
+        if (errMsg.includes('timeout') || errMsg.includes('timed')) {
+            rpLog('error', 'KEY-CHK', `⚠️ 可能是网络超时或域名解析问题，请检查网络连接`);
+            return { valid: false, error: '网络超时或连接失败', detail: errMsg };
+        } else if (errMsg.includes('fetch') || errMsg.includes('network')) {
+            rpLog('error', 'KEY-CHK', `⚠️ 网络错误，可能是 CORS 或连接被拒绝`);
+            return { valid: false, error: '网络连接失败', detail: errMsg };
+        }
+        return { valid: false, error: '校验失败', detail: errMsg };
     }
 };
 
@@ -126,15 +166,22 @@ App.showErrorModal = function(message, title = '⚠️ 提示', buttons = null) 
 
 /**
  * 显示 Key 校验失败的提示
+ * @param {string} optionalDetail - 可选的详细错误信息
  */
-App.showKeyError = function(message) {
+App.showKeyError = function(message, optionalDetail = null) {
+    let detailedMessage = message;
+    if (optionalDetail) {
+        detailedMessage += `<br><br><strong style="color:var(--warning);">详情:</strong> ${optionalDetail}`;
+    } else {
+        detailedMessage += `<br><br>请检查网络连接、API Key 格式是否正确，或尝试重新注册新的 API Key。`;
+    }
     App.showErrorModal(
+        detailedMessage + '<br><br>' +
         '请输入有效的 API Key 后继续。<br><br>' +
-        '还没有 Key？<a href="https://platform.agnes-ai.com/settings/apiKeys" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">点击申请 →</a>',
+        '还没有 Key？<a href="https://platform.agnes-ai.cn/settings/apiKeys" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline;">点击申请 →</a>',
         '🔑 需要 API Key',
-        [{ label: '输入 Key', action: App.promptForKeyInput }]
-    );
-};
+        [{ label: "输入 Key", action: App.promptForKeyInput }]);
+    };
 
 /**
  * 弹出 Key 输入框
@@ -160,23 +207,25 @@ App.promptForKeyInput = function() {
     if (input) input.focus();
 
     document.getElementById('inline-key-submit').addEventListener('click', async () => {
-        const apiKey = input?.value.trim();
-        if (!apiKey) {
-            App.showErrorModal('请输入 API Key', '⚠️ 提示');
-            return;
-        }
-        overlay.remove();
-        const valid = await App.validateApiKey(apiKey);
-        if (!valid) {
-            App.showErrorModal('API Key 无效，请检查后重试', '⚠️ 校验失败');
-            return;
-        }
-        state.apiKeys.chat = apiKey;
-        localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
-        // 重新执行存档加载
-        if (_pendingImportData) {
-            App.startFromArchive(_pendingImportData.data, _pendingImportData.mode || 'continue');
-        }
+    const apiKey = input?.value.trim();
+    if (!apiKey) {
+        App.showErrorModal('请输入 API Key', '⚠️ 提示');
+        return;
+    }
+    overlay.remove();
+    const result = await App.validateApiKey(apiKey);
+    if (!result.valid) {
+        const errorMsg = result.error || 'API Key 无效';
+        const detailMsg = result.detail ? `<br><br><strong style="color:var(--warning);">详情:</strong> ${result.detail}` : '';
+        App.showErrorModal(`API Key 验证失败：${errorMsg}${detailMsg}`, '⚠️ 校验失败');
+        return;
+    }
+    state.apiKeys.chat = apiKey;
+    localStorage.setItem('rp_apiKeys', JSON.stringify(state.apiKeys));
+    // 重新执行存档加载
+    if (_pendingImportData) {
+        App.startFromArchive(_pendingImportData.data, _pendingImportData.mode || 'continue');
+    }
     });
 
     document.getElementById('inline-key-cancel').addEventListener('click', () => {
@@ -216,10 +265,12 @@ App.importArchive = function() {
         // 校验 API Key 有效性（复用 validateApiKey）
         App.showKeyCheckOverlay();
         try {
-            const valid = await App.validateApiKey(chatKey);
-            if (!valid) {
+            const result = await App.validateApiKey(chatKey);
+            if (!result.valid) {
                 App.hideKeyCheckOverlay();
-                App.showErrorModal('API Key 无效，请检查后重试', '❌ 校验失败');
+                const errorMsg = result.error || 'API Key 无效';
+                const detailMsg = result.detail ? `<br><br><strong style="color:var(--warning);">详情:</strong> ${result.detail}` : '';
+                App.showErrorModal(`API Key 验证失败：${errorMsg}${detailMsg}`, '❌ 校验失败');
                 return;
             }
         } catch (e) {
@@ -405,9 +456,9 @@ App.importData = async function() {
     }
     try {
         App.showKeyCheckOverlay();
-        const isValid = await App.validateApiKey(existingKey);
-        if (!isValid) {
-            App.showKeyError('API Key 无效');
+        const isValidResult = await App.validateApiKey(existingKey);
+        if (!isValidResult.valid) {
+            App.showKeyError('API Key 无效', isValidResult.error || '');
             return;
         }
     } catch (e) {

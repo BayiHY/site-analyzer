@@ -50,14 +50,14 @@
 
         const userPrompt = '请为这张图片提炼可复用的画面风格提示词。';
 
-        const resp = await fetch('https://apihub.agnes-ai.com/v1/chat/completions', {
+        const resp = await fetch('https://api.agnes-ai.cn/v1/chat/completions', {
             method: 'POST',
-            headers: {
+            headers: Object.assign({
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
+                'Authorization': 'Bearer ' + apiKey
+            }),
             body: JSON.stringify({
-                model: 'agnes-2.0-flash',
+                model: 'agnes-2.5-flash',
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: [

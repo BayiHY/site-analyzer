@@ -5,9 +5,9 @@
 // 降级链定义：按优先级排列的模型列表
 // 每个元素: { model, temperature, label }
 App.LLM_FALLBACK_CHAIN = [
-    { model: 'agnes-2.0-flash', temperature: null, label: 'agnes-2.0-flash' },
-    { model: 'agnes-2.0-flash', temperature: null, label: 'agnes-2.0-flash (重试)' },
-    { model: 'agnes-2.0-flash', temperature: null, label: 'agnes-2.0-flash (兜底)' },
+    { model: 'agnes-2.5-flash', temperature: null, label: 'agnes-2.5-flash' },
+    { model: 'agnes-2.5-flash', temperature: null, label: 'agnes-2.5-flash (重试)' },
+    { model: 'agnes-2.5-flash', temperature: null, label: 'agnes-2.5-flash (兜底)' },
 ];
 
 /**

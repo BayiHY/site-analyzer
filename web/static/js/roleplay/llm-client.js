@@ -8,7 +8,7 @@ App.agnesChat = async function(messages, options = {}) {
     }
 
     const temperature = options.temperature ?? 1.0;
-    const model = options.model || 'agnes-2.0-flash';
+    const model = options.model || 'agnes-2.5-flash';
     const route = options.route || 'default';
 
     // 结构化输出路由使用低温度保证格式稳定
@@ -29,7 +29,7 @@ App.agnesChat = async function(messages, options = {}) {
 
     rpLog('info', 'LLM', `=== 对话请求开始 ===`);
     rpLog('info', 'LLM', `模型: ${model}`);
-    rpLog('info', 'LLM', `端点: https://apihub.agnes-ai.com/v1/chat/completions`);
+    rpLog('info', 'LLM', `端点: https://api.agnes-ai.cn/v1/chat/completions`);
     rpLog('info', 'LLM', `路由: ${route}, 温度: ${effectiveTemp} (原始=${temperature})`);
     rpLog('info', 'LLM', `输入字符数: ${inputChars}`);
 
@@ -51,12 +51,12 @@ App.agnesChat = async function(messages, options = {}) {
     
     rpLog('info', 'LLM', `输入估算 ${estimatedInputTokens} tokens, 输出上限 ${finalMaxTokens} tokens`);
     
-    const resp = await fetch('https://apihub.agnes-ai.com/v1/chat/completions', {
+    const resp = await fetch('https://api.agnes-ai.cn/v1/chat/completions', {
         method: 'POST',
-        headers: {
+        headers: Object.assign({
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
+            'Authorization': 'Bearer ' + apiKey
+        }),
         body: JSON.stringify({
             model: model,
             messages: messages,
@@ -71,7 +71,9 @@ App.agnesChat = async function(messages, options = {}) {
         const errData = await resp.json().catch(() => ({}));
         const errMsg = errData.error?.message || errData.message || `API 错误 (${resp.status})`;
         rpLog('error', 'LLM', `❌ 对话请求失败: ${errMsg}`);
-        throw new Error(errMsg);
+        
+        // 将详细错误信息返回给调用方，便于前端展示具体原因
+        throw new Error(`${errMsg} (状态码: ${resp.status})`);
     }
 
     const data = await resp.json();
