@@ -400,6 +400,13 @@ def test_piano_octaves():
     """钢琴八度渲染测试"""
     return render_template('test-piano-octaves.html')
 
+
+@app.route('/qr-generator')
+def qr_generator():
+    """二维码图片生成器 - 上传图片后生成可拖拽摆放的二维码并导出"""
+    return render_template('qr-generator.html')
+
+
 @app.route('/toolsbox')
 def toolsbox():
     return render_template('toolsbox.html')

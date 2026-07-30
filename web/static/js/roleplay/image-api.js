@@ -616,7 +616,7 @@ App.agnesImageGenerate = async function(options) {
             rpLog('info', 'TIMEOUT', `生图请求开始: ${label}${attempt > 0 ? ' (降级)' : ''}`);
             const imgStart = Date.now();
 
-            const resp = await fetch('https://apihub.agnes-ai.com/v1/images/generations', {
+            const resp = await fetch('https://api.agnes-ai.cn/v1/images/generations', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

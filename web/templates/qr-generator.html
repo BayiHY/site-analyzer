@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二维码图片生成器</title>
+    <link rel="stylesheet" href="/static/css/tool-content.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        body{background:var(--bg);color:var(--text);min-height:100vh;padding:20px;margin:0}
+        .container{max-width:1200px;margin:0 auto}
+        .back-link{display:inline-block;margin-bottom:20px;color:#4f8a8b;text-decoration:none;font-size:0.85rem}
+        .header{text-align:center;margin-bottom:30px;padding:20px 0}
+        .header h1{font-size:2rem;color:#4f8a8b;margin-bottom:8px}
+        .main-layout{display:grid;grid-template-columns:320px 1fr;gap:24px;margin-bottom:30px}
+        .control-panel{background:#f8f9fa;border:1px solid #2d3a4a;border-radius:12px;padding:20px;height:fit-content}
+        .control-section{margin-bottom:20px}
+        label{display:block;margin-top:8px;font-weight:500;font-size:0.9rem;color:#333}
+        textarea{width:100%;padding:10px;border:1px solid #2d3a4a;border-radius:6px;background:#ffffff;color:#333;resize:vertical;min-height:80px;font-size:0.9rem}
+        .btn{width:100%;padding:12px;background:#4f8a8b;color:white;border:none;border-radius:6px;font-size:1rem;cursor:pointer;margin-top:12px}
+        .btn:hover{background:#3a6b6c;transform:translateY(-1px)}
+        .btn-secondary{background:#6c757d}
+        .btn-secondary:hover{background:#5a6268}
+        .btn-export{background:#28a745}
+        .btn-export:hover{background:#218838}
+        .btn-upload{background:#6c757d;color:white;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:0.9rem}
+        select,input[type="number"]{width:100%;padding:8px;border:1px solid #2d3a4a;border-radius:6px;background:#ffffff;color:#333}
+        .size-controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .status{padding:12px;border-radius:6px;margin-top:20px;font-size:0.9rem}
+        .status.success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
+        .status.warning{background:#fff3cd;color:#856404;border:1px solid #ffeaa7}
+        .status.error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+        .preview-area{background:#f8f9fa;border:1px solid #2d3a4a;border-radius:12px;padding:20px;position:relative;min-height:500px;overflow:hidden}
+        #mainCanvas{position:relative;background:#ffffff;border-radius:8px;width:100%}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1>二维码图片生成器</h1><p>上传图片 &rarr; 生成二维码 &rarr; 拖拽摆放 &rarr; 一键导出含二维码的背景图</p></div>
+        <a href="/tools/toolsbox" class="back-link">&larr; 返回工具箱</a>
+        <div class="main-layout">
+            <div class="control-panel">
+                <div class="control-section"><h3 style="color:#4f8a8b">第一步：选择背景图片</h3><label for="fileInput" class="btn-upload" style="cursor:pointer;">选择图片文件</label><input type="file" id="fileInput" accept="image/*" style="display:none;"><div id="fileInputLabel">未选择图片</div></div>
+                <div class="control-section"><h3 style="color:#4f8a8b">第二步：设置二维码内容</h3><label for="qrContent">输入要编码的文字/网址：</label><textarea id="qrContent">https://example.com</textarea><button class="btn" onclick="generateQR()">生成二维码</button></div>
+                <div class="control-section"><h3 style="color:#4f8a8b">第三步：二维码参数</h3><label>二维码大小（像素）：</label><div class="size-controls"><div><label>宽度</label><input type="number" id="qrWidth" value="150" min="50" max="500"></div><div><label>高度</label><input type="number" id="qrHeight" value="150" min="50" max="500"></div></div></div>
+                <div class="control-section"><button class="btn btn-secondary" onclick="resetPosition()" style="width:100%;margin-top:8px">重置位置</button><button class="btn btn-export" onclick="exportImage()" style="width:100%;margin-top:8px">导出图片</button></div>
+                <div class="status" id="status">请先选择第一张背景图片开始使用</div>
+            </div>
+            <div class="preview-area"><canvas id="mainCanvas" width="800" height="600"></canvas></div>
+        </div>
+        <div class="footer"><p style="font-size:12px;color:var(--text-dim)">站长工具 &copy; <a href="https://gitcode.com/BayiHY" target="_blank">巴依浩爷(BayiHY)</a> &middot; 免费开源 &middot; 隐私优先</p></div>
+    </div>
+<script>
+(function(){
+    var backgroundImage=null, mainCanvas=document.getElementById('mainCanvas'), mainCtx=mainCanvas.getContext('2d'), qrElement=null, isDragging=false, dragOffsetX=0, dragOffsetY=0;
+    document.getElementById("fileInput").addEventListener("change", handleImageUpload);
+    
+    function updateStatus(msg,type){var s=document.getElementById('status');s.textContent=msg;s.className='status '+type;}
+    
+    function handleImageUpload(e){
+        var file=e.target.files[0]; if(!file) return;
+        var r=new FileReader();
+        r.onload=function(){
+            backgroundImage=r.result;
+            var img=new Image();
+            img.onload=function(){
+                mainCanvas.width=img.width; mainCanvas.height=img.height;
+                mainCtx.drawImage(img,0,0,mainCanvas.width,mainCanvas.height);
+                updateStatus('已加载图片('+img.width+'×'+img.height+')','success');
+            };
+            img.src=bg;
+        };
+        r.readAsDataURL(file);
+        document.getElementById('fileInputLabel').textContent='已选择：'+file.name;
+    }
+    
+    function clearQR(){
+        if(qrElement && qrElement.parentNode) qrElement.parentNode.removeChild(qrElement);
+        qrElement=null;
+        updateStatus('二维码已清除','warning');
+    }
+    
+    function generateQR(){
+        var content=document.getElementById('qrContent').value.trim();
+        var width=parseInt(document.getElementById('qrWidth').value)||150;
+        var height=parseInt(document.getElementById('qrHeight').value)||150;
+        if(!backgroundImage){updateStatus('请先上传背景图片！','warning');return;}
+        if(!content){updateStatus('请输入二维码内容！','warning');return;}
+        clearQR();
+        if(typeof QRCode==="undefined"){updateStatus('二维码库未加载，请检查网络连接后重试','error');return;}
+        
+        var qrDiv=document.createElement('div');
+        mainCanvas.parentElement.appendChild(qrDiv);
+        new QRCode(qrDiv,{text:content,width:width,height:height,colorDark:'#000000',colorLight:'#ffffff'});
+        
+        setTimeout(function(){
+            var c=qrDiv.querySelector('canvas');
+            if(c){
+                qrElement=c;
+                qrElement.style.position='absolute';
+                qrElement.style.left=(mainCanvas.offsetWidth/2-width/2)+'px';
+                qrElement.style.top=(mainCanvas.offsetHeight/2-height/2)+'px';
+                qrElement.style.width=width+'px';
+                qrElement.style.height=height+'px';
+                setupDragAndDrop(qrElement,width,height);
+                updateStatus('二维码已生成 可拖动调整位置','success');
+            }else{
+                updateStatus('生成二维码失败','error');
+            }
+        },100);
+    }
+    
+    function setupDragAndDrop(el,w,h){
+        function move(ev){
+            if(!isDragging) return;
+            var rect=mainCanvas.parentElement.getBoundingClientRect();
+            var clientX=ev.clientX||(ev.touches?ev.touches[0].clientX:0);
+            var clientY=ev.clientY||(ev.touches?ev.touches[0].clientY:0);
+            var x=clientX-rect.left-dragOffsetX;
+            var y=clientY-rect.top-dragOffsetY;
+            x=Math.max(0,Math.min(x,rect.width-w));
+            y=Math.max(0,Math.min(y,rect.height-h));
+            el.style.left=x+'px'; el.style.top=y+'px';
+        }
+        function endDrag(){
+            isDragging=false;
+            document.onmousemove=null; document.onmouseup=null;
+            document.ontouchmove=null; document.ontouchend=null;
+        }
+        function startDrag(ev){
+            isDragging=true;
+            var clientX=ev.clientX||(ev.touches?ev.touches[0].clientX:0);
+            var clientY=ev.clientY||(ev.touches?ev.touches[0].clientY:0);
+            dragOffsetX=clientX-el.offsetLeft;
+            dragOffsetY=clientY-el.offsetTop;
+            document.onmousemove=move;
+            document.onmouseup=endDrag;
+            document.ontouchmove=move;
+            document.ontouchend=endDrag;
+            ev.preventDefault();
+        }
+        el.onmousedown=startDrag;
+        el.ontouchstart=startDrag;
+    }
+    
+    function resetPosition(){
+        if(!qrElement){updateStatus('没有二维码需要重置','error');return;}
+        var rect=mainCanvas.getBoundingClientRect();
+        var w=parseInt(qrElement.style.width)||150;
+        var h=parseInt(qrElement.style.height)||150;
+        qrElement.style.left=(rect.width/2-w/2)+'px';
+        qrElement.style.top=(rect.height/2-h/2)+'px';
+        updateStatus('二维码已重置到中心位置','success');
+    }
+    
+    function exportImage(){
+        if(!backgroundImage){updateStatus('请先上传背景图片!','error');return;}
+        if(!qrElement){updateStatus('先生成二维码!','error');return;}
+        updateStatus('正在导出图片...','warning');
+        
+        var canvas=document.createElement('canvas');
+        canvas.width=mainCanvas.width; canvas.height=mainCanvas.height;
+        var ctx=canvas.getContext('2d');
+        var bg=new Image();
+        bg.onload=function(){
+            ctx.drawImage(bg,0,0,canvas.width,canvas.height);
+            var r=qrElement.getBoundingClientRect();
+            var mr=mainCanvas.getBoundingClientRect();
+            var x=r.left-mr.left;
+            var y=r.top-mr.top;
+            ctx.drawImage(qrElement,x,y,qrElement.width,qrElement.height);
+            var link=document.createElement('a');
+            link.download='qr-code-'+Date.now()+'.png';
+            link.href=canvas.toDataURL('image/png');
+            link.click();
+            updateStatus('图片导出成功!','success');
+        };
+        bg.src=backgroundImage;
+    }
+    
+    window.onload=function(){updateStatus('请先选择一张背景图片，然后点击生成二维码','info')};
+})();
+<\/script>
+</body>
+</html>
