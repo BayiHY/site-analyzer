@@ -45,17 +45,18 @@ ${formatModule.buildFormatRequirements()}`;
 
     // 用户消息：序章阶段没有历史对话，直接给出创作指令
     const userInspiration = state.story.userInspiration || '无';
-    const userMessage = `【序章创作指令】\n\n这是故事的开端，请基于世界观和角色设定创作一段沉浸式序章场景。要求：\n1. 场景描写生动，角色对话自然\n2. 必须使用以下角色的真实姓名\n3. 体现角色性格和世界观氛围\n4. 结尾附上 3 条玩家可选回复\n\n用户原始灵感：${userInspiration}`;
+    const userMessage = `【序章创作指令】\n\n这是故事的开端，请基于世界观和角色设定创作一段沉浸式序章场景。\n\n**重要规则：**\n1. **只让一个角色登场**：选择最合适的一个角色（通常是与玩家最先相遇的角色）发起对话，不要所有角色同时登场\n2. **渐进式登场**：后续剧情中根据情节发展逐步引入其他角色\n3. 场景描写生动，角色对话自然\n4. 必须使用以下角色的真实姓名\n5. 体现角色性格和世界观氛围\n6. 结尾附上 3 条玩家可选回复\n\n用户原始灵感：${userInspiration}`;
 
     try {
         const startTime = Date.now();
         rpLog('info', 'TIMEOUT', `LLM 请求开始: opening_scene (对话智能体)`);
 
         // 调用对话智能体（route='opening', 温度 0.7），走降级重试
+        // ⚠️ 序章生成最大重试1次，避免429限流雪崩
         const response = await App.agnesChatWithFallback([
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMessage }
-        ], { route: 'opening' });
+        ], { route: 'opening', maxRetries: 1 });
 
         const elapsed = Date.now() - startTime;
         rpLog('info', 'TIMEOUT', `LLM 请求完成: opening_scene, 耗时 ${elapsed}ms, 输出长度: ${response?.length || 0}`);
@@ -64,6 +65,7 @@ ${formatModule.buildFormatRequirements()}`;
 
         // 优先尝试直接解析对话智能体返回的结构化 JSON
         rpLog('info', 'TIMEOUT', '尝试直接解析对话智能体返回的 JSON...');
+        rpLog('info', 'OPENING-DEBUG', `[fix#9] LLM response 前500字: ${(response||'').slice(0,500)}`);
         const directJson = App.parseJson(response);
         if (directJson && typeof directJson === 'object' && !Array.isArray(directJson)) {
             const hasReplies = Array.isArray(directJson.suggestedReplies) && directJson.suggestedReplies.length >= 2;
@@ -95,18 +97,22 @@ ${formatModule.buildFormatRequirements()}`;
         if (!structuredResult) {
             rpLog('info', 'TIMEOUT', '调用结构化智能体拆分序章回复...');
             const structStart = Date.now();
-            structuredResult = await App.structuredParseReply(response, {
-                characters: allChars,
-                emotions: state.emotions || {},
-                dynamicAttrs: Object.fromEntries(
+            
+            // [fix#9] 修正参数传递方式：structuredParseReply 期望多个独立参数
+            structuredResult = await App.structuredParseReply(
+                response,
+                allChars,
+                state.emotions || {},
+                Object.fromEntries(
                     allChars.map(c => [c.name, {
                         perception: c.perception || '',
                         secret: c.secret || '',
                         currentMood: c.currentMood || ''
                     }])
                 ),
-                revealedInfo: state.revealed || {}
-            });
+                state.revealed || {}
+            );
+            
             rpLog('info', 'TIMEOUT', `结构化拆分完成: 耗时 ${Date.now()-structStart}ms, scene=${(structuredResult.scene || '').length}字符, chars=${(structuredResult.characters || []).length}个`);
         }
 
@@ -117,9 +123,14 @@ ${formatModule.buildFormatRequirements()}`;
         return { rawText, structured: structuredResult };
 
     } catch (err) {
-        rpLog('error', 'OPENING', `序章生成失败: ${err.message}`);
-        addSystemMessage(`⚠️ 序章生成失败: ${err.message}`);
-        return { rawText: '', structured: null };
+        const errDetail = err?.message || String(err);
+        const errStack = (err?.stack || '').replace(/.*\n.*\n/g, '\n').slice(0, 150);
+        rpLog('error', 'OPENING', `[fix#9] 序章生成异常: ${err.message}`);
+        rpLog('error', 'OPENING', `[fix#9] 错误类型: ${err.constructor.name}`);
+        rpLog('error', 'OPENING', `[fix#9] 堆栈: ${(err.stack || '无').split('\n').slice(1, 5).join(' | ')}`);
+        addSystemMessage(`⚠️ 序章生成失败: ${errDetail}${errStack ? ' | ' + errStack : ''}`);
+        // [fix#9] 抛出错误而不是静默返回，让调用方知道失败
+        throw err;
     }
 };
 

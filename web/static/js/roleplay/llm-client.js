@@ -47,7 +47,8 @@ App.agnesChat = async function(messages, options = {}) {
     // Agnes 上下文最大是 8192，输入 + 输出不超过这个值
     const estimatedInputTokens = Math.ceil(inputChars / 4);
     const maxOutputTokens = Math.max(1024, 8192 - estimatedInputTokens);
-    const finalMaxTokens = Math.min(maxOutputTokens, 4096);
+    // [fix#9] 提高上限：结构化拆分需要输出完整 JSON，4096 不够用
+    const finalMaxTokens = Math.min(maxOutputTokens, 8192);
     
     rpLog('info', 'LLM', `输入估算 ${estimatedInputTokens} tokens, 输出上限 ${finalMaxTokens} tokens`);
     
@@ -76,8 +77,30 @@ App.agnesChat = async function(messages, options = {}) {
         throw new Error(`${errMsg} (状态码: ${resp.status})`);
     }
 
-    const data = await resp.json();
-    const reply = data.choices?.[0]?.message?.content || '';
+    const rawText = await resp.text();
+    rpLog('info', 'LLM-API', `[fix#9] Chat API 原始响应 (${resp.status}): ${rawText.slice(0, 500)}`);
+    
+    // [fix#9] 先解析 JSON，再提取 content，最后清洗 markdown
+    let data;
+    try {
+        data = JSON.parse(rawText);
+    } catch (e) {
+        rpLog('error', 'LLM-API', `[fix#9] 原始 JSON 解析失败: ${e.message}`);
+        rpLog('error', 'LLM-API', `[fix#9] 原始文本前300字符: ${rawText.slice(0, 300)}`);
+        throw new Error(`API 响应不是合法 JSON: ${e.message}`);
+    }
+    
+    let reply = data.choices?.[0]?.message?.content || '';
+    
+    // [fix#9] 对 content 字段应用 markdown 清洗（移除代码块包裹、bold标记等）
+    if (reply && typeof App.cleanMarkdown === 'function') {
+        const cleaned = App.cleanMarkdown(reply);
+        if (cleaned !== reply) {
+            rpLog('info', 'LLM-API', `[fix#9] markdown 清洗完成: ${(reply||'').length} → ${cleaned.length} 字符`);
+        }
+        reply = cleaned;
+    }
+    
     const outputChars = reply.length;
 
     // 【日志】输出完整返回内容

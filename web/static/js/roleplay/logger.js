@@ -7,8 +7,9 @@ let _rpLogCollapsed = false;
 let _rpLogPendingRender = false; // 防抖标志
 
 // 日志过滤：精简模式 — 只保留关键 tag
-const _RP_LOG_FILTER_ACTIVE = true;
-const _RP_LOG_TAGS = new Set(['TITLE', 'SCENE', 'TIMEOUT', 'META', 'PARSE', 'PARSE-REPLY', 'PARSE-COL', 'WORLDVIEW', 'IMG', 'IMG-MODULAR', 'IMG-MODULES', 'IMG-API', 'IMG-IMG2IMG', 'IMG-SANITIZE', 'IMG-BACKUP', 'STYLE', 'CREATE', 'CHARS', 'REGEN', 'LLM', 'LLM-REQUEST', 'LLM-RESPONSE', 'INIT', 'RENDER', 'FORMAT-MULTI', 'FORMAT-INTERACTION', 'CHAR-NAME', 'PARSE-CHAR', 'PARSE-SCENE', 'SCENE-RULE', 'TTS', 'EMOTION', 'EMOTION-DELTA', 'EMOTION-CONFLICT', 'WORLDVIEW-SYNC', 'IMG-SAFETY', 'IMG-MODULAR', 'IMG-MODULES', 'IMG-API', 'IMG-IMG2IMG', 'SCENE-BUILD', 'STRUCTURED', 'STRUCTURED-PARSE']);
+// [fix#10] 临时关闭过滤，方便调试 fix#9 残留问题
+const _RP_LOG_FILTER_ACTIVE = false;
+const _RP_LOG_TAGS = new Set(['TITLE', 'SCENE', 'TIMEOUT', 'META', 'PARSE', 'PARSE-REPLY', 'PARSE-COL', 'WORLDVIEW', 'IMG', 'IMG-MODULAR', 'IMG-MODULES', 'IMG-API', 'IMG-IMG2IMG', 'IMG-SANITIZE', 'IMG-BACKUP', 'STYLE', 'CREATE', 'CHARS', 'REGEN', 'LLM', 'LLM-API', 'LLM-REQUEST', 'LLM-RESPONSE', 'INIT', 'RENDER', 'FORMAT-MULTI', 'FORMAT-INTERACTION', 'CHAR-NAME', 'PARSE-CHAR', 'PARSE-SCENE', 'SCENE-RULE', 'TTS', 'EMOTION', 'EMOTION-DELTA', 'EMOTION-CONFLICT', 'WORLDVIEW-SYNC', 'IMG-SAFETY', 'SCENE-BUILD', 'STRUCTURED', 'STRUCTURED-PARSE', 'OPENING', 'OPENING-DEBUG', 'INIT-REPLY', 'JSON-PARSE', 'FALLBACK', 'INFO-DISCLOSE', 'ATTR-UPDATE']);
 
 function rpLog(level, tag, msg) {
     const now = new Date();
@@ -77,7 +78,7 @@ function renderLogPanel() {
     const header = document.getElementById('rp-log-header');
     if (!header) {
         // 首次渲染：构建完整面板
-        panel.innerHTML = '<div id="rp-log-header" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:2px 4px;border-bottom:1px solid #333;background:#111;user-select:none;"><span style="font-size:10px;color:#888;">📋 日志 (' + visibleEntries.length + ')</span><div style="display:flex;gap:4px;"><button id="rp-log-copy" title="复制日志" style="background:none;color:#4fc3f7;border:none;font-size:11px;cursor:pointer;line-height:1;">📋</button><button id="rp-log-close" title="收起日志" style="background:none;color:#ef5350;border:none;font-size:14px;cursor:pointer;line-height:1;">×</button></div></div><div id="rp-log-body" style="overflow-y:auto;max-height:160px;"></div>';
+        panel.innerHTML = '<div id="rp-log-header" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:2px 4px;border-bottom:1px solid #333;background:#111;user-select:none;"><span style="font-size:10px;color:#888;">📋 日志 (' + visibleEntries.length + ')</span><div style="display:flex;gap:4px;"><button id="rp-log-copy" title="复制日志" style="background:none;color:#4fc3f7;border:none;font-size:11px;cursor:pointer;line-height:1;">📋</button><button id="rp-log-export" title="导出日志文件" style="background:none;color:#81c784;border:none;font-size:11px;cursor:pointer;line-height:1;">💾</button><button id="rp-log-close" title="收起日志" style="background:none;color:#ef5350;border:none;font-size:14px;cursor:pointer;line-height:1;">×</button></div></div><div id="rp-log-body" style="overflow-y:auto;max-height:160px;"></div>';
         const newBody = document.getElementById('rp-log-body');
         newBody.innerHTML = visibleEntries.map(e => {
             const c = levelColor[e.level] || '#ccc';
@@ -110,6 +111,28 @@ function renderLogPanel() {
                 btn.innerHTML = '✗';
                 setTimeout(() => { btn.innerHTML = '📋'; btn.style.color = '#4fc3f7'; }, 1500);
             });
+        };
+        document.getElementById('rp-log-export').onclick = function(e) {
+            e.stopPropagation();
+            // 重新获取最新的 visibleEntries
+            const latestVisible = window._rpLogEntries.filter(entry => {
+                const t = (entry.tag || '').toUpperCase();
+                if (t.startsWith('FORMAT-')) return false;
+                if (t === 'RENDER') return false;
+                return true;
+            });
+            const now = new Date().toLocaleString('zh-CN');
+            const header = '=== 角色扮演调试日志 ===\n时间: ' + now + '\n共 ' + latestVisible.length + ' 条日志\n========================\n\n';
+            const text = header + latestVisible.map(entry => entry.ts + ' [' + entry.tag + ']: ' + entry.msg).join('\n');
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'roleplay_log_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         };
         document.getElementById('rp-log-header').onclick = function(e) {
             e.stopPropagation();

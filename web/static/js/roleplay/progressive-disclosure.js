@@ -14,6 +14,18 @@ App.toggleCharDetails = function(index) {
     }
 }
 
+// 显示角色全身图
+App.showCharPortrait = function(index) {
+    const c = state.characters[index];
+    if (!c) return;
+    
+    const showUrl = c.portraitImageUrl || c.faceImageUrl;
+    if (showUrl) {
+        document.getElementById('img-overlay-img').src = showUrl;
+        document.getElementById('img-overlay').classList.add('show');
+    }
+}
+
 App.updateRevealedInfo = async function(charName, userMsg, charResponse) {
     const c = state.characters.find(ch => ch.name === charName);
     if (!c || !c.faceImageUrl) return;

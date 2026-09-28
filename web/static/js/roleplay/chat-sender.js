@@ -78,7 +78,26 @@ ${formatModule.buildFormatRequirements()}`;
             rpLog('error', 'TIMEOUT', `⚠️ 超时警告: chat 请求耗时 ${chatElapsed}ms`);
         }
 
-        // ===== 4. 调用结构化智能体拆 JSON =====
+        // ===== 4.5 意图分析与在场过滤（前置处理） =====
+        const intentModule = await import('./player-intent.js');
+        const presenceModule = await import('./char-presence.js');
+        
+        // 获取在场角色
+        const presentChars = App.PresenceManager?.getPresentCharacters() || allChars.filter(c => true);
+        rpLog('info', 'INTENT', `在场角色: ${presentChars.map(c => c.name).join(', ')}`);
+        
+        // 分析玩家意图
+        const intent = App.IntentAnalyzer?.analyze(text, presentChars) || {
+            targetChar: null,
+            targetType: 'none',
+            confidence: 0,
+            keywords: [],
+            isDirectAddress: false
+        };
+        
+        rpLog('info', 'INTENT', `玩家意图: type=${intent.targetType}, target=${intent.targetChar || '无'}, confidence=${intent.confidence}`);
+        
+        // ===== 5. 调用结构化智能体拆 JSON =====
         rpLog('info', 'TIMEOUT', '调用结构化智能体拆分回复...');
         rpLog('info', 'TIMEOUT', `原始回复内容: ${response.slice(0, 500)}${response.length > 500 ? '...' : ''}`);
         const structStart = Date.now();
@@ -96,9 +115,31 @@ ${formatModule.buildFormatRequirements()}`;
         });
         rpLog('info', 'TIMEOUT', `结构化拆分完成: 耗时 ${Date.now()-structStart}ms, scene=${(structuredResult.scene || '').length}字符, chars=${(structuredResult.characters || []).length}个`);
 
-        // ===== 5. 渲染结构化消息 =====
+        // ===== 5. 渲染结构化消息（带在场过滤） =====
         const baseMs = Date.now();
-        const renderedMessages = App.structuredToMessages(structuredResult, 'msg_' + baseMs);
+        
+        // 过滤：只保留符合在场/距离规则的字符消息
+        let filteredResult = structuredResult;
+        if (intent.targetType !== 'none' || intent.isDirectAddress) {
+            const allowedChars = new Set(App.IntentAnalyzer?.filterRespondingCharacters(text, presentChars) || 
+                                        structuredResult.characters?.map(c => c.name) || []);
+            
+            rpLog('info', 'INTENT', `应该响应的角色: ${[...allowedChars].join(', ') || '无'}`);
+            
+            // 过滤角色消息
+            if (structuredResult.characters?.length > 0) {
+                const filteredChars = structuredResult.characters.filter(c => allowedChars.has(c.name));
+                if (filteredChars.length < structuredResult.characters.length) {
+                    rpLog('info', 'INTENT', `过滤掉 ${structuredResult.characters.length - filteredChars.length} 个不在场/听不见的角色`);
+                    filteredResult = {
+                        ...structuredResult,
+                        characters: filteredChars
+                    };
+                }
+            }
+        }
+        
+        const renderedMessages = App.structuredToMessages(filteredResult, 'msg_' + baseMs);
 
         for (const msg of renderedMessages) {
             state.messages.push(msg);

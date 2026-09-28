@@ -150,7 +150,7 @@ storyTitle|worldviewSummary|mainArc|toneKeywords|worldviewNotes
         title: data.storyTitle || '未命名故事',
         worldview: data.worldviewSummary || '',
         mainArc: Array.isArray(data.mainArc) ? data.mainArc : [],
-        openingScene: '', // 将在角色生成后由 generateOpeningScene 填充
+        openingScene: data.openingScene || '',
         toneKeywords: Array.isArray(data.toneKeywords) ? data.toneKeywords : [],
         worldviewNotes: data.worldviewNotes || '',
         factors: factors,
@@ -226,8 +226,28 @@ App.parseWorldviewDelimited = function(text) {
     // 去掉可能的包裹符号（兼容旧格式残留）
     content = content.replace(/^◆/, '').replace(/◆$/, '');
 
+    // 按行分割，找到数据行（跳过表头行）
+    const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return result;
+
+    // 找到第一行不包含"故事标题|世界观概要|..."等标签的内容行
+    let dataLine = null;
+    for (const line of lines) {
+        // 检查是否是表头行（包含标签前缀）
+        const hasLabelPrefix = /^故事标题\|世界观概要\||^storyTitle\|worldviewSummary\|/.test(line);
+        if (!hasLabelPrefix) {
+            dataLine = line;
+            break;
+        }
+    }
+    // 如果没找到无标签行，用第一行
+    if (!dataLine && lines.length > 0) {
+        dataLine = lines[0];
+    }
+    if (!dataLine) return result;
+
     // 按 | 分割字段
-    let parts = content.split('|').map(s => s.trim()).filter(Boolean);
+    let parts = dataLine.split('|').map(s => s.trim()).filter(Boolean);
     if (parts.length === 0) return result;
 
     // 检测并移除前缀标签（如 "storyTitle|" 这种）
@@ -237,13 +257,14 @@ App.parseWorldviewDelimited = function(text) {
     }
     if (parts.length === 0) return result;
 
-    // 严格按 TSV 列顺序映射（5 个字段，已移除 openingScene）
-    // storyTitle | worldviewSummary | mainArc | toneKeywords | worldviewNotes
+    // 严格按 TSV 列顺序映射（6 个字段，含 openingScene）
+    // storyTitle | worldviewSummary | mainArc | toneKeywords | worldviewNotes | openingScene
     if (parts.length >= 1) result.storyTitle = parts[0];
     if (parts.length >= 2) result.worldviewSummary = parts[1];
     if (parts.length >= 3) result.mainArc = parts[2];
     if (parts.length >= 4) result.toneKeywords = parts[3];
     if (parts.length >= 5) result.worldviewNotes = parts[4];
+    if (parts.length >= 6) result.openingScene = parts[5];
 
     // 如果 mainArc 包含阶段标记（起/承/转/合），将其识别为主线
     if (!result.mainArc) {
@@ -275,6 +296,13 @@ App.parseWorldviewDelimited = function(text) {
             }
         }
         if (minIdx >= 0) result.worldviewNotes = parts[minIdx];
+    }
+
+    // 如果 openingScene 缺失，尝试从 mainArc 提取开篇场景
+    if (!result.openingScene && result.mainArc) {
+        const arcStr = typeof result.mainArc === 'string' ? result.mainArc : JSON.stringify(result.mainArc);
+        const match = arcStr.match(/起[：:]\s*(.+?)(?:。|：|：|$)/);
+        if (match) result.openingScene = match[1].trim();
     }
     
     // 如果 storyTitle 仍为空，从 worldviewSummary 开头提取短标题

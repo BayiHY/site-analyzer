@@ -281,21 +281,39 @@ App.showNewDiscovery = function(msg) {
     if (el) { el.textContent = msg; el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 3000); }
 }
 
+// ===== 初始化 =====
 App.init = async function() {
+    rpLog('info', 'INIT', `开始初始化，检查存档状态...`);
+    
+    // 先尝试打开 IndexedDB
+    try {
+        await openDB();
+        rpLog('info', 'INIT', `IndexedDB 已就绪，_dbReady=${_dbReady}`);
+    } catch(e) {
+        rpLog('warn', 'INIT', `IndexedDB 打开失败: ${e.message}，将使用 localStorage 回退`);
+    }
+    
     loadSettings();
     restoreApiKeysToInputs();
-    try { await openDB(); } catch(e) { /* IndexedDB 不可用，使用 localStorage 回退 */ }
     const hasState = await loadState();
+    rpLog('info', 'INIT', `loadState 返回: ${hasState}, characters.length=${state.characters?.length || 0}, story=${state.story ? '存在' : 'null'}, _dbReady=${_dbReady}`);
 
-    if (hasState && (state.character || state.characters?.length)) {
+    if (hasState && state.characters?.length > 0 && state.story) {
+        rpLog('info', 'INIT', `找到有效故事，恢复聊天界面，messages.length=${state.messages?.length || 0}`);
+        // 有完整故事，恢复聊天界面
         await loadMessages();
         showChatScreen();
         renderMessages();
-
+        
         // 恢复场景背景图
         if (state.currentSceneBg) {
             App.applySceneBackground(state.currentSceneBg);
         }
+    } else {
+        rpLog('info', 'INIT', `无有效故事，显示创建界面 (hasState=${hasState}, chars=${state.characters?.length || 0}, story=${state.story ? '存在' : 'null'}, _dbReady=${_dbReady})`);
+        // 故事被重置过或首次使用，显示创建界面
+        document.getElementById('char-setup-screen').style.display = 'flex';
+        document.getElementById('chat-screen').style.display = 'none';
     }
 }
 

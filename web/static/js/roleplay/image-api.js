@@ -1,6 +1,7 @@
 // === Section: 图片 API 封装 ===
-// === 生图失败类型分类 ===
-// 根据 API 响应判断失败原因，用于前端消息展示
+// === 修复版本: 2026-09-25-v2 (正则反斜杠修复 + 重试不覆盖序章) ===
+// 修复前正则 /\\*\\*(.+?)\\*\\*/g 匹配不到 **bold**，导致 Unexpected token '**'
+// 修复后正则 /\*\*(.+?)\*\*/g 正确匹配，清洗后不再传入 ** 标记
 App.classifyImageError = function(statusCode, errorMessage) {
     const msg = (errorMessage || '').toLowerCase();
     
@@ -201,6 +202,17 @@ App.buildModularPrompt = function(character, level, actionText) {
     let base = parts.join(', ');
     if (!base) base = 'character portrait';
 
+    // 清除 markdown 标记，防止生图 API JSON 解析崩溃（Unexpected token '**'）
+    // 先处理双星号/双反引号包裹的内容，再清除残留的单个标记
+    const rawBase = base;
+    base = base
+        .replace(/\*\*(.+?)\*\*/g, '$1')              // **bold**
+        .replace(/`[^`]+`/g, '')                     // `code`
+        .replace(/\*(.+?)\*/g, '$1')                 // *italic*
+        .replace(/[`*]/g, '');                        // 清除所有残留的 ` 和 *
+    rpLog('info', 'IMG-SANITIZE', `[v2] 原始模块数据: ${rawBase.slice(0, 200)}`);
+    rpLog('info', 'IMG-SANITIZE', `[v2] 清洗后: ${base.slice(0, 200)}`);
+
     // 追加角色信息 + 分级 framing 提示词
     let genderStr = 'male';
     if (character.gender === '男') genderStr = 'male';
@@ -250,6 +262,8 @@ App.extractModules = function(character) {
 // 旧版：清洗 prompt → 追加角色信息 → 追加风格
 App.sanitizeImagePrompt = function(prompt, character) {
     let cleaned = prompt
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/`[^`]+`/g, '')
         .replace(/\bbusty\b/gi, 'well-proportioned')
         .replace(/\bsensual\b/gi, 'attractive')
         .replace(/\berotic\b/gi, 'beautiful')
@@ -264,7 +278,9 @@ App.sanitizeImagePrompt = function(prompt, character) {
         .replace(/\bNSFW\b/gi, '')
         .replace(/\bflesh-toned\b/gi, 'light-colored')
         .replace(/\bunderwear\b/gi, 'clothing')
-        .replace(/\blingerie\b/gi, 'casual wear');
+        .replace(/\blingerie\b/gi, 'casual wear')
+        .replace(/\*(.+?)\*/g, '$1')   // *italic*（单个星号）
+        .replace(/[`*]/g, '');          // 清除所有残留的 ` 和 *
 
     if (character && character.appearance) {
         let genderStr = '';
@@ -303,7 +319,9 @@ App.generateCharacterFaceOnly = async function(character) {
     }
 
     rpLog('info', 'IMG', `📷 面部特写: ${character.name}`);
+    rpLog('info', 'IMG-SANITIZE', `[faceOnly] 角色数据: face=${(character.imageFace||'').slice(0,80)}, hair=${(character.imageHair||'').slice(0,80)}, body=${(character.imageBody||'').slice(0,80)}, clothes=${(character.imageClothes||'').slice(0,80)}, env=${(character.imageEnvironment||'').slice(0,80)}`);
     const facePrompt = App.buildModularPrompt(character, 2); // level 2 = 特写
+    rpLog('info', 'IMG-SANITIZE', `[faceOnly] buildModularPrompt 返回: ${(facePrompt||'').slice(0,300)}`);
     rpLog('debug', 'IMG', `面部特写 Prompt: ${facePrompt.slice(0, 150)}...`);
 
     const faceModels = ['agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
@@ -323,6 +341,7 @@ App.generateCharacterFaceOnly = async function(character) {
             // 快速失败：不可重试的错误不再浪费时间在重试上
             if (e._errorType === 'policy' || e._errorType === 'client_error') {
                 rpLog('warn', 'IMG', `面部特写策略违规/参数错误，不再重试: ${character.name}`);
+                rpLog('error', 'IMG', `[fix#4] 面部特写失败详情: ${e.message}, stack: ${e.stack?.slice(0, 200)}`);
                 throw e;
             }
             
@@ -365,7 +384,9 @@ App.generateCharacterImage = async function(character, actionText, skipFace) {
             faceImageUrl = character.faceImageUrl;
         } else {
             rpLog('info', 'IMG', `📷 第一步：生成面部特写: ${character.name}`);
+            rpLog('info', 'IMG-SANITIZE', `[face] 角色数据: face=${(character.imageFace||'').slice(0,80)}, hair=${(character.imageHair||'').slice(0,80)}, body=${(character.imageBody||'').slice(0,80)}, clothes=${(character.imageClothes||'').slice(0,80)}, env=${(character.imageEnvironment||'').slice(0,80)}`);
             const facePrompt = App.buildModularPrompt(character, 2); // level 2 = 特写
+            rpLog('info', 'IMG-SANITIZE', `[face] buildModularPrompt 返回: ${(facePrompt||'').slice(0,300)}`);
             rpLog('debug', 'IMG', `面部特写 Prompt: ${facePrompt.slice(0, 150)}...`);
             
             const faceModels = ['agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
@@ -569,6 +590,8 @@ App.agnesImageGenerate = async function(options) {
         label = 'image'     // 日志标签
     } = options;
 
+    rpLog('info', 'IMG-API', `[ENTRY] label=${label}, prompt=${(prompt||'').slice(0,100)}, size=${size}`);
+
     // ⭐ 所有生图都需要等 styleAnchor 就绪
     let effectivePrompt = prompt;
     if (label !== 'style_anchor' && typeof App.awaitStyleReady === 'function') {
@@ -578,6 +601,14 @@ App.agnesImageGenerate = async function(options) {
             effectivePrompt = App.resolveStyleInPrompt(prompt);
         }
     }
+
+    rpLog('info', 'IMG-API', `[ENTRY] effectivePrompt after style=${(effectivePrompt||'').slice(0,200)}`);
+
+    // 清洗 markdown 标记（**bold**、`code` 等），防止 Agnes API JSON 解析崩溃（Unexpected token）
+    rpLog('warn', 'IMG-SANITIZE', `[fix#3] ${label} 清洗前: ${(effectivePrompt||'').slice(0,150)}...`);
+    const sanitizedPrompt = App.sanitizeImagePrompt(effectivePrompt, null);
+    rpLog('warn', 'IMG-SANITIZE', `[fix#3] ${label} 清洗后: ${sanitizedPrompt.slice(0,150)}...`);
+    effectivePrompt = sanitizedPrompt;
 
     const apiKey = state.apiKeys.chat;
     if (!apiKey) {
@@ -628,16 +659,20 @@ App.agnesImageGenerate = async function(options) {
 
             const imgElapsed = Date.now() - imgStart;
             rpLog('info', 'TIMEOUT', `生图请求完成: ${label}, 耗时 ${imgElapsed}ms, status=${resp.status}`);
+            rpLog('info', 'IMG-API', `请求 prompt: ${effectivePrompt.slice(0, 300)}...`);
 
             if (!resp.ok) {
                 let errMsg = `生图错误 (${resp.status})`;
                 let errorDetail = null;
                 try {
-                    const errData = await resp.json();
-                    errMsg = errData.error?.message || errData.message || errMsg;
+                    const errText = await resp.text();
+                    rpLog('info', 'IMG-API', `API 原始响应: ${errText.slice(0, 500)}`);
+                    let errData;
+                    try { errData = JSON.parse(errText); } catch(e) { errData = null; }
+                    errMsg = errData?.error?.message || errData?.message || errMsg;
                     errorDetail = { statusCode: resp.status, message: errMsg };
                 } catch(e) {
-                    errMsg = `生图错误 (${resp.status}): ${await resp.text()}`;
+                    errMsg = `生图错误 (${resp.status}): ${e.message}`;
                     errorDetail = { statusCode: resp.status, message: errMsg };
                 }
                 rpLog('warn', 'IMG', `${label} 失败 (${currentModel}): ${errMsg}`);
@@ -651,7 +686,20 @@ App.agnesImageGenerate = async function(options) {
                 continue; // 尝试降级模型
             }
 
-            const data = await resp.json();
+            // API 响应有时包含未转义的 ** 导致 JSON.parse 崩溃，先清理
+            const rawText = await resp.text();
+            rpLog('info', 'IMG-API', `[fix#3] API 原始响应 (${resp.status}): ${rawText.slice(0, 500)}`);
+            let cleanText = App.cleanMarkdown(rawText);
+            let data;
+            try {
+                data = JSON.parse(cleanText);
+            } catch (e) {
+                rpLog('warn', 'IMG-API', `JSON 解析失败，尝试直接解析: ${e.message}`);
+                rpLog('warn', 'IMG-API', `[fix#9] 清洗后文本: ${cleanText?.slice(0, 300)}`);
+                rpLog('warn', 'IMG-API', `[fix#9] 原始文本: ${rawText?.slice(0, 300)}`);
+                // [fix#9] 不要直接用原始文本重试，可能导致 Unexpected token 错误
+                throw new Error(`生图 API JSON 解析失败: ${e.message}`);
+            }
             const imgUrl = data.data?.[0]?.url || data.data?.[0]?.b64_json || '';
             if (!imgUrl) {
                 rpLog('warn', 'IMG', `${label} 返回数据异常 (${currentModel})`);

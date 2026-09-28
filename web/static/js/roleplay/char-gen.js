@@ -17,7 +17,13 @@ App.generateCharacters = async function(count, playerGender, userInspiration, ge
 
     // ===== Step 1: 调用 Agnes 生成基本信息 =====
     rpLog('info', 'CHARS', 'Step 1: 调用 Agnes 生成基本信息...');
-    const promptModule = await import('./char-prompt.js');
+    rpLog('info', 'CHARS', `[DEBUG] import path: '/static/js/roleplay/char-prompt.js?v=${Date.now()}'`);
+    const promptModule = await import('/static/js/roleplay/char-prompt.js?v=' + Date.now());
+    rpLog('info', 'CHARS', `[DEBUG] module keys: ${Object.keys(promptModule).join(', ')}`);
+    rpLog('info', 'CHARS', `[DEBUG] buildCharBasicPrompt type: ${typeof promptModule.buildCharBasicPrompt}`);
+    if (typeof promptModule.buildCharBasicPrompt !== 'function') {
+        throw new Error(`buildCharBasicPrompt is not a function, keys: ${Object.keys(promptModule).join(', ')}`);
+    }
     const basicPrompt = promptModule.buildCharBasicPrompt(count, playerGender, inspiration, genderHint, state);
 
     let basicChars = [];
@@ -188,23 +194,130 @@ ${worldview}
         return bio;
     }
 
-    // 顺序生成所有角色的生物（避免并发限制）
+    // 顺序生成所有角色的生物（批量调用，只发1次LLM请求）
     const bioMap = {};
     const failedNames = [];
     const bioStartTime = Date.now();
 
-    for (const charBasic of basicChars) {
-        try {
-            const bio = await generateSingleBio(charBasic);
-            if (bio) {
-                bioMap[bio.name] = bio;
-            } else {
-                failedNames.push(charBasic.name);
-            }
-        } catch (e) {
-            rpLog('error', 'CHARS-BIO', `❌ ${charBasic.name} 小传生成失败: ${e.message}`);
-            failedNames.push(charBasic.name);
+    // 批量生成：1次LLM请求生成所有角色内核
+    try {
+        rpLog('info', 'CHARS-BIO', `批量生成 ${basicChars.length} 个角色内核...`);
+        const batchSize = basicChars.length;
+        const worldview = state.story.worldview || '未设定';
+
+        const batchSystemPrompt = `你是资深角色编剧，擅长为虚构角色创作立体、有深度的背景故事。请根据世界观和角色基础信息，一次性为所有角色生成人物内核。
+
+【输出格式要求】
+每个角色按以下标准化文本格式输出（每行一个字段，格式为 key: value），一个角色输出完成后换行再输出下一个角色：
+
+name: 角色名
+gender: 性别
+age: 年龄
+personality: 性格特点（50字以内，包含优点和缺点）
+background: 背景故事（100字以内）
+motivation: 核心动机（20字以内）
+secret: 秘密（30字以内）
+speechStyle: 说话风格（20字以内）
+relationships: 角色关系网（30字以内）
+origin: 出身（50字以内）
+abilities: 能力与短板（30字以内）
+likes: 喜恶（20字以内）
+habits: 习惯癖好（20字以内）
+appearance: 外貌描述（直接复制输入中的值）
+voice: 声线（直接复制输入中的值）
+ttsPitch: TTS音高参数（直接复制）
+ttsRate: TTS语速参数（直接复制）
+imageFace: 面部生图描述（直接复制）
+imageHair: 发型生图描述（直接复制）
+imageBody: 身材生图描述（直接复制）
+imageClothes: 服装生图描述（直接复制）
+imageEnvironment: 场景环境生图描述（直接复制）
+
+⚠️ 注意：appearance/voice/ttsPitch/ttsRate/imageFace/imageHair/imageBody/imageClothes/imageEnvironment 字段必须直接复制输入中的值！`;
+
+        let batchUserContent = `【世界观概要】\n${worldview}\n\n`;
+        batchUserContent += `请为以下 ${batchSize} 个角色生成完整人物内核档案，严格按格式输出每个角色的全部字段：\n\n`;
+
+        for (let i = 0; i < basicChars.length; i++) {
+            const c = basicChars[i];
+            batchUserContent += `【角色${i + 1}：${c.name}】\n`;
+            batchUserContent += `name: ${c.name}\n`;
+            batchUserContent += `gender: ${c.gender || '未知'}\n`;
+            batchUserContent += `age: ${c.age || 20}\n`;
+            batchUserContent += `appearance: ${c.appearance || '待生成'}\n`;
+            batchUserContent += `voice: ${c.voice || '未指定'}\n`;
+            batchUserContent += `personality: ${c.personality || '待生成'}\n`;
+            batchUserContent += `relationship: ${c.relationship || '与主角的关系待定'}\n`;
+            batchUserContent += `relationships: ${c.relationships || '待生成'}\n`;
+            batchUserContent += `origin: ${c.origin || '待生成'}\n`;
+            batchUserContent += `motivation: ${c.motivation || '待生成'}\n`;
+            batchUserContent += `abilities: ${c.abilities || '待生成'}\n`;
+            batchUserContent += `likes: ${c.likes || '待生成'}\n`;
+            batchUserContent += `habits: ${c.habits || '待生成'}\n`;
+            batchUserContent += `ttsPitch: ${c.ttsPitch || '未指定'}\n`;
+            batchUserContent += `ttsRate: ${c.ttsRate || '未指定'}\n`;
+            batchUserContent += `imageFace: ${c.imageFace || '未指定'}\n`;
+            batchUserContent += `imageHair: ${c.imageHair || '未指定'}\n`;
+            batchUserContent += `imageBody: ${c.imageBody || '未指定'}\n`;
+            batchUserContent += `imageClothes: ${c.imageClothes || '未指定'}\n`;
+            batchUserContent += `imageEnvironment: ${c.imageEnvironment || '未指定'}\n\n`;
         }
+
+        const batchResponse = await App.agnesChat([
+            { role: 'system', content: batchSystemPrompt },
+            { role: 'user', content: batchUserContent }
+        ], { temperature: 0.8 });
+
+        rpLog('info', 'CHARS-BIO', `批量生成完成，解析 ${basicChars.length} 个角色内核...`);
+
+        // 解析批量输出：按角色分隔符分割
+        const charBlocks = batchResponse.split('【角色').filter(block => block.trim());
+        rpLog('info', 'CHARS-BIO', `解析到 ${charBlocks.length} 个角色块`);
+
+        for (let i = 0; i < charBlocks.length && i < basicChars.length; i++) {
+            const block = charBlocks[i].trim();
+            const bio = {};
+            const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+            for (const line of lines) {
+                const colonIdx = line.indexOf(':');
+                if (colonIdx === -1) continue;
+                const key = line.substring(0, colonIdx).trim();
+                const value = line.substring(colonIdx + 1).trim();
+                if (key && value) {
+                    bio[key] = value;
+                }
+            }
+            if (bio.name) {
+                bioMap[bio.name] = bio;
+            }
+        }
+    } catch (e) {
+        rpLog('error', 'CHARS-BIO', `批量生成失败: ${e.message}`);
+    }
+
+    // 补全缺失字段
+    for (const c of basicChars) {
+        if (!bioMap[c.name]) {
+            failedNames.push(c.name);
+            continue;
+        }
+        const bio = bioMap[c.name];
+        // 补全从 Step 1 透传的字段
+        if (!bio.appearance && c.appearance) bio.appearance = c.appearance;
+        if (!bio.voice && c.voice) {
+            bio.voice = c.voice;
+            bio.ttsPitch = c.ttsPitch || '';
+            bio.ttsRate = c.ttsRate || '';
+        }
+        if (!bio.imageFace && c.imageFace) bio.imageFace = c.imageFace;
+        if (!bio.imageHair && c.imageHair) bio.imageHair = c.imageHair;
+        if (!bio.imageBody && c.imageBody) bio.imageBody = c.imageBody;
+        if (!bio.imageClothes && c.imageClothes) bio.imageClothes = c.imageClothes;
+        if (!bio.imageEnvironment && c.imageEnvironment) bio.imageEnvironment = c.imageEnvironment;
+        // 设置默认值
+        bio.gender = bio.gender || (c.gender || '未知');
+        bio.age = bio.age || String(c.age || 20);
+        bio.personality = bio.personality || (c.personality || '');
     }
 
     const bioElapsed = Date.now() - bioStartTime;
@@ -307,7 +420,7 @@ ${worldview}
     }
 
     // ===== 4. 声线去重 =====
-    const voiceModule = await import('./voice-allocation.js');
+    const voiceModule = await import('/static/js/roleplay/voice-allocation.js?v=' + Date.now());
     // TTS_VOICES 从全局 App 对象获取（tts-engine.js 已挂载到 window.App）
     const ttsVoices = (typeof window !== 'undefined' && window._TTS_VOICES) || {};
     voiceModule.allocateVoices(state.characters);

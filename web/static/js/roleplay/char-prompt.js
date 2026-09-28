@@ -154,6 +154,7 @@ ${genderHint ? `【性别倾向】${genderHint}` : ''}
  * @returns {string} 提示词文本
  */
 export function buildCharBasicPrompt(count, playerGender, inspiration, genderHint, state) {
+    console.log('[char-prompt.js] buildCharBasicPrompt called, count=', count, 'inspiration=', inspiration);
     const pg = playerGender || state.player?.gender || '男';
     const visualStyle = state.story?.imageStyle || '';
     const worldview = state.story.worldview || '未设定';
@@ -280,5 +281,7 @@ name|gender|age|appearance|voice|personality|relationships|origin|motivation|abi
 5. 角色之间要有关系网（亲友、敌对、师徒、竞争对手等）
 6. 角色设计必须符合世界观设定，不能出现违和感
 7. 避免脸谱化和套路化
-8. 每个角色必须有独特性`;
+8. 每个角色必须有独特性
+9. ⚠️ 必须输出全部 22 个字段，包括 imageClothes 和 imageEnvironment，严禁省略任何字段
+10. 所有 image* 字段值必须为纯英文描述，禁止使用 markdown 标记（如 **、[CODE] 等）`;
 }

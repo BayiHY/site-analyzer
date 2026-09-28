@@ -57,6 +57,7 @@ window.closePanel = App.closePanel;
 window.renderCharactersPanel = App.renderCharactersPanel;
 window.renderSettingsPanel = App.renderSettingsPanel;
 window.toggleCharDetails = App.toggleCharDetails;
+window.showCharPortrait = App.showCharPortrait;
 
 // 应用初始化
 window.loadSettings = App.loadSettings;

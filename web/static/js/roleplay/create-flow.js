@@ -1,5 +1,7 @@
 // === Section: 角色创建流程 ===
-// 创建角色 + 刷新世界观/角色 + 系统消息
+// 修复版本: 2026-09-25-v2 (重试时不覆盖已成功的序章数据)
+// 修复前：生图失败后重试会重新调用 generateOpeningScene()，若 LLM 限流返回空则覆盖有效数据
+// 修复后：若 openingRaw + openingStructured 已存在，跳过重新生成，直接复用
 
 App.addSystemMessage = function(text) {
     const msg = {
@@ -178,8 +180,11 @@ App.generateCharactersAndStart = async function() {
                     }
                 } catch (e) {
                     rpLog('warn', 'IMG', `${c.name} 面部特写失败: ${e.message}`);
+                    addSystemMessage(`⚠️ ${c.name} 面部特写生成失败，将使用备用方案`);
                 }
             })());
+            // 确保所有面部特写任务的 rejection 被正确处理，不会冒泡
+            faceTasks.forEach(task => task.catch(e => rpLog('warn', 'IMG', `面部特写未捕获错误: ${e.message}`)));
             rpLog('info', 'IMG', `━━━ 面部特写已后台启动 (${chars.length} 个)，不阻塞序章生成 ━━━`);
 
             try {
@@ -295,8 +300,36 @@ App.generateCharactersAndStart = async function() {
                     avatarTasks.push(sceneTask);
                 }
             } catch (imgErr) {
-                rpLog('error', 'IMG', '生图阶段失败: ' + imgErr.message);
-                addSystemMessage(`⚠️ 生图阶段失败: ${imgErr.message}`);
+                // 生图失败不阻断流程，尝试重试
+                rpLog('error', 'IMG', '生图阶段失败: ' + imgErr.message + '，尝试自动重试...');
+                addSystemMessage(`⚠️ 生图阶段失败: ${imgErr.message}，自动重试中...`);
+                let retryOk = false;
+                // 如果序章已成功生成，直接复用已有数据重试生图，避免重复调用 LLM
+                if (openingRaw && openingStructured) {
+                    rpLog('info', 'IMG', '序章数据已存在，跳过重新生成，直接重试生图');
+                    retryOk = true;
+                } else {
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        rpLog('info', 'IMG', `生图重试 ${attempt}/3: ${imgErr.message}`);
+                        await new Promise(r => setTimeout(r, 2000));
+                        try {
+                            const retryResult = await App.generateOpeningScene();
+                            if (retryResult?.rawText) {
+                                openingRaw = retryResult.rawText;
+                                openingStructured = retryResult.structured;
+                                rpLog('info', 'IMG', `生图重试 ${attempt}/3 成功`);
+                                retryOk = true;
+                                break;
+                            }
+                        } catch (retryErr) {
+                            rpLog('warn', 'IMG', `生图重试 ${attempt}/3 失败: ${retryErr.message}`);
+                        }
+                    }
+                }
+                if (!retryOk) {
+                    rpLog('error', 'IMG', '生图全部重试失败，降级为纯文本序章');
+                    addSystemMessage('⚠️ 生图阶段全部失败，已降级为纯文本序章');
+                }
             }
         } else if (!state.apiKeys.chat) {
             // 没有生图 API Key，也生成序章
@@ -405,9 +438,9 @@ App.regenerateCharacters = async function() {
         rpLog('info', 'CHARS', `regenerateCharacters 返回 chars.length=${chars.length}, state.characters.length=${state.characters.length}`);
 
         if (state.apiKeys.chat && chars.length > 0) {
-            // 面部特写改为后台异步生成，不阻塞序章生成
-            // 序章文本生成不依赖面部图片，两者可并行
-            const faceTasks = chars.map(c => (async () => {
+            // 面部特写改为串行生成，避免并发触发生图QPS限流
+            rpLog('info', 'IMG', `━━━ 开始串行生成面部特写 (${chars.length} 个) ━━━`);
+            for (const c of chars) {
                 try {
                     rpLog('info', 'IMG', `📷 面部特写: ${c.name}`);
                     const url = await App.generateCharacterFaceOnly(c);
@@ -415,17 +448,19 @@ App.regenerateCharacters = async function() {
                         rpLog('info', 'IMG', `✅ ${c.name} 面部特写完成`);
                         addSystemMessage(`✅ ${c.name} 头像已生成`);
                     }
+                    // 每张图之间加短暂间隔，避免QPS限制
+                    await new Promise(r => setTimeout(r, 500));
                 } catch (e) {
                     rpLog('warn', 'IMG', `${c.name} 面部特写失败: ${e.message}`);
                 }
-            })());
-            rpLog('info', 'IMG', `━━━ 面部特写已后台启动 (${chars.length} 个)，不阻塞序章生成 ━━━`);
+            }
+            rpLog('info', 'IMG', `━━━ 面部特写全部生成完成 ━━━`);
 
             try {
-                // 第一步：生成序章（不再等待面部特写）
+                // 第一步：生成序章（面部特写已完成）
                 rpLog('info', 'OPENING', '开始生成序章');
                 addSystemMessage('✍️ 正在生成序章...');
-                
+
                 const openingResult = await App.generateOpeningScene();
                 openingRaw = openingResult?.rawText || '';
                 openingStructured = openingResult?.structured || null;
@@ -534,8 +569,36 @@ App.regenerateCharacters = async function() {
                     avatarTasks.push(sceneTask);
                 }
             } catch (imgErr) {
-                rpLog('error', 'IMG', '生图阶段失败: ' + imgErr.message);
-                addSystemMessage(`⚠️ 生图阶段失败: ${imgErr.message}`);
+                // 生图失败不阻断流程，尝试重试
+                rpLog('error', 'IMG', '生图阶段失败: ' + imgErr.message + '，尝试自动重试...');
+                addSystemMessage(`⚠️ 生图阶段失败: ${imgErr.message}，自动重试中...`);
+                let retryOk = false;
+                // 如果序章已成功生成，直接复用已有数据重试生图，避免重复调用 LLM
+                if (openingRaw && openingStructured) {
+                    rpLog('info', 'IMG', '序章数据已存在，跳过重新生成，直接重试生图');
+                    retryOk = true;
+                } else {
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        rpLog('info', 'IMG', `生图重试 ${attempt}/3: ${imgErr.message}`);
+                        await new Promise(r => setTimeout(r, 2000));
+                        try {
+                            const retryResult = await App.generateOpeningScene();
+                            if (retryResult?.rawText) {
+                                openingRaw = retryResult.rawText;
+                                openingStructured = retryResult.structured;
+                                rpLog('info', 'IMG', `生图重试 ${attempt}/3 成功`);
+                                retryOk = true;
+                                break;
+                            }
+                        } catch (retryErr) {
+                            rpLog('warn', 'IMG', `生图重试 ${attempt}/3 失败: ${retryErr.message}`);
+                        }
+                    }
+                }
+                if (!retryOk) {
+                    rpLog('error', 'IMG', '生图全部重试失败，降级为纯文本序章');
+                    addSystemMessage('⚠️ 生图阶段全部失败，已降级为纯文本序章');
+                }
             }
         } else if (!state.apiKeys.chat) {
             // 没有生图 API Key，也重新生成序章

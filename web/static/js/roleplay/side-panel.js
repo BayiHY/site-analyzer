@@ -97,9 +97,9 @@ App.renderCharactersPanel = function() {
         return `
             <div class="char-card ${isActive ? 'active' : ''}">
                 <div class="char-card-header">
-                    <div class="char-card-avatar">
+                    <div class="char-card-avatar" onclick="App.showCharPortrait(${i})">
                         ${c.faceImageUrl
-                            ? `<img src="${c.faceImageUrl}" onerror="this.parentElement.textContent='🎭'" title="面部特写">`
+                            ? `<img src="${c.faceImageUrl}" onerror="this.parentElement.textContent='🎭'" title="点击放大">`
                             : '🎭'}
                     </div>
                     <div>

@@ -28,9 +28,9 @@ App.shouldRetryOnError = function(err) {
         return { shouldRetry: true, reason: '超时/网络中断' };
     }
     
-    // 429 限流
+    // 429 限流 — 禁止重试，直接终止
     if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')) {
-        return { shouldRetry: true, reason: 'API 限流' };
+        return { shouldRetry: false, reason: 'API 限流（禁止重试）' };
     }
     
     // 5xx 服务端错误

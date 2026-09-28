@@ -89,24 +89,29 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
                 }
             } catch (e) {
                 rpLog('warn', 'IMG', `${c.name} 面部特写失败: ${e.message}`);
+                addSystemMessage(`⚠️ ${c.name} 面部特写生成失败，将使用备用方案`);
             }
         })());
+        // 确保所有面部特写任务的 rejection 被正确处理，不会冒泡
+        faceTasks.forEach(task => task.catch(e => rpLog('warn', 'IMG', `面部特写未捕获错误: ${e.message}`)));
         rpLog('info', 'IMG', `━━━ 面部特写已后台启动 (${chars.length} 个)，不阻塞序章生成 ━━━`);
     }
 
-    // ===== 生成序章 → 渲染序章 → 按出场顺序生成全身/半身（含动作描写）=====
+    // ===== 生成序章 → 渲染序章 =====
+    // 序章生成与生图完全解耦：序章失败不影响后续流程，生图失败不影响序章
+    // [fix#8] 统一错误处理：只在最外层 catch，避免重复日志
     if (state.apiKeys.chat) {
         try {
-            // 第一步：生成序章
-            rpLog('info', 'OPENING', '开始生成序章');
+            // 第一步：生成序章（纯文本，不涉及生图）
+            rpLog('info', 'OPENING', '[fix#8] 开始生成序章');
             addSystemMessage('✍️ 正在生成序章...');
-            
+
             const openingResult = await App.generateOpeningScene();
             openingRaw = openingResult?.rawText || '';
             openingStructured = openingResult?.structured || null;
 
             if (openingRaw) {
-                rpLog('info', 'OPENING', '序章生成完成，立即渲染序章场景消息');
+                rpLog('info', 'OPENING', '[fix#8] 序章生成完成，立即渲染序章场景消息');
 
                 // 只渲染场景消息，不渲染角色消息
                 let parsedMessages = [];
@@ -120,13 +125,17 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
                 saveMessages().catch(() => {});
                 rpLog('info', 'TIMING', '✅ 序章场景消息渲染完成');
             } else {
-                rpLog('warn', 'OPENING', '序章生成返回空');
+                // 序章生成失败：只影响序章，不阻断后续
+                const hasStructured = openingStructured && openingStructured.characters?.length > 0;
+                rpLog('error', 'OPENING', `[fix#8] 序章生成失败: rawText空=${!openingRaw}, structured空=${!hasStructured}`);
+                addSystemMessage('⚠️ 序章生成失败，请检查后点击"重新生成序章"重试');
             }
 
             // 第二步：渲染角色消息 + 异步并行生成全身/半身（含序章动作描写）
+            // 这部分与序章生成解耦，即使序章失败也继续执行
             if (openingStructured && openingStructured.characters?.length > 0) {
                 const appearingChars = openingStructured.characters;
-                rpLog('info', 'OPENING', `序章出场 ${appearingChars.length} 个角色`);
+                rpLog('info', 'OPENING', `[fix#8] 序章出场 ${appearingChars.length} 个角色`);
 
                 // 2a. 立即渲染所有角色消息
                 for (const charData of appearingChars) {
@@ -154,11 +163,11 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
                 saveMessages().catch(() => {});
                 rpLog('info', 'TIMING', '✅ 所有角色消息已渲染');
 
-                // 2b. 异步并行生成主角头像 + 出场角色的全身/半身（含动作描写）
+                // 2b. 异步并行生成主角头像 + 出场角色的全身/半身
                 const avatarTasks = [];
 
                 // 主角头像
-                rpLog('info', 'IMG', '后台生成主角头像');
+                rpLog('info', 'IMG', '[fix#8] 后台生成主角头像');
                 const playerAvatarTask = (async () => {
                     try {
                         const playerUrl = await App.generatePlayerAvatar();
@@ -178,7 +187,7 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
 
                     // 提取动作描写（用于全身/半身 prompt 的 pose）
                     const actionText = charInfo.action ? charInfo.action.replace(/[（(].*?[）)]/g, '').trim() : '';
-                    rpLog('info', 'IMG', `后台生成 ${charName} 全身/半身（动作: ${actionText || '默认站立'}）`);
+                    rpLog('info', 'IMG', `[fix#8] 后台生成 ${charName} 全身/半身（动作: ${actionText || '默认站立'}）`);
                     avatarTasks.push((async () => {
                         try {
                             addSystemMessage(`🎨 正在生成 ${charName} 的角色形象...`);
@@ -206,7 +215,7 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
                 const sceneTask = Promise.allSettled(avatarTasks).then(() => {
                     const sceneRefUrls = allCharObjs.map(c => c.faceImageUrl || c.portraitImageUrl).filter(Boolean);
                     if (sceneRefUrls.length > 0) {
-                        rpLog('info', 'SCENE', `所有头像就绪 (${allCharNames.join(', ')})，开始生成统一场景图`);
+                        rpLog('info', 'SCENE', `[fix#8] 所有头像就绪 (${allCharNames.join(', ')})，开始生成统一场景图`);
                         return App.generateSceneImage('opening', openingStructured.scene || openingRaw, allCharObjs[0], openingRaw, metadata);
                     } else {
                         rpLog('warn', 'SCENE', '头像全部生成失败，跳过场景图');
@@ -216,9 +225,17 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
                 });
                 avatarTasks.push(sceneTask);
             }
-        } catch (imgErr) {
-            rpLog('error', 'IMG', '生图阶段失败: ' + imgErr.message);
-            addSystemMessage(`⚠️ 生图阶段失败: ${imgErr.message}`);
+        } catch (err) {
+            // [fix#9] 唯一错误处理点：序章生成或渲染失败
+            rpLog('error', 'OPENING', `[fix#9] ❌ 序章流程异常: ${err.message}`);
+            rpLog('error', 'OPENING', `[fix#9] 错误类型: ${err.constructor.name}`);
+            rpLog('error', 'OPENING', `[fix#9] 错误详情: ${JSON.stringify(err).slice(0, 500)}`);
+            rpLog('error', 'OPENING', `[fix#9] 完整堆栈:\n${err.stack || '无'}`);
+            // [fix#9] 检查是否为 JSON 解析错误，提供更友好的提示
+            if (err instanceof SyntaxError && err.message.includes("Unexpected token")) {
+                rpLog('error', 'OPENING', `[fix#9] ⚠️ JSON解析错误：LLM返回的内容包含未清洗的markdown标记(**)，请检查LLM响应格式`);
+            }
+            addSystemMessage(`⚠️ 序章生成失败: ${err.message}`);
         }
     } else {
         // 没有生图 API Key，也生成序章
@@ -227,15 +244,16 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
             if (openingResult) {
                 openingRaw = openingResult.rawText || '';
                 openingStructured = openingResult.structured || null;
-                rpLog('info', 'OPENING', '序章生成完成（无生图）');
+                rpLog('info', 'OPENING', '[fix#8] 序章生成完成（无生图）');
             }
         } catch (err) {
-            rpLog('warn', 'OPENING', '序章生成失败: ' + err.message);
+            rpLog('error', 'OPENING', `[fix#8] 序章生成失败（无API Key模式）: ${err.message}`);
         }
     }
 
     // 兜底：如果 openingRaw 为空但 structured 有值，在这里渲染
     rpLog('info', 'TIMING', '=== 序章渲染检查 ===');
+    rpLog('info', 'IMG', `[fix#8] [DEBUG-RETRY] openingRaw长度=${openingRaw.length}, openingStructured=${openingStructured ? '存在' : 'null'}, characters=${openingStructured?.characters?.length || 0}`);
     if (!openingRaw && openingStructured && openingStructured.characters?.length > 0) {
         rpLog('info', 'INIT-REPLY', 'openingRaw 为空但 structured 有值，兜底渲染');
         let parsedMessages = App.structuredToMessages(openingStructured, 'msg_opening_');
@@ -246,8 +264,8 @@ App.initializeStory = async function(userInspiration, playerGender, playerName) 
         saveMessages().catch(() => {});
         rpLog('info', 'TIMING', '✅ 序章消息渲染完成（兜底）');
     } else if (!openingStructured || openingStructured.characters?.length === 0) {
-        rpLog('error', 'INIT-REPLY', '❌ 序章结构化结果为空，无法渲染');
-        addSystemMessage('⚠️ 序章生成失败，请重试');
+        rpLog('error', 'INIT-REPLY', '[fix#8] ❌ 序章结构化结果为空，无法渲染');
+        if (!openingRaw) addSystemMessage('⚠️ 序章生成失败，请重试');
     }
     // 如果 openingRaw 非空，上面已经渲染过了，不再重复
 
