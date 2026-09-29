@@ -69,7 +69,7 @@
             </div>
             <div class="form-group">
                 <label>故事灵感 <span style="color:#666;font-weight:normal;">（选填）</span></label>
-                <textarea id="story-prompt" placeholder="例如：我想和一个温柔的外科医生青梅竹马的故事。&#10;&#10;留空则完全随机生成世界观和角色。" rows="4"></textarea>
+                <textarea id="story-prompt" placeholder="例如：赛博朋克都市，四名底层拾荒者相遇，我扮演其中一人" rows="4"></textarea>
             </div>
             <div class="form-group">
                 <label>玩家角色名 <span style="color:#666;font-weight:normal;">（选填，留空则使用默认名）</span></label>
@@ -195,6 +195,10 @@
 <script src="/static/js/roleplay/unified-structured-output.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/roleplay-structured-agent.js?v={{ cb }}"></script>
 <script src="/static/js/roleplay/aliases.js?v={{ cb }}"></script>
+<!-- 空间系统模块 -->
+<script src="/static/js/roleplay/char-presence.js?v={{ cb }}"></script>
+<script src="/static/js/roleplay/player-intent.js?v={{ cb }}"></script>
+<script src="/static/js/roleplay/scene-position.js?v={{ cb }}"></script>
 
 <!-- Initialize App after all modules load -->
 <script>
