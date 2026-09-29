@@ -431,9 +431,12 @@ App.startFromArchive = async function(data, mode = 'continue') {
 
         // 切换到聊天界面
         showChatScreen();
-        renderMessages();
+        App.renderMessages();
         updateStoryHeader();
-        updateGenerationControls();
+
+        // 有消息则解锁发送按钮（序章完成后立即可用）
+        const sb = document.getElementById('send-btn');
+        if (sb && state.messages.length > 0) sb.disabled = false;
 
         // 如果有消息，渲染最后一条消息的建议选项
         if (state.messages.length > 0) {

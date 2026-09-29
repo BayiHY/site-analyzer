@@ -244,6 +244,12 @@ App.renderMessages = function() {
     if (App.isTTSEnabled()) {
         App.restoreAudioControls();
     }
+
+    // 有消息且无活跃发送 → 解锁发送按钮
+    if (state.messages.length > 0) {
+        const sb = document.getElementById('send-btn');
+        if (sb) sb.disabled = false;
+    }
 }
 
 App.saveSettings = function() {
