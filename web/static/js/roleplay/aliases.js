@@ -58,6 +58,7 @@ window.renderCharactersPanel = App.renderCharactersPanel;
 window.renderSettingsPanel = App.renderSettingsPanel;
 window.toggleCharDetails = App.toggleCharDetails;
 window.showCharPortrait = App.showCharPortrait;
+window.showCharFaceImage = App.showCharFaceImage;
 
 // 应用初始化
 window.loadSettings = App.loadSettings;

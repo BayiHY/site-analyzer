@@ -14,15 +14,63 @@ App.toggleCharDetails = function(index) {
     }
 }
 
-// 显示角色全身图
+// 显示角色全身图（聊天界面点头像用）
 App.showCharPortrait = function(index) {
+    rpLog('info', 'PORTRAIT', `showCharPortrait 被调用, index=${index}`);
     const c = state.characters[index];
-    if (!c) return;
+    rpLog('info', 'PORTRAIT', `角色数据: name="${c?.name}", faceImageUrl="${c?.faceImageUrl || 'null'}", portraitImageUrl="${c?.portraitImageUrl || 'null'}"`);
+    if (!c) {
+        rpLog('warn', 'PORTRAIT', '角色不存在');
+        return;
+    }
     
     const showUrl = c.portraitImageUrl || c.faceImageUrl;
+    rpLog('info', 'PORTRAIT', `将显示图片 URL: ${showUrl || '无可用图片'}`);
     if (showUrl) {
-        document.getElementById('img-overlay-img').src = showUrl;
-        document.getElementById('img-overlay').classList.add('show');
+        const overlay = document.getElementById('img-overlay-img');
+        const overlayContainer = document.getElementById('img-overlay');
+        if (overlay) {
+            overlay.src = showUrl;
+        } else {
+            rpLog('error', 'PORTRAIT', 'img-overlay-img 元素不存在');
+        }
+        if (overlayContainer) {
+            overlayContainer.classList.add('show');
+        } else {
+            rpLog('error', 'PORTRAIT', 'img-overlay 元素不存在');
+        }
+    } else {
+        rpLog('warn', 'PORTRAIT', '没有可用的图片 URL');
+    }
+}
+
+// 显示角色头像原图（角色列表点头像用）
+App.showCharFaceImage = function(index) {
+    rpLog('info', 'PORTRAIT', `showCharFaceImage 被调用, index=${index}`);
+    const c = state.characters[index];
+    rpLog('info', 'PORTRAIT', `角色数据: name="${c?.name}", faceImageUrl="${c?.faceImageUrl || 'null'}"`);
+    if (!c) {
+        rpLog('warn', 'PORTRAIT', '角色不存在');
+        return;
+    }
+
+    const showUrl = c.faceImageUrl;
+    rpLog('info', 'PORTRAIT', `将显示头像原图 URL: ${showUrl || '无可用图片'}`);
+    if (showUrl) {
+        const overlay = document.getElementById('img-overlay-img');
+        const overlayContainer = document.getElementById('img-overlay');
+        if (overlay) {
+            overlay.src = showUrl;
+        } else {
+            rpLog('error', 'PORTRAIT', 'img-overlay-img 元素不存在');
+        }
+        if (overlayContainer) {
+            overlayContainer.classList.add('show');
+        } else {
+            rpLog('error', 'PORTRAIT', 'img-overlay 元素不存在');
+        }
+    } else {
+        rpLog('warn', 'PORTRAIT', '没有可用的头像图片 URL');
     }
 }
 

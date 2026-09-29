@@ -97,9 +97,9 @@ App.renderCharactersPanel = function() {
         return `
             <div class="char-card ${isActive ? 'active' : ''}">
                 <div class="char-card-header">
-                    <div class="char-card-avatar" onclick="App.showCharPortrait(${i})">
+                    <div class="char-card-avatar" onclick="App.showCharFaceImage(${i})" style="cursor: pointer;" title="点击查看头像原图">
                         ${c.faceImageUrl
-                            ? `<img src="${c.faceImageUrl}" onerror="this.parentElement.textContent='🎭'" title="点击放大">`
+                            ? `<img src="${c.faceImageUrl}" onerror="this.parentElement.textContent='🎭'; rpLog('error', 'PORTRAIT', '头像加载失败: ${c.name}');" title="点击查看头像原图">`
                             : '🎭'}
                     </div>
                     <div>
