@@ -310,6 +310,9 @@ App.init = async function() {
         await loadMessages();
         showChatScreen();
         renderMessages();
+        // 从存档恢复时解锁发送按钮
+        const sb = document.getElementById('send-btn');
+        if (sb && state.messages.length > 0) sb.disabled = false;
         
         // 恢复场景背景图
         if (state.currentSceneBg) {

@@ -99,15 +99,21 @@ App.createCharacter = async function() {
     document.getElementById('send-btn').disabled = true;
     addSystemMessage('正在初始化故事世界...');
 
-    // ===== 并行执行：风格识别 + 故事初始化（互不阻塞）=====
+    // ===== 并行执行：风格识别 + 故事初始化（互不阻塞）=====-
     const storyPromise = (async () => {
         try {
             rpLog('info', 'CREATE', `开始两阶段初始化，玩家: ${playerName} (${playerGender})`);
             await App.initializeStory(storyPrompt, playerGender, playerName);
             rpLog('info', 'CREATE', '初始化完成，进入聊天阶段');
+            // 解锁发送按钮（与 generateCharactersAndStart 保持一致）
+            const sb = document.getElementById('send-btn');
+            if (sb) sb.disabled = false;
         } catch (err) {
             rpLog('error', 'CREATE', '初始化失败: ' + (err.message || String(err)));
             addSystemMessage('❌ 初始化失败: ' + (err.message || String(err)));
+            // 失败也解锁，让用户可以手动重试
+            const sb = document.getElementById('send-btn');
+            if (sb) sb.disabled = false;
         }
     })();
 
@@ -359,6 +365,7 @@ App.generateCharactersAndStart = async function() {
         } else if (!openingStructured || openingStructured.characters?.length === 0) {
             rpLog('error', 'INIT-REPLY', '❌ 序章结构化结果为空，无法渲染');
             addSystemMessage('⚠️ 序章生成失败，请重试');
+            addSystemMessage('💡 提示：你可以直接在下方输入框手动输入消息开始对话，无需等待序章生成成功');
         }
         // 如果 openingRaw 非空，上面已经渲染过了，不再重复
 
@@ -627,6 +634,7 @@ App.regenerateCharacters = async function() {
         } else if (!openingStructured || openingStructured.characters?.length === 0) {
             rpLog('error', 'INIT-REPLY', '❌ 序章结构化结果为空，无法渲染');
             addSystemMessage('⚠️ 序章生成失败，请重试');
+            addSystemMessage('💡 提示：你可以直接在下方输入框手动输入消息开始对话，无需等待序章生成成功');
         }
         // 如果 openingRaw 非空，上面已经渲染过了，不再重复
 
